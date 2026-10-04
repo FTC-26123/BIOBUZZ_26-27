@@ -30,7 +30,7 @@ public class red_cycle extends LinearOpMode {
     private final Pose flowerReady = poseFactory.of(18, 47, 180);
     private final Pose flower = poseFactory.of(13.6166, 47, 180);
     private final Pose shoot2 = poseFactory.of(31, 29, 46);
-    private final Pose point7 = poseFactory.of(13.7021, 91.8842, 256);
+    private final Pose pointpark = poseFactory.of(13.7021, 91.8842, 256);
 
     // Autonomous routine
     public Command autoRoutine() {
@@ -41,7 +41,7 @@ public class red_cycle extends LinearOpMode {
                 follow(follower, flowerReady()),
                 follow(follower, flower()),
                 follow(follower, shoot2()),
-                follow(follower, path7())
+                follow(follower, park())
         );
     }
 
@@ -106,7 +106,7 @@ public class red_cycle extends LinearOpMode {
         return Paths.line(flower, shoot2).linear(flower, shoot2);
     }
 
-    public Path path7() {
-        return Paths.line(shoot2, point7).linear(shoot2, point7);
+    public Path park() {
+        return Paths.line(shoot2, pointpark).linear(shoot2, pointpark);
     }
 }
