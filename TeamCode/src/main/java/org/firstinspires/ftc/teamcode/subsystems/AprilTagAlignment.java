@@ -60,12 +60,8 @@ public class AprilTagAlignment {
         error = goalX - limelight.getHorizontalDelta();
         lastError = error;
     }
-    public void update(Gamepad gamepad1){
+    public void update(){
         handlePDupdates();
-        handleIncrements(gamepad1);
-        handleAutoRotation(gamepad1);
-        handleAutoStrafe(gamepad1);
-
     }
     private void handlePDupdates(){
         lastTime = curTime;
@@ -98,60 +94,60 @@ public class AprilTagAlignment {
             strafeOutput = 0;
         }
     }
-    private void handleAutoRotation(Gamepad gamepad1){
-        if (gamepad1.left_trigger>0.3) {
-            if (limelight.isTargetVisible()){
-                rotationMultiplier = 0;
-                if (Math.abs(error) < angleTolerance){
-                    addedRotation = 0;
-                }
-                else {
-                    addedRotation = -output;
-                }
-            }
-            else {
-                rotationMultiplier = 1;
+
+    public void autoRotate(){
+        if (limelight.isTargetVisible()){
+            rotationMultiplier = 0;
+            if (Math.abs(error) < angleTolerance){
                 addedRotation = 0;
             }
-
-        } else {
-            rotationMultiplier = 1;
-            addedRotation = 0;
+            else {
+                addedRotation = -output;
+            }
+        }
+        else {
+            setManualRotation();
         }
     }
-    private void handleAutoStrafe(Gamepad gamepad1){
-        if (gamepad1.left_bumper) {
-            if (limelight.isTargetVisible()){
-                strafeMultiplier = 0;
-                if (Math.abs(strafeError) < strafeTolerance){
-                    addedStrafe = 0;
-                } else {
-                    addedStrafe = strafeOutput;
-                }
-            } else {
-                strafeMultiplier = 1;
+
+    public void setManualRotation(){
+        rotationMultiplier = 1;
+        addedRotation = 0;
+    }
+
+
+    public void autoStrafe(){
+        if (limelight.isTargetVisible()){
+            strafeMultiplier = 0;
+            if (Math.abs(strafeError) < strafeTolerance){
                 addedStrafe = 0;
+            } else {
+                addedStrafe = strafeOutput;
             }
         } else {
-            strafeMultiplier = 1;
-            addedStrafe = 0;
+            setManualStrafing();
         }
     }
-    private void handleIncrements(Gamepad gamepad1){
-        if (gamepad1.dpadUpWasPressed()){
-            modifiableValues[modifiableIndex] += stepSizes[stepIndex];
-            syncModifiableValues();
-        }
-        if (gamepad1.dpadDownWasPressed()){
-            modifiableValues[modifiableIndex] -= stepSizes[stepIndex];
-            syncModifiableValues();
-        }
-        if (gamepad1.dpadLeftWasPressed()){
-            modifiableIndex = (modifiableIndex + 1) % modifiableValues.length;
-        }
-        if (gamepad1.bWasPressed()){
-            stepIndex = (stepIndex + 1) % stepSizes.length;
-        }
+
+    public void setManualStrafing(){
+        strafeMultiplier = 1;
+        addedStrafe = 0;
+    }
+
+    public void addIndexValue(){
+        modifiableValues[modifiableIndex] += stepSizes[stepIndex];
+        syncModifiableValues();
+    }
+    public void subIndexValue(){
+        modifiableValues[modifiableIndex] -= stepSizes[stepIndex];
+        syncModifiableValues();
+    }
+    public void switchPIDModifyingValue(){
+        modifiableIndex = (modifiableIndex + 1) % modifiableValues.length;
+    }
+
+    public void switchStepSize(){
+        modifiableIndex = (modifiableIndex + 1) % modifiableValues.length;
     }
     private void syncModifiableValues() {
         kP_rotation = modifiableValues[0];

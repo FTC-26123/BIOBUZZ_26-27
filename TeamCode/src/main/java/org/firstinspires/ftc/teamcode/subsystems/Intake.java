@@ -47,23 +47,8 @@ public class Intake {
         windmill.setPower(0);
     }
 
-    public void update(Gamepad gamepad2){
-        handleManualIntakeControl(gamepad2);
-    }
     public String getIntakeStatus() {
         return intakeStatus;
-    }
-    private void handleManualIntakeControl(Gamepad gamepad2){
-        if (gamepad2.left_trigger>0.5){
-            //Starting intake
-            start();
-        } else if (gamepad2.back) {
-            //Reversing intake
-            out();
-        } else if (gamepad2.left_bumper) {
-            //Stopping intake
-            stop();
-        }
     }
 
 
