@@ -90,8 +90,8 @@ public class MecanumDrive {
                 rx *= aprilTagAlignment.getRotationMultiplier();
                 rx += aprilTagAlignment.getAddedRotation();
 
-                x *= aprilTagAlignment.getStrafeMultiplier();
-                x += aprilTagAlignment.getAddedStrafe();
+//                x *= aprilTagAlignment.getStrafeMultiplier();
+//                x += aprilTagAlignment.getAddedStrafe();
             }
             if (odometryMovement != null) {
                 x *= odometryMovement.getStrafeMultiplier();

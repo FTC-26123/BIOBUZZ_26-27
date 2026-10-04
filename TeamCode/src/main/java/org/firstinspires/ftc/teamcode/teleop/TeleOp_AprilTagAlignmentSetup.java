@@ -65,8 +65,8 @@ public class TeleOp_AprilTagAlignmentSetup extends OpMode {
         telemetry.addLine("----------------April Tags ---------------");
         telemetry.addData("kP_Rotation(G1DpadUp/Down)", aprilTagAlignment.getkP_rotation());
         telemetry.addData("kD_Rotation(G1DpadUp/Down)", aprilTagAlignment.getkD_rotation());
-        telemetry.addData("kP_Strafe(G1DpadUp/Down)", aprilTagAlignment.getkP_strafe());
-        telemetry.addData("kD_Strafe(G1DpadUp/Down)", aprilTagAlignment.getkD_strafe());
+//        telemetry.addData("kP_Strafe(G1DpadUp/Down)", aprilTagAlignment.getkP_strafe());
+//        telemetry.addData("kD_Strafe(G1DpadUp/Down)", aprilTagAlignment.getkD_strafe());
         telemetry.addData("Step Size(G1B)", aprilTagAlignment.getStepSize());
         telemetry.addData("Currently Modifying(G1DpadLeft)", aprilTagAlignment.getCurrentlyModifying());
         telemetry.addData("HorAngleDelta", limelight.getHorizontalDelta());
