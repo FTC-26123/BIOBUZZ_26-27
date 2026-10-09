@@ -78,39 +78,7 @@ public class Shooter {
     }
 
     public void update(Gamepad gamepad2){
-        handleManualShootingControl(gamepad2);
         handleAutoShooting();
-        handlePresets(gamepad2);
-        handleManualGateControl(gamepad2);
-    }
-    private void handlePresets(Gamepad gamepad2){
-        if(gamepad2.dpad_up){
-            //Very far
-            switchSpeed(2000);
-        }
-        if(gamepad2.dpad_right){
-            //Far
-            switchSpeed(1500);
-        }
-        if(gamepad2.dpad_down){
-            //Close
-            switchSpeed(1000);
-        }
-    }
-    private void handleManualShootingControl(Gamepad gamepad2){
-        if (gamepad2.right_trigger>0.5) {
-            start();
-        } else if (gamepad2.right_bumper){
-            stop();
-        }
-    }
-    private void handleManualGateControl(Gamepad gamepad2){
-        if (gamepad2.x) {
-            openGate();
-        }
-        else if (gamepad2.y) {
-            closeGate();
-        }
     }
     private void handleAutoShooting(){
         //If motor speed is above/equal to target speed -50 then start the shooting process

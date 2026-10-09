@@ -120,14 +120,9 @@ public class MecanumDrive {
     public double getSpeedMultiplier() {
         return speedMultiplier;
     }
-    public void update(Gamepad gamepad1){
-        handleDpadSpeedSwitching(gamepad1);
-    }
-    private void handleDpadSpeedSwitching(Gamepad gamepad1){
-        if (gamepad1.dpadRightWasPressed()){
-            drivingSpeedsIndex = (drivingSpeedsIndex+1) % drivingSpeeds.length;
-            setSpeedMultiplier(drivingSpeeds[drivingSpeedsIndex]);
-        }
 
+    public void switchSpeed(){
+        drivingSpeedsIndex = (drivingSpeedsIndex+1) % drivingSpeeds.length;
+        setSpeedMultiplier(drivingSpeeds[drivingSpeedsIndex]);
     }
 }

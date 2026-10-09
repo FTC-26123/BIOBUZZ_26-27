@@ -8,14 +8,16 @@ public class AprilTagAlignment {
     private Limelight limelight;
     private ElapsedTime runtime;
 
+
+    // ------------------------ Rotation Locked ----------------
     double rotationMultiplier = 1;
     double addedRotation = 0;
 
-    /*
+    // ------------------------ Strafe Locked ------------------
     double strafeMultiplier = 1;
     double addedStrafe = 0;
-    */
 
+    // ------------------------ Rotation PD Controller ---------
     double kP_rotation = 0.02;
     double kD_rotation = 0.0;
 
@@ -25,7 +27,7 @@ public class AprilTagAlignment {
     double error = 0;
     double lastError = 0;
 
-    /*
+    // ------------------------ Strafe PD Controller -----------
     double kP_strafe = 1.5;
     double kD_strafe = 0.05;
 
@@ -33,9 +35,7 @@ public class AprilTagAlignment {
     double lastStrafeError = 0;
     double strafeDerivative = 0;
     double strafeOutput = 0;
-
-    double strafeTolerance = 0.02;
-    */
+    double strafeTolerance = 0.02; // 2cm tolerance
 
     double goalX = 0;
     double angleTolerance = 0.2;
@@ -47,12 +47,7 @@ public class AprilTagAlignment {
     int stepIndex = 2;
 
     double output = 0;
-
-    double[] modifiableValues = {
-            kP_rotation,
-            kD_rotation
-    };
-
+    double[] modifiableValues = {kP_rotation, kD_rotation, kP_strafe, kD_strafe};
     int modifiableIndex = 0;
 
     private boolean targetWasVisible = false;
@@ -63,7 +58,7 @@ public class AprilTagAlignment {
     private static final double MAX_STRAFE_OUTPUT = 1.0;
     */
 
-    public void init(Limelight limelight, ElapsedTime runtime) {
+    public void init(Limelight limelight, ElapsedTime runtime){
         this.limelight = limelight;
         this.runtime = runtime;
     }
@@ -93,12 +88,6 @@ public class AprilTagAlignment {
     public void update(Gamepad gamepad1) {
 
         handlePDupdates();
-        handleIncrements(gamepad1);
-        handleAutoRotation(gamepad1);
-
-        /*
-        handleAutoStrafe(gamepad1);
-        */
     }
 
     private void handlePDupdates() {
@@ -193,105 +182,76 @@ public class AprilTagAlignment {
             rotationDerivative = 0;
             output = 0;
 
-            /*
             strafeError = 0;
             lastStrafeError = 0;
             strafeDerivative = 0;
             strafeOutput = 0;
-            */
         }
 
         targetWasVisible = targetVisible;
     }
 
-    private void handleAutoRotation(Gamepad gamepad1) {
-
-        if (gamepad1.left_trigger > 0.3) {
-
-            if (limelight.isTargetVisible()) {
-
-                rotationMultiplier = 0;
-
-                if (Math.abs(error) < angleTolerance) {
-                    addedRotation = 0;
-                } else {
-                    addedRotation = -output;
-                }
-
-            } else {
-
-                rotationMultiplier = 1;
+    public void autoRotate(){
+        if (limelight.isTargetVisible()){
+            rotationMultiplier = 0;
+            if (Math.abs(error) < angleTolerance){
                 addedRotation = 0;
             }
-
-        } else {
-
-            rotationMultiplier = 1;
-            addedRotation = 0;
-        }
-    }
-
-    /*
-    private void handleAutoStrafe(Gamepad gamepad1) {
-
-        if (gamepad1.left_bumper) {
-
-            if (limelight.isTargetVisible()) {
-
-                strafeMultiplier = 0;
-
-                if (Math.abs(strafeError) < strafeTolerance) {
-                    addedStrafe = 0;
-                } else {
-                    addedStrafe = strafeOutput;
-                }
-
-            } else {
-
-                strafeMultiplier = 1;
-                addedStrafe = 0;
+            else {
+                addedRotation = -output;
             }
-
-        } else {
-
-            strafeMultiplier = 1;
-            addedStrafe = 0;
+        }
+        else {
+            setManualRotation();
         }
     }
-    */
 
-    private void handleIncrements(Gamepad gamepad1) {
+    public void setManualRotation(){
+        rotationMultiplier = 1;
+        addedRotation = 0;
+    }
 
-        if (gamepad1.dpadUpWasPressed()) {
-            modifiableValues[modifiableIndex] += stepSizes[stepIndex];
-            syncModifiableValues();
+
+    public void autoStrafe(){
+        if (limelight.isTargetVisible()){
+            strafeMultiplier = 0;
+            if (Math.abs(strafeError) < strafeTolerance){
+                addedStrafe = 0;
+            } else {
+                addedStrafe = strafeOutput;
+            }
+        } else {
+            setManualStrafing();
         }
+    }
 
-        if (gamepad1.dpadDownWasPressed()) {
-            modifiableValues[modifiableIndex] -= stepSizes[stepIndex];
-            syncModifiableValues();
-        }
+    public void setManualStrafing(){
+        strafeMultiplier = 1;
+        addedStrafe = 0;
+    }
 
-        if (gamepad1.dpadLeftWasPressed()) {
-            modifiableIndex =
-                    (modifiableIndex + 1) % modifiableValues.length;
-        }
+    public void addIndexValue(){
+        modifiableValues[modifiableIndex] += stepSizes[stepIndex];
+        syncModifiableValues();
+    }
+    public void subIndexValue(){
+        modifiableValues[modifiableIndex] -= stepSizes[stepIndex];
+        syncModifiableValues();
+    }
+    public void switchPIDModifyingValue(){
+        modifiableIndex = (modifiableIndex + 1) % modifiableValues.length;
+    }
 
-        if (gamepad1.bWasPressed()) {
-            stepIndex =
-                    (stepIndex + 1) % stepSizes.length;
-        }
+    public void switchStepSize(){
+        modifiableIndex = (modifiableIndex + 1) % modifiableValues.length;
     }
 
     private void syncModifiableValues() {
 
         kP_rotation = modifiableValues[0];
         kD_rotation = modifiableValues[1];
-
-        /*
         kP_strafe = modifiableValues[2];
         kD_strafe = modifiableValues[3];
-        */
     }
 
     private double clamp(double value, double min, double max) {
@@ -301,29 +261,11 @@ public class AprilTagAlignment {
     public double getRotationMultiplier() {
         return rotationMultiplier;
     }
-
-    public double getAddedRotation() {
-        return addedRotation;
-    }
-
-    /*
-    public double getStrafeMultiplier() {
-        return strafeMultiplier;
-    }
-
-    public double getAddedStrafe() {
-        return addedStrafe;
-    }
-
-    public double getkP_strafe() {
-        return kP_strafe;
-    }
-
-    public double getkD_strafe() {
-        return kD_strafe;
-    }
-    */
-
+    public double getAddedRotation(){return addedRotation;}
+    public double getStrafeMultiplier(){return strafeMultiplier;}
+    public double getAddedStrafe(){return addedStrafe;}
+    public double getkP_strafe(){return kP_strafe;}
+    public double getkD_strafe(){return kD_strafe;}
     public double getStepSize() {
         return stepSizes[stepIndex];
     }
@@ -337,17 +279,8 @@ public class AprilTagAlignment {
     }
 
     public String getCurrentlyModifying() {
-
-        String[] names = {
-                "kP_rotation",
-                "kD_rotation"
-
-                /*
-                "kP_strafe",
-                "kD_strafe"
-                */
-        };
-
+        String[] names = {"kP_rotation", "kD_rotation", "kP_strafe", "kD_strafe"};
         return names[modifiableIndex];
     }
 }
+
