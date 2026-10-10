@@ -108,6 +108,14 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
 
         telemetry.addLine("---------------- Calibration ---------------");
         telemetry.addData("Calibration Status G1 Logo/Guide", tuningState.toString());
+        if (auto_kP_rot!=0 && auto_kD_rot!=0){
+            telemetry.addData("Tuned kP-Rot", auto_kP_rot);
+            telemetry.addData("Tuned kD-Rot", auto_kD_rot);
+        }
+        if (auto_kP_str!=0 && auto_kD_str!=0 && tuningState == TuningState.DONE){
+            telemetry.addData("Tuned kP-Str", auto_kP_str);
+            telemetry.addData("Tuned kD-Str", auto_kD_str);
+        }
         telemetry.addData("Zero Crossings Count", zeroCrossings);
 
         telemetry.addLine("---------------- Calculated Parameters ---------------");
@@ -254,7 +262,7 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
 
                 // After 7 zero-crossings (3 full wave cycles), compute Tu and Ku constants
                 if (zeroCrossings >= 7) {
-                    double Tu = (curTime - firstZeroCrossingTime) / ((zeroCrossings - 1) / 2);
+                    double Tu = (curTime - firstZeroCrossingTime) / ((zeroCrossings - 1) / 2.0);
 
                     double avgDev = 0;
                     for (double d : waveDeviances) avgDev += d;
