@@ -1,88 +1,125 @@
 package org.firstinspires.ftc.teamcode.subsystems;
-import static org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.telemetry;
 
-import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.Servo;
 
-
+/**
+ * Subsystem controlling the high-speed launcher flywheel motor and servo gate.
+ * Interacts with Intake to automatically feed game elements when target flywheel velocity is reached.
+ */
 public class Shooter {
 
-    //Setting up hardware
+    // ---------------------- Hardware & Subsystem Dependencies ----------------------
     private DcMotorEx shooter;
     private Servo gate;
     private Intake intake;
 
-
-    //Gate positions
+    // ---------------------- Gate Servo Positions ----------------------
     double GATE_OPEN = 0.27;
     double GATE_CLOSED = 0.5;
 
-    //Status variables
+    // ---------------------- Status Variables ----------------------
     String shooterStatus = "Off";
     String gateStatus = "Closed";
 
-    //Current target speed, zero is default
-    double targetLaunchPower = 0;
+    // Predefined launch velocity powers (encoder ticks per second)
+    double[] launchingPowers = {2000, 1500, 1000};
+    int launchingIndex = 0;
 
-    public void init(HardwareMap hwMap, Intake intake){
-        //Map hardware
+    /**
+     * Initializes launcher flywheel motor and gate servo from hardware map.
+     */
+    public void init(HardwareMap hwMap, Intake intake) {
         this.intake = intake;
         shooter = hwMap.get(DcMotorEx.class, "launcher");
-
         gate = hwMap.get(Servo.class, "gate");
-        //Set direction
         shooter.setDirection(DcMotorSimple.Direction.REVERSE);
-
     }
-    public void stop(){
-        //Stop all motion and close the gate
+
+    /**
+     * Stops launcher motor, closes gate servo, and stops intake.
+     */
+    public void stop() {
         shooterStatus = "Off";
         shooter.setVelocity(0);
         intake.stop();
         closeGate();
     }
-    public void switchSpeed(double speed){
-        targetLaunchPower = speed;
+
+    /**
+     * Cycles target launch velocity power preset (2000 -> 1500 -> 1000 ticks/sec).
+     */
+    public void switchSpeed() {
+        launchingIndex = (launchingIndex + 1) % launchingPowers.length;
     }
-    public void openGate(){
+
+    /**
+     * Opens the launcher gate servo to allow game elements to pass into flywheel.
+     */
+    public void openGate() {
         gateStatus = "Open";
         gate.setPosition(GATE_OPEN);
     }
-    public void closeGate(){
+
+    /**
+     * Closes the launcher gate servo.
+     */
+    public void closeGate() {
         gateStatus = "Closed";
         gate.setPosition(GATE_CLOSED);
     }
 
-    public void start(){
+    /**
+     * Spools up launcher flywheel motor to active target velocity.
+     */
+    public void start() {
         shooterStatus = "Starting";
-        shooter.setVelocity(targetLaunchPower);
-    }
-    public double getCurrentSpeed(){
-        return shooter.getVelocity();
-    }
-    public double getTargetLaunchPower(){
-        return targetLaunchPower;
-    }
-    public String getShooterStatus(){
-        return shooterStatus;
-    }
-    public String getGateStatus(){
-        return gateStatus;
-    }
-    public boolean isReady(){
-        return shooter.getVelocity()>=(targetLaunchPower-50);
+        shooter.setVelocity(launchingPowers[launchingIndex]);
     }
 
-    public void update(Gamepad gamepad2){
+    /**
+     * @return Current real-time motor velocity in encoder ticks per second.
+     */
+    public double getCurrentSpeed() {
+        return shooter.getVelocity();
+    }
+
+    /**
+     * @return Target launch velocity preset in encoder ticks per second.
+     */
+    public double getTargetLaunchPower() {
+        return launchingPowers[launchingIndex];
+    }
+
+    public String getShooterStatus() {
+        return shooterStatus;
+    }
+
+    public String getGateStatus() {
+        return gateStatus;
+    }
+
+    /**
+     * @return True if flywheel velocity is within 50 ticks/sec of target speed.
+     */
+    public boolean isReady() {
+        return shooter.getVelocity() >= (launchingPowers[launchingIndex] - 50);
+    }
+
+    /**
+     * Updates automated shooting sequence on every loop.
+     */
+    public void update() {
         handleAutoShooting();
     }
-    private void handleAutoShooting(){
-        //If motor speed is above/equal to target speed -50 then start the shooting process
-        if (targetLaunchPower>0 && isReady()){
+
+    /**
+     * Automatically opens gate and starts intake feeder when flywheel reaches target velocity.
+     */
+    private void handleAutoShooting() {
+        if (launchingPowers[launchingIndex] > 0 && isReady()) {
             shooterStatus = "Shooting";
             intake.start();
             openGate();

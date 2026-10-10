@@ -12,12 +12,11 @@ import org.firstinspires.ftc.teamcode.subsystems.MecanumDrive;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
 
 /**
- * Standard dual-controller TeleOp OpMode for competition driving.
- * Driver 1 controls Mecanum driving, speed multiplier switching, and AprilTag auto-rotation.
- * Driver 2 controls intake roller/windmill, shooter flywheel speeds, and servo gate release.
+ * Single-controller TeleOp OpMode for solo driver operation.
+ * Maps driving, speed switching, intake, shooter flywheel, gate servo, and vision alignment onto Gamepad 1.
  */
 @TeleOp
-public class TeleOp_BaseCode extends OpMode {
+public class TeleOp_BaseCodeOneController extends OpMode {
 
     // ---------------------- Subsystems & Hardware Objects ----------------------
     public Shooter shooter = new Shooter();
@@ -49,7 +48,7 @@ public class TeleOp_BaseCode extends OpMode {
     }
 
     /**
-     * Main TeleOp frame loop handling driver controls, subsystem updates, and status telemetry.
+     * Main TeleOp frame loop handling single-driver inputs, subsystem updates, and telemetry output.
      */
     @Override
     public void loop() {
@@ -59,27 +58,26 @@ public class TeleOp_BaseCode extends OpMode {
         handleAutoRotation(gamepad1);
         // handleAutoStrafe(gamepad1);
 
-        // Driver 1 Drivetrain Control
+        // Gamepad 1 Mecanum Drivetrain Control
         handleDrivtrainDpadSpeedSwitching(gamepad1);
         driveTrain.drive(gamepad1.left_stick_y, gamepad1.left_stick_x, gamepad1.right_stick_x);
 
-        // Driver 2 Intake Control
-        handleManualIntakeControl(gamepad2);
+        // Gamepad 1 Intake Control
+        handleManualIntakeControl(gamepad1);
 
-        // Driver 2 Shooter Flywheel & Gate Control
-        handleManualShootingControl(gamepad2);
-        handleShooterSpeedControl(gamepad2);
-        handleManualGateControl(gamepad2);
+        // Gamepad 1 Shooter Flywheel & Gate Control
+        handleManualShootingControl(gamepad1);
+        handleShooterSpeedControl();
+        handleManualGateControl(gamepad1);
         shooter.update();
 
         // ---------------- Telemetry Status Output ----------------
         telemetry.addData("Robot Speed Multiplier G1 Dpad Right", driveTrain.getSpeedMultiplier());
 
-        telemetry.addLine("---------------- Statuses ---------------");
-        telemetry.addData("Shooter Status G2 RT", shooter.getShooterStatus());
-        telemetry.addData("Gate Status G2 X/Y", shooter.getGateStatus());
-        telemetry.addData("Intake Status G2 LT/Back/LB", intake.getIntakeStatus());
-        telemetry.addData("Target Launch Power G2 Dpad Up", shooter.getTargetLaunchPower());
+        telemetry.addData("Shooter Status G1 RT/RB", shooter.getShooterStatus());
+        telemetry.addData("Gate Status G1 X/Y", shooter.getGateStatus());
+        telemetry.addData("Intake Status G1 LT/Back/LB", intake.getIntakeStatus());
+        telemetry.addData("Target Launch Power G1 Dpad Up", shooter.getTargetLaunchPower());
         telemetry.addData("Current Motor Speed", shooter.getCurrentSpeed());
 
         telemetry.addData("Runtime:", TeleOpRuntime.seconds());
@@ -87,36 +85,36 @@ public class TeleOp_BaseCode extends OpMode {
         telemetry.update();
     }
 
-    // ---------------------- Driver Input Handlers ----------------------
+    // ---------------------- Single Driver Input Handlers ----------------------
 
-    private void handleManualShootingControl(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.5) {
+    private void handleManualShootingControl(Gamepad gamepad1) {
+        if (gamepad1.right_trigger > 0.5) {
             shooter.start();
-        } else if (gamepad2.right_bumper) {
+        } else if (gamepad1.right_bumper) {
             shooter.stop();
         }
     }
 
-    private void handleShooterSpeedControl(Gamepad gamepad2) {
-        if (gamepad2.dpadUpWasPressed()) {
+    private void handleShooterSpeedControl() {
+        if (gamepad1.dpadUpWasPressed()) {
             shooter.switchSpeed();
         }
     }
 
-    private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
+    private void handleManualGateControl(Gamepad gamepad1) {
+        if (gamepad1.x) {
             shooter.openGate();
-        } else if (gamepad2.y) {
+        } else if (gamepad1.y) {
             shooter.closeGate();
         }
     }
 
-    private void handleManualIntakeControl(Gamepad gamepad2) {
-        if (gamepad2.left_trigger > 0.5) {
+    private void handleManualIntakeControl(Gamepad gamepad1) {
+        if (gamepad1.left_trigger > 0.5) {
             intake.start();
-        } else if (gamepad2.back) {
+        } else if (gamepad1.back) {
             intake.out();
-        } else if (gamepad2.left_bumper) {
+        } else if (gamepad1.left_bumper) {
             intake.stop();
         }
     }
