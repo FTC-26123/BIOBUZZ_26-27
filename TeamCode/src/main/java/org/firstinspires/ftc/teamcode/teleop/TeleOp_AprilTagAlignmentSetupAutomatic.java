@@ -38,7 +38,7 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
     private TuningState tuningState = TuningState.IDLE;
 
     // ---------------------- Relay Calibration Parameters ----------------------
-    private final double TEST_POWER = 0.20; // Constant relay power step (20%)
+    private final double TEST_POWER = 0.40; // Increased relay test power to overcome motor friction
     private double zeroCrossings = 0;
     private double firstZeroCrossingTime = 0;
 
@@ -46,6 +46,8 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
     private double lastError = 0;
     private double currentMaxDeviance = 0;
     private List<Double> waveDeviances = new ArrayList<>();
+    private double targetLostTime = 0;
+    private static final double TARGET_LOST_TIMEOUT = 0.3;
 
     // ---------------------- Calibrated PID Outputs ----------------------
     private double auto_kP_rot = 0;
@@ -107,12 +109,14 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
         telemetry.addData("Current Motor Speed", shooter.getCurrentSpeed());
 
         telemetry.addLine("---------------- Calibration ---------------");
-        telemetry.addData("Calibration Status G1 Logo/Guide", tuningState.toString());
-        if (auto_kP_rot!=0 && auto_kD_rot!=0){
+        telemetry.addData("Calibration Status [G1 Guide or A]", tuningState.toString());
+        telemetry.addData("AprilTag Visible", limelight.isTargetVisible());
+        telemetry.addData("Horiz Error (deg)", limelight.getHorizontalDelta());
+        if (auto_kP_rot != 0 && auto_kD_rot != 0) {
             telemetry.addData("Tuned kP-Rot", auto_kP_rot);
             telemetry.addData("Tuned kD-Rot", auto_kD_rot);
         }
-        if (auto_kP_str!=0 && auto_kD_str!=0 && tuningState == TuningState.DONE){
+        if (auto_kP_str != 0 && auto_kD_str != 0 && tuningState == TuningState.DONE) {
             telemetry.addData("Tuned kP-Str", auto_kP_str);
             telemetry.addData("Tuned kD-Str", auto_kD_str);
         }
@@ -227,23 +231,42 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
         firstZeroCrossingTime = 0;
         currentMaxDeviance = 0;
         waveDeviances.clear();
+        lastError = 0;
     }
 
     /**
      * Executes real-time Ziegler-Nichols relay oscillation testing to determine ultimate period and gain.
      */
     private void handleLiveCalibration() {
-        if (!limelight.isTargetVisible()) {
-            driveTrain.drive(0, 0, 0);
-            return;
-        }
-
         double curTime = TeleOpRuntime.seconds();
+        if (!limelight.isTargetVisible()) {
+            if (targetLostTime == 0) {
+                targetLostTime = TeleOpRuntime.seconds();
+            }
+            if (curTime - targetLostTime > TARGET_LOST_TIMEOUT) {
+                driveTrain.drive(0, 0, 0);
+                telemetry.addData("CALIBRATION ALERT", "NO APRILTAG VISIBLE - POINT CAMERA AT TAG!");
+                return;
+            }
+            else {
+                if (tuningState == TuningState.TUNING_ROT){
+                    double rotDrivetrainValue = (lastError > 0) ? -TEST_POWER : TEST_POWER;
+                    driveTrain.drive(0, 0, rotDrivetrainValue);
+                } else if (tuningState == TuningState.TUNING_STRAFE) {
+                    double strafeDrivetrainValue = (lastError > 0) ? TEST_POWER : -TEST_POWER;
+                    driveTrain.drive(0, strafeDrivetrainValue, 0);
+                }
+                return;
+            }
+        } else {
+            targetLostTime = 0;
+        }
 
         // ---------------- Rotation Calibration ----------------
         if (tuningState == TuningState.TUNING_ROT) {
             currentError = 0 - limelight.getHorizontalDelta();
-            double rotDrivetrainValue = (currentError > 0) ? TEST_POWER : -TEST_POWER;
+            double rotDrivetrainValue = (currentError > 0) ? -TEST_POWER :
+                    TEST_POWER;
             driveTrain.drive(0, 0, rotDrivetrainValue);
 
             currentMaxDeviance = Math.max(currentMaxDeviance, Math.abs(currentError));
@@ -328,12 +351,16 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
     }
 
     /**
-     * Triggers auto-calibration on Gamepad 1 Guide button or processes driver teleop driving when idle.
+     * Triggers auto-calibration on Gamepad 1 Guide or A button or processes driver teleop driving when idle.
      */
     private void handleAutoCalibration(Gamepad gamepad1) {
-        if (gamepad1.guideWasPressed() && tuningState == TuningState.IDLE) {
+        if ((gamepad1.guideWasPressed() || gamepad1.aWasPressed()) && tuningState == TuningState.IDLE) {
             tuningState = TuningState.TUNING_ROT;
             clearWaveCounters();
+            if (limelight.isTargetVisible()) {
+                currentError = 0 - limelight.getHorizontalDelta();
+                lastError = currentError;
+            }
         }
 
         if (tuningState == TuningState.TUNING_ROT || tuningState == TuningState.TUNING_STRAFE) {

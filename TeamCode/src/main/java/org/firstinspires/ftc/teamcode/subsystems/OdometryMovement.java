@@ -190,25 +190,14 @@ public class OdometryMovement {
                 stopMoving();
             } else {
                 double kP = 0.2;
-                forwardMultiplier = 0; // Lock manual joystick y-axis
-                addedForward = -(kP * error); // Negative power due to MecanumDrive -y equation
+                double power = kP * error;
+                power = Math.max(-0.8, Math.min(0.8, power)); // Clamp max speed to 0.8
+                if (Math.abs(power) < 0.20) {
+                    power = 0.20 * Math.signum(error);        // Anti-stall power floor (0.20)
+                }
 
-                // Clamp maximum output magnitude to 0.8
-                if ((Math.min(Math.abs(addedForward), 0.8)) != Math.abs(addedForward)) {
-                    if (error < 0) {
-                        addedForward = 0.8;
-                    } else {
-                        addedForward = -0.8;
-                    }
-                }
-                // Enforce minimum output power floor of 0.20 to prevent stalling
-                if ((Math.max(Math.abs(addedForward), 0.20)) != Math.abs(addedForward)) {
-                    if (error < 0) {
-                        addedForward = 0.20;
-                    } else {
-                        addedForward = -0.20;
-                    }
-                }
+                forwardMultiplier = 0; // Lock manual joystick y-axis
+                addedForward = -power;  // Negative power due to MecanumDrive -y equation
                 strafeMultiplier = 0;
                 addedStrafe = 0;
             }
@@ -220,25 +209,14 @@ public class OdometryMovement {
                 stopMoving();
             } else {
                 double kP = 0.2;
-                strafeMultiplier = 0; // Lock manual joystick x-axis
-                addedStrafe = kP * error;
+                double power = kP * error;
+                power = Math.max(-0.8, Math.min(0.8, power)); // Clamp max speed to 0.8
+                if (Math.abs(power) < 0.20) {
+                    power = 0.20 * Math.signum(error);        // Anti-stall power floor (0.20)
+                }
 
-                // Clamp maximum output magnitude to 0.8
-                if ((Math.min(Math.abs(addedStrafe), 0.8)) != Math.abs(addedStrafe)) {
-                    if (error < 0) {
-                        addedStrafe = -0.8;
-                    } else {
-                        addedStrafe = 0.8;
-                    }
-                }
-                // Enforce minimum output power floor of 0.20 to prevent stalling
-                if ((Math.max(Math.abs(addedStrafe), 0.20)) != Math.abs(addedStrafe)) {
-                    if (error < 0) {
-                        addedStrafe = -0.20;
-                    } else {
-                        addedStrafe = 0.20;
-                    }
-                }
+                strafeMultiplier = 0; // Lock manual joystick x-axis
+                addedStrafe = power;
                 forwardMultiplier = 0;
                 addedForward = 0;
             }
