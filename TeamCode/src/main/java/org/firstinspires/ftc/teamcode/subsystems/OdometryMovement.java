@@ -12,60 +12,47 @@ import org.firstinspires.ftc.teamcode.odometry.GoBildaPinpointDriver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Subsystem responsible for closed-loop distance movements using the goBILDA Pinpoint Odometry Computer.
+ * Integrates directly with MecanumDrive using multiplier locks and power offsets.
+ */
 public class OdometryMovement {
 
     private static final Logger log = LoggerFactory.getLogger(OdometryMovement.class);
     private GoBildaPinpointDriver pinpoint;
     private MecanumDrive driveTrain;
 
+    // --------------------- Input & Target Variables ---------------------
     double inputDistance = 0;
     int[] increments = {1, 2, 6, 12};
     int incrementIndex = 0;
     String[] direction = {"forward", "strafe"};
     int directionIndex = 0;
 
-    double error = 0;
+    double error = 0; // Current distance error (target - traveled)
 
+    // --------------------- Drivetrain Multipliers & Offsets ---------------------
+    double strafeMultiplier = 1;  // 1 = manual joystick enabled, 0 = locked for auto-strafe
+    double addedStrafe = 0;       // Output strafe power sent to MecanumDrive
+    double forwardMultiplier = 1; // 1 = manual joystick enabled, 0 = locked for auto-forward
+    double addedForward = 0;      // Output forward power sent to MecanumDrive
 
-    // --------------------- Forward/Strafe multipliers
-    double strafeMultiplier = 1;
-    double addedStrafe = 0;
-    double forwardMultiplier = 1;
-    double addedForward = 0;
-    
     double forwardOutput = 0;
-    
     double strafeOutput = 0;
-    
-    public double getStrafeMultiplier() {
-        return strafeMultiplier;
-    }
 
-    public double getAddedStrafe() {
-        return addedStrafe;
-    }
-
-    public double getForwardMultiplier() {
-        return forwardMultiplier;
-    }
-
-    public double getAddedForward() {
-        return addedForward;
-    }
-
-    // ---------- Log
     public static final String TAG = "Odometry";
-    
-    
-    // --------------------- Distance tracking variables
-    
+
+    // --------------------- Distance Tracking State ---------------------
     private double targetDistance = 0;
     private double startYInches = 0;
     private double startXInches = 0;
     private boolean isDrivingY = false;
     private boolean isStrafingX = false;
-    private static final double DISTANCE_TOLERANCE_INCHES = 0.5;
+    private static final double DISTANCE_TOLERANCE_INCHES = 0.5; // Arrived deadband tolerance (inches)
 
+    /**
+     * Cycles through distance step size increments (1, 2, 6, 12 inches).
+     */
     public void cycleIncrement() {
         incrementIndex = (incrementIndex + 1) % increments.length;
     }
@@ -74,6 +61,9 @@ public class OdometryMovement {
         return increments[incrementIndex];
     }
 
+    /**
+     * Cycles through travel direction ("forward", "strafe").
+     */
     public void cycleDirection() {
         directionIndex = (directionIndex + 1) % direction.length;
     }
@@ -86,11 +76,14 @@ public class OdometryMovement {
         return inputDistance;
     }
 
+    /**
+     * @return True if the robot is currently executing an automated distance drive movement.
+     */
     public boolean isBusy() {
         return isDrivingY || isStrafingX;
     }
 
-    public double getError(){
+    public double getError() {
         return error;
     }
 
@@ -98,16 +91,22 @@ public class OdometryMovement {
         return targetDistance;
     }
 
+    /**
+     * @return Status description for Driver Station telemetry.
+     */
     public String getStatus() {
         if (isDrivingY) return String.format("Driving Forward (Target: %.1f in)", targetDistance);
         if (isStrafingX) return String.format("Strafing (Target: %.1f in)", targetDistance);
         return "Idle";
     }
 
+    /**
+     * Initializes the goBILDA Pinpoint Odometry Computer hardware, pod offsets, and directions.
+     */
     public void init(HardwareMap hwMap, MecanumDrive driveTrain) {
         this.driveTrain = driveTrain;
         pinpoint = hwMap.get(GoBildaPinpointDriver.class, "pinpoint");
-        pinpoint.setOffsets(2.0, -7.0); // Pod offsets
+        pinpoint.setOffsets(2.0, -7.0); // Pod offsets in mm relative to tracking center
         pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         pinpoint.setEncoderDirections(
                 GoBildaPinpointDriver.EncoderDirection.FORWARD,
@@ -115,17 +114,23 @@ public class OdometryMovement {
         );
         pinpoint.resetPosAndIMU();
     }
-    public double getStartXInches(){
+
+    public double getStartXInches() {
         return startXInches;
     }
-    public double getStartYInches(){
+
+    public double getStartYInches() {
         return startYInches;
     }
+
+    /**
+     * Main update loop called in TeleOp/Auton frame loops.
+     */
     public void update(Gamepad gamepad1) {
         pinpoint.update();
         handleManualDistanceInput(gamepad1);
         updateDistanceMovement();
-        Log.d(TAG,"X" + getHorizantalValue() + "Error" + getError() + "Target" + getTargetDistance() + "Status" + getStatus() + "Start X" + getStartXInches() + "StrafeMultiplier" + getStrafeMultiplier()+ "addedStrafe" + getAddedStrafe() + "ForwardMultiplier" + getForwardMultiplier() + "AddedForward" + getAddedForward() );
+        Log.d(TAG, "X" + getHorizantalValue() + "Error" + getError() + "Target" + getTargetDistance() + "Status" + getStatus() + "Start X" + getStartXInches() + "StrafeMultiplier" + getStrafeMultiplier() + "addedStrafe" + getAddedStrafe() + "ForwardMultiplier" + getForwardMultiplier() + "AddedForward" + getAddedForward());
     }
 
     private Pose2D getPose() {
@@ -133,18 +138,30 @@ public class OdometryMovement {
         return pinpoint.getPosition();
     }
 
+    /**
+     * @return Horizontal position in inches (mapped from Pinpoint Y position).
+     */
     public double getHorizantalValue() {
         return getPose().getY(DistanceUnit.INCH);
     }
 
+    /**
+     * @return Vertical position in inches (mapped from Pinpoint X position).
+     */
     public double getVerticalValue() {
         return getPose().getX(DistanceUnit.INCH);
     }
 
+    /**
+     * @return Heading orientation in degrees.
+     */
     public double getHeadingDegrees() {
         return getPose().getHeading(AngleUnit.DEGREES);
     }
 
+    /**
+     * Initiates automated distance movement in the requested direction.
+     */
     public void startDistanceMovement(String direction, double distance) {
         targetDistance = distance;
         inputDistance = 0; // Reset input distance at start
@@ -160,6 +177,10 @@ public class OdometryMovement {
         }
     }
 
+    /**
+     * Closed-loop distance controller executed inside update().
+     * Calculates distance error, applies proportional power, clamps speed, and stops at deadband tolerance.
+     */
     private void updateDistanceMovement() {
         if (isDrivingY) {
             double distanceTraveled = getVerticalValue() - startYInches;
@@ -169,16 +190,19 @@ public class OdometryMovement {
                 stopMoving();
             } else {
                 double kP = 0.2;
-                forwardMultiplier = 0;
-                addedForward = -(kP * error);
-                if ((Math.min(Math.abs(addedForward),0.8)) != Math.abs(addedForward)){
-                    if (error < 0){
+                forwardMultiplier = 0; // Lock manual joystick y-axis
+                addedForward = -(kP * error); // Negative power due to MecanumDrive -y equation
+
+                // Clamp maximum output magnitude to 0.8
+                if ((Math.min(Math.abs(addedForward), 0.8)) != Math.abs(addedForward)) {
+                    if (error < 0) {
                         addedForward = 0.8;
                     } else {
                         addedForward = -0.8;
                     }
                 }
-                if ((Math.max(Math.abs(addedForward), 0.20)) != Math.abs(addedForward)){
+                // Enforce minimum output power floor of 0.20 to prevent stalling
+                if ((Math.max(Math.abs(addedForward), 0.20)) != Math.abs(addedForward)) {
                     if (error < 0) {
                         addedForward = 0.20;
                     } else {
@@ -187,9 +211,6 @@ public class OdometryMovement {
                 }
                 strafeMultiplier = 0;
                 addedStrafe = 0;
-
-
-
             }
         } else if (isStrafingX) {
             double distanceTraveled = getHorizantalValue() - startXInches;
@@ -199,16 +220,19 @@ public class OdometryMovement {
                 stopMoving();
             } else {
                 double kP = 0.2;
-                strafeMultiplier = 0;
+                strafeMultiplier = 0; // Lock manual joystick x-axis
                 addedStrafe = kP * error;
-                if ((Math.min(Math.abs(addedStrafe),0.8)) != Math.abs(addedStrafe)){
-                    if (error < 0){
+
+                // Clamp maximum output magnitude to 0.8
+                if ((Math.min(Math.abs(addedStrafe), 0.8)) != Math.abs(addedStrafe)) {
+                    if (error < 0) {
                         addedStrafe = -0.8;
                     } else {
                         addedStrafe = 0.8;
                     }
                 }
-                if ((Math.max(Math.abs(addedStrafe), 0.20)) != Math.abs(addedStrafe)){
+                // Enforce minimum output power floor of 0.20 to prevent stalling
+                if ((Math.max(Math.abs(addedStrafe), 0.20)) != Math.abs(addedStrafe)) {
                     if (error < 0) {
                         addedStrafe = -0.20;
                     } else {
@@ -218,8 +242,8 @@ public class OdometryMovement {
                 forwardMultiplier = 0;
                 addedForward = 0;
             }
-        }
-        else {
+        } else {
+            // Idle state: restore manual driver joysticks
             strafeMultiplier = 1;
             addedStrafe = 0;
             forwardMultiplier = 1;
@@ -227,14 +251,23 @@ public class OdometryMovement {
         }
     }
 
+    /**
+     * Convenience helper to drive forward by specified inches.
+     */
     public void driveForwardInches(double distanceInches) {
         startDistanceMovement("forward", distanceInches);
     }
 
+    /**
+     * Convenience helper to strafe by specified inches.
+     */
     public void strafeInches(double distanceInches) {
         startDistanceMovement("strafe", distanceInches);
     }
 
+    /**
+     * Immediately stops active movement and restores full manual driver joystick control.
+     */
     public void stopMoving() {
         isDrivingY = false;
         isStrafingX = false;
@@ -247,9 +280,11 @@ public class OdometryMovement {
         strafeMultiplier = 1;
         addedStrafe = 0;
         addedForward = 0;
-
     }
 
+    /**
+     * Process Gamepad 1 button inputs for testing distance movement.
+     */
     private void handleManualDistanceInput(Gamepad gamepad1) {
         if (gamepad1.aWasPressed()) {
             cycleDirection();
@@ -263,10 +298,12 @@ public class OdometryMovement {
             inputDistance -= getSelectedIncrement();
         }
 
+        // Start movement on Right Trigger
         if (gamepad1.right_trigger > 0.3 && !isBusy() && inputDistance != 0) {
             startDistanceMovement(getSelectedDirection(), inputDistance);
         }
 
+        // Emergency stop on Right Bumper
         if (gamepad1.right_bumper) {
             stopMoving();
         }
@@ -274,5 +311,22 @@ public class OdometryMovement {
 
     public void handleDistanceDriving(String direction, double distance) {
         startDistanceMovement(direction, distance);
+    }
+
+    // --------------------- Getters ---------------------
+    public double getStrafeMultiplier() {
+        return strafeMultiplier;
+    }
+
+    public double getAddedStrafe() {
+        return addedStrafe;
+    }
+
+    public double getForwardMultiplier() {
+        return forwardMultiplier;
+    }
+
+    public double getAddedForward() {
+        return addedForward;
     }
 }

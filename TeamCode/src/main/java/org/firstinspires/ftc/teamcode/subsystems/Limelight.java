@@ -11,63 +11,93 @@ import com.qualcomm.robotcore.hardware.IMU;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
 
+/**
+ * Subsystem wrapping the Limelight 3A vision sensor and REV Control Hub IMU.
+ * Provides target tracking data (Tx, Ty, Ta) and MegaTag2 3D field localization poses.
+ */
 public class Limelight {
-    //seting up hardware
+
+    // ---------------------- Hardware Devices ----------------------
     private Limelight3A limelight;
     private IMU imu;
+
+    // ---------------------- Tracking State Variables ----------------------
     private Pose3D botPose;
     private boolean targetVisible = false;
-    private double horizontalDelta = 0;
-    private double verticalDelta = 0;
-    private double targetArea = 0;
+    private double horizontalDelta = 0; // Tx: horizontal offset angle to target
+    private double verticalDelta = 0;   // Ty: vertical offset angle to target
+    private double targetArea = 0;      // Ta: target area (% of camera image)
+
     public static final String TAG = "Limelight";
 
-    public void init(HardwareMap hwMap){
+    /**
+     * Initializes Limelight 3A camera and REV Hub IMU orientation.
+     * Configures default pipeline index 0.
+     */
+    public void init(HardwareMap hwMap) {
         limelight = hwMap.get(Limelight3A.class, "limelight");
         Log.d(TAG, "Limelight found " + limelight);
         try {
             imu = hwMap.get(IMU.class, "imu");
             Log.d(TAG, "IMU found " + imu);
-            RevHubOrientationOnRobot revHubOrientationOnRobot = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,RevHubOrientationOnRobot.UsbFacingDirection.FORWARD);
+            RevHubOrientationOnRobot revHubOrientationOnRobot = new RevHubOrientationOnRobot(
+                    RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
+                    RevHubOrientationOnRobot.UsbFacingDirection.FORWARD
+            );
             imu.initialize(new IMU.Parameters(revHubOrientationOnRobot));
         } catch (Exception e) {
-            imu = null;
+            imu = null; // IMU optional fallback
         }
         limelight.pipelineSwitch(0);
     }
-    
-    public void start(){
+
+    /**
+     * Starts camera polling and processing on the Limelight.
+     */
+    public void start() {
         limelight.start();
     }
 
-    public void stop(){
+    /**
+     * Stops camera polling and processing.
+     */
+    public void stop() {
         limelight.stop();
     }
-    
-    public void update(){
+
+    /**
+     * Updates IMU orientation feed and processes latest Limelight vision result.
+     */
+    public void update() {
         handlePosition(getLimelightResult());
     }
-    
-    public LLResult getLimelightResult(){
+
+    /**
+     * Updates robot yaw orientation on Limelight for MegaTag2 localization and returns latest result.
+     */
+    public LLResult getLimelightResult() {
         if (imu != null) {
             YawPitchRollAngles orientation = imu.getRobotYawPitchRollAngles();
             limelight.updateRobotOrientation(orientation.getYaw());
         }
         return limelight.getLatestResult();
-
     }
-    
-    private void handlePosition(LLResult llResult){
-        if (llResult != null && llResult.isValid()){
-            if (imu != null){
-                botPose = llResult.getBotpose_MT2();
+
+    /**
+     * Parses the Limelight 3D pose, horizontal/vertical target deltas, and logs diagnostic output.
+     */
+    private void handlePosition(LLResult llResult) {
+        if (llResult != null && llResult.isValid()) {
+            if (imu != null) {
+                botPose = llResult.getBotpose_MT2(); // MegaTag 2 IMU-assisted 3D pose
             } else {
-                botPose = llResult.getBotpose();
+                botPose = llResult.getBotpose();     // Standard 3D botpose
             }
             targetVisible = true;
             double tx = llResult.getTx();
             double ty = llResult.getTy();
             double ta = llResult.getTa();
+
             if (tx != horizontalDelta || ty != verticalDelta || ta != targetArea) {
                 this.horizontalDelta = tx;
                 this.verticalDelta = ty;
@@ -91,6 +121,7 @@ public class Limelight {
         }
     }
 
+    // --------------------- Getters ---------------------
     public double getHorizontalDelta() {
         return horizontalDelta;
     }
@@ -103,7 +134,6 @@ public class Limelight {
         return targetArea;
     }
 
-
     public Pose3D getBotPose() {
         return botPose;
     }
@@ -114,6 +144,7 @@ public class Limelight {
         }
         return 0;
     }
+
     public double get3DYDistance() {
         if (botPose != null) {
             return botPose.getPosition().y;
