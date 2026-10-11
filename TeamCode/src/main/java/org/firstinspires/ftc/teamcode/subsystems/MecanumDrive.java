@@ -50,6 +50,23 @@ public class MecanumDrive {
         backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     }
+    public void init(HardwareMap hwMap) {
+        this.aprilTagAlignment = aprilTagAlignment;
+        frontLeftMotor = hwMap.get(DcMotor.class, "frontLeftMotor");
+        frontRightMotor = hwMap.get(DcMotor.class, "frontRightMotor");
+        backLeftMotor = hwMap.get(DcMotor.class, "backLeftMotor");
+        backRightMotor = hwMap.get(DcMotor.class, "backRightMotor");
+
+        frontLeftMotor.setDirection(DcMotor.Direction.REVERSE);
+        backLeftMotor.setDirection(DcMotor.Direction.REVERSE);
+        frontRightMotor.setDirection(DcMotor.Direction.REVERSE);
+        backRightMotor.setDirection(DcMotor.Direction.REVERSE);
+
+        frontLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        frontRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        backLeftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+    }
 
 //    public void init(HardwareMap hwMap, AprilTagAlignment aprilTagAlignment, OdometryMovement odometryMovement){
 //        this.aprilTagAlignment = aprilTagAlignment;
