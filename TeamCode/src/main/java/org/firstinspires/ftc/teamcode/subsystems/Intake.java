@@ -5,7 +5,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
 /**
- * Subsystem controlling the intake roller motor and windmill mechanism.
+ * Subsystem controlling the intake roller motor and optional windmill mechanism.
  * Handles intaking game elements, reversing (spitting out), and stopping.
  */
 public class Intake {
@@ -24,42 +24,66 @@ public class Intake {
     String intakeStatus = "Off";
 
     /**
-     * Initializes intake and windmill motors from hardware map with brake behavior.
+     * Initializes intake motor and optional windmill motor from hardware map with brake behavior.
+     * Safely catches missing "windmill" configuration if not present.
      */
     public void init(HardwareMap hwMap) {
         intake = hwMap.get(DcMotor.class, "intake");
-        windmill = hwMap.get(DcMotor.class, "windmill");
-        windmill.setDirection(DcMotorSimple.Direction.FORWARD);
-        windmill.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         intake.setDirection(DcMotorSimple.Direction.FORWARD);
         intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
+        try {
+            windmill = hwMap.get(DcMotor.class, "windmill");
+            if (windmill != null) {
+                windmill.setDirection(DcMotorSimple.Direction.FORWARD);
+                windmill.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+            }
+        } catch (Exception e) {
+            windmill = null; // Windmill hardware motor not configured/installed
+        }
     }
 
     /**
-     * Runs intake and windmill inwards to pull game elements into the robot.
+     * Runs intake and optional windmill inwards to pull game elements into the robot.
      */
     public void start() {
         intakeStatus = "Running";
         intake.setPower(INTAKE_IN);
-        windmill.setPower(WINDMILL_IN);
+        if (windmill != null) {
+            windmill.setPower(WINDMILL_IN);
+        }
     }
 
     /**
-     * Runs intake and windmill in reverse to eject game elements.
+     * Runs intake and optional windmill in reverse to eject game elements.
      */
     public void out() {
         intakeStatus = "Reverse";
         intake.setPower(INTAKE_OUT);
-        windmill.setPower(WINDMILL_OUT);
+        if (windmill != null) {
+            windmill.setPower(WINDMILL_OUT);
+        }
     }
 
     /**
-     * Stops intake and windmill motors completely.
+     * Stops intake and optional windmill motors completely.
      */
     public void stop() {
         intakeStatus = "Off";
         intake.setPower(0);
-        windmill.setPower(0);
+        if (windmill != null) {
+            windmill.setPower(0);
+        }
+    }
+
+    /**
+     * Sets custom speed for intake and optional windmill.
+     */
+    public void switchSpeed(double speed) {
+        intake.setPower(speed);
+        if (windmill != null) {
+            windmill.setPower(speed);
+        }
     }
 
     /**

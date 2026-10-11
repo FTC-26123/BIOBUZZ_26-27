@@ -1,4 +1,3 @@
-
 package org.firstinspires.ftc.teamcode.Auton;
 
 import com.pedropathing.follower.Follower;
@@ -17,6 +16,10 @@ import org.firstinspires.ftc.robotcore.external.navigation.Position;
 
 import java.util.List;
 
+/**
+ * Autonomous alignment and shot calculation subsystem for scoring into the HIVE cell opening.
+ * Uses Limelight 3A AprilTag detection and PedroPathing Follower drivetrain manual control.
+ */
 public class HiveAim {
 
     private final Follower follower;
@@ -27,8 +30,8 @@ public class HiveAim {
     private static final int FIRST_TAG = 34;
     private static final int LAST_TAG = 37;
 
-    private static final double IN_TO_M = 0.0254;
-    private static final double M_TO_IN = 39.37007874;
+    private static final double INCHES_TO_METERS = 0.0254;
+    private static final double METERS_TO_INCHES = 39.37007874;
     private static final double GRAVITY = 9.80665;
 
     private static final double FLYWHEEL_DIAMETER_M = 0.072;
@@ -72,6 +75,7 @@ public class HiveAim {
     public static double TURN_SIGN = 1.0;
 
     private static final double ALIGN_KP = 0.014;
+    private static final double ALIGN_KD = 0.002;
     private static final double MAX_TURN = 0.22;
     private static final double MIN_TURN = 0.055;
 
@@ -98,9 +102,15 @@ public class HiveAim {
     public double motorRPM = Double.NaN;
     public double flightTime = Double.NaN;
 
+    private double lastErrorDeg = Double.NaN;
+    private double lastErrorTime = 0;
+
     public String status = "Idle";
     public String stage = "";
 
+    /**
+     * Initializes HiveAim with PedroPathing Follower and Limelight 3A camera.
+     */
     public HiveAim(
             Follower follower,
             Limelight3A limelight) {
@@ -178,9 +188,9 @@ public class HiveAim {
                 continue;
             }
 
-            right[index] = p.x * M_TO_IN;
-            down[index] = p.y * M_TO_IN;
-            forward[index] = p.z * M_TO_IN;
+            right[index] = p.x * METERS_TO_INCHES;
+            down[index] = p.y * METERS_TO_INCHES;
+            forward[index] = p.z * METERS_TO_INCHES;
 
             found[index] = true;
             visibleTags++;
@@ -300,11 +310,11 @@ public class HiveAim {
             return;
         }
 
-        double x = distanceIn * IN_TO_M;
+        double x = distanceIn * INCHES_TO_METERS;
 
         double deltaH =
                 (targetHeightIn - SHOOTER_EXIT_HEIGHT_IN)
-                        * IN_TO_M;
+                        * INCHES_TO_METERS;
 
         for (double angle = MIN_LAUNCH_ANGLE;
              angle <= MAX_LAUNCH_ANGLE;
@@ -410,6 +420,9 @@ public class HiveAim {
                     motorRPM = Double.NaN;
                     flightTime = Double.NaN;
 
+                    lastErrorDeg = Double.NaN;
+                    lastErrorTime = 0;
+
                     alignTimer.reset();
 
                     limelight.pipelineSwitch(TAG_PIPELINE);
@@ -434,7 +447,18 @@ public class HiveAim {
                         return;
                     }
 
+                    double currentTime = alignTimer.seconds();
+                    double dt = currentTime - lastErrorTime;
+
                     double error = yawErrorDeg;
+                    double derivative = 0;
+
+                    if (dt > 0.000001 && !Double.isNaN(lastErrorDeg)) {
+                        derivative = (error - lastErrorDeg) / dt;
+                    }
+
+                    lastErrorDeg = error;
+                    lastErrorTime = currentTime;
 
                     if (Math.abs(error)
                             <= ALIGN_TOLERANCE) {
@@ -459,7 +483,7 @@ public class HiveAim {
                     status = "Aligning to HIVE";
 
                     double turn =
-                            TURN_SIGN * ALIGN_KP * error;
+                            TURN_SIGN * ((ALIGN_KP * error) + (ALIGN_KD * derivative));
 
                     if (Math.abs(turn) < MIN_TURN) {
                         turn = Math.copySign(
