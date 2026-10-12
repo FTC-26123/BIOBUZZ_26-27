@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -33,8 +34,12 @@ public class Shooter {
      */
     public void init(HardwareMap hwMap, Intake intake) {
         this.intake = intake;
-        shooter = hwMap.get(DcMotorEx.class, "launcher");
-        gate = hwMap.get(Servo.class, "gate");
+        shooter = hwMap.get(DcMotorEx.class, "shooter");
+        try {
+            gate = hwMap.get(Servo.class, "gate");
+        } catch (Exception e) {
+            gate = null; // Windmill hardware motor not configured/installed
+        }
         shooter.setDirection(DcMotorSimple.Direction.REVERSE);
     }
 
@@ -45,7 +50,9 @@ public class Shooter {
         shooterStatus = "Off";
         shooter.setVelocity(0);
         intake.stop();
-        closeGate();
+        if (gate!=null){
+            closeGate();
+        }
     }
 
     /**
@@ -122,7 +129,9 @@ public class Shooter {
         if (launchingPowers[launchingIndex] > 0 && isReady()) {
             shooterStatus = "Shooting";
             intake.start();
-            openGate();
+            if (gate!=null) {
+                openGate();
+            }
         }
     }
 }

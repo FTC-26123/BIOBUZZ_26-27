@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 
 /**
  * Subsystem controlling the intake roller motor and optional windmill mechanism.
- * Handles intaking game elements, reversing (spitting out), and stopping.
+ * Handles intaking game elements, reversing (spitting out), custom power adjustments, and stopping.
  */
 public class Intake {
 
@@ -15,8 +15,10 @@ public class Intake {
     private DcMotor windmill;
 
     // ---------------------- Default Motor Power Constants ----------------------
-    public static final double INTAKE_IN = 0.7;
-    public static final double INTAKE_OUT = -0.7;
+
+    public static final double INTAKE_POWER = 0.8;
+    public static final double INTAKE_IN = INTAKE_POWER;
+    public static final double INTAKE_OUT = -INTAKE_POWER;
     public static final double WINDMILL_IN = -1.0;
     public static final double WINDMILL_OUT = 1.0;
 
@@ -29,7 +31,7 @@ public class Intake {
      */
     public void init(HardwareMap hwMap) {
         intake = hwMap.get(DcMotor.class, "intake");
-        intake.setDirection(DcMotorSimple.Direction.FORWARD);
+        intake.setDirection(DcMotorSimple.Direction.REVERSE);
         intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         try {
@@ -44,10 +46,10 @@ public class Intake {
     }
 
     /**
-     * Runs intake and optional windmill inwards to pull game elements into the robot.
+     * Runs intake and optional windmill inwards at default power to pull game elements into the robot.
      */
     public void start() {
-        intakeStatus = "Running";
+        intakeStatus = "Running Inwards";
         intake.setPower(INTAKE_IN);
         if (windmill != null) {
             windmill.setPower(WINDMILL_IN);
@@ -55,10 +57,10 @@ public class Intake {
     }
 
     /**
-     * Runs intake and optional windmill in reverse to eject game elements.
+     * Runs intake and optional windmill in reverse at default power to eject game elements.
      */
     public void out() {
-        intakeStatus = "Reverse";
+        intakeStatus = "Running Reverse";
         intake.setPower(INTAKE_OUT);
         if (windmill != null) {
             windmill.setPower(WINDMILL_OUT);
@@ -77,9 +79,17 @@ public class Intake {
     }
 
     /**
-     * Sets custom speed for intake and optional windmill.
+     * Sets custom speed/power for intake and optional windmill.
      */
     public void switchSpeed(double speed) {
+        if (speed > 0) {
+            intakeStatus = String.format(java.util.Locale.US, "Running Inwards at (%.2f)", speed);
+        } else if (speed < 0) {
+            intakeStatus = String.format(java.util.Locale.US, "Running Reverse at (%.2f)", speed);
+        } else {
+            intakeStatus = "Off";
+        }
+
         intake.setPower(speed);
         if (windmill != null) {
             windmill.setPower(speed);
@@ -87,7 +97,7 @@ public class Intake {
     }
 
     /**
-     * @return Status description for telemetry ("Running", "Reverse", "Off").
+     * @return Status description for telemetry ("Running Inwards", "Running Reverse", "Off").
      */
     public String getIntakeStatus() {
         return intakeStatus;
