@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.subsystems;
 
-import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 /**
@@ -12,6 +11,12 @@ public class AprilTagAlignment {
     // --------------------- Hardware Dependencies ---------------------
     private Limelight limelight;
     private ElapsedTime runtime;
+
+    // --------------------- Target Grace & Stall Protection ---------------------
+    private final ElapsedTime targetLostTimer = new ElapsedTime();
+    private static final double TARGET_LOST_TIMEOUT = 0.25; // 250ms grace period for frame drops
+    private static final double MIN_ROTATION_OUTPUT = 0.08; // Minimum anti-stall power floor
+    private static final double MIN_STRAFE_OUTPUT = 0.08;   // Minimum anti-stall power floor
 
     // --------------------- Strafe Control Variables ---------------------
     double strafeMultiplier = 1; // 1 = full manual joystick, 0 = automated control
@@ -112,6 +117,7 @@ public class AprilTagAlignment {
         strafeOutput = 0;
 
         targetWasVisible = false;
+        targetLostTimer.reset();
     }
 
     /**
@@ -130,9 +136,10 @@ public class AprilTagAlignment {
         curTime = runtime.time();
         dt = curTime - lastTime;
 
-        boolean targetVisible = limelight.isTargetVisible();
+        boolean targetVisible = limelight != null && limelight.isTargetVisible();
 
         if (targetVisible) {
+            targetLostTimer.reset(); // Reset grace timer while target is in view
             double newRotError = goalX - limelight.getHorizontalDelta();
             double newStrafeError = goalX - limelight.get3DXDistance();
 
@@ -173,11 +180,19 @@ public class AprilTagAlignment {
             rotOutput = (kP_rotation * rawRotError) + (kD_rotation * rotationDerivative);
             strafeOutput = (kP_strafe * rawStrafeError) + (kD_strafe * strafeDerivative);
 
+            // Anti-stall power floor when outside tolerance
+            if (Math.abs(rawRotError) > angleTolerance && Math.abs(rotOutput) < MIN_ROTATION_OUTPUT) {
+                rotOutput = MIN_ROTATION_OUTPUT * Math.signum(rotOutput);
+            }
+            if (Math.abs(rawStrafeError) > strafeTolerance && Math.abs(strafeOutput) < MIN_STRAFE_OUTPUT) {
+                strafeOutput = MIN_STRAFE_OUTPUT * Math.signum(strafeOutput);
+            }
+
             // Clamp power output to safe maximums
             rotOutput = clamp(rotOutput, -MAX_ROTATION_OUTPUT, MAX_ROTATION_OUTPUT);
             strafeOutput = clamp(strafeOutput, -MAX_STRAFE_OUTPUT, MAX_STRAFE_OUTPUT);
-        } else {
-            // Target lost: clear error accumulation and outputs
+        } else if (targetLostTimer.seconds() >= TARGET_LOST_TIMEOUT) {
+            // Target lost for longer than grace period: clear error accumulation and outputs
             rawRotError = 0;
             lastRotError = 0;
             rotationDerivative = 0;
@@ -196,11 +211,13 @@ public class AprilTagAlignment {
     }
 
     /**
-     * Enables automated rotation toward the target tag if visible.
+     * Enables automated rotation toward the target tag if visible (or within target-lost grace period).
      * Disables manual joystick rotation (`rotationMultiplier = 0`) and applies calculated PD power.
      */
     public void autoRotate() {
-        if (limelight.isTargetVisible()) {
+        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
+
+        if (isTargetValid) {
             rotationMultiplier = 0; // Lock manual joystick rotation
             if (Math.abs(rawRotError) < angleTolerance) {
                 addedRotation = 0; // Within angle tolerance deadband
@@ -221,11 +238,13 @@ public class AprilTagAlignment {
     }
 
     /**
-     * Enables automated strafing toward the target tag if visible.
+     * Enables automated strafing toward the target tag if visible (or within target-lost grace period).
      * Disables manual joystick strafing (`strafeMultiplier = 0`) and applies calculated PD power.
      */
     public void autoStrafe() {
-        if (limelight.isTargetVisible()) {
+        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
+
+        if (isTargetValid) {
             strafeMultiplier = 0; // Lock manual joystick strafe
             if (Math.abs(rawStrafeError) < strafeTolerance) {
                 addedStrafe = 0; // Within distance tolerance deadband
