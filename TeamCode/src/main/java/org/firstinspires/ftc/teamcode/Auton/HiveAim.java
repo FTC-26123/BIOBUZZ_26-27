@@ -90,6 +90,7 @@ public class HiveAim {
     private final ElapsedTime lockTimer = new ElapsedTime();
 
     private boolean lockStarted = false;
+    private double lastFrameTimestamp = Double.NaN;
     private boolean aligned = false;
 
     public int visibleTags = 0;
@@ -132,17 +133,19 @@ public class HiveAim {
         }
     }
 
-    private TagCenter readFourTags() {
+    private TagCenter readFourTags(LLResult result) {
 
         visibleTags = 0;
 
-        LLResult result = limelight.getLatestResult();
-
         if (result == null
-                || !result.isValid()
+                || !org.firstinspires.ftc.teamcode.subsystems.Limelight.isFresh(result)
                 || result.getPipelineIndex() != TAG_PIPELINE) {
             return null;
         }
+
+        double timestamp = result.getTimestamp();
+        if (!Double.isFinite(timestamp) || timestamp == lastFrameTimestamp) return null;
+        lastFrameTimestamp = timestamp;
 
         List<LLResultTypes.FiducialResult> tags =
                 result.getFiducialResults();
@@ -217,9 +220,9 @@ public class HiveAim {
         );
     }
 
-    private boolean updateTargetGeometry() {
+    private boolean updateTargetGeometry(LLResult result) {
 
-        TagCenter center = readFourTags();
+        TagCenter center = readFourTags(result);
 
         if (center == null) {
             return false;
@@ -407,6 +410,7 @@ public class HiveAim {
                     stage = stageName;
                     status = "Switching to AprilTags";
 
+                    lastFrameTimestamp = Double.NaN;
                     aligned = false;
                     lockStarted = false;
 
@@ -438,10 +442,18 @@ public class HiveAim {
                         return;
                     }
 
-                    if (!updateTargetGeometry()) {
+                    LLResult frame = limelight.getLatestResult();
+                    if (org.firstinspires.ftc.teamcode.subsystems.Limelight.isFresh(frame)
+                            && frame.getPipelineIndex() == TAG_PIPELINE
+                            && frame.getTimestamp() == lastFrameTimestamp) {
+                        return;
+                    }
+                    if (!updateTargetGeometry(frame)) {
 
                         status = "Waiting for four HIVE tags";
                         lockStarted = false;
+                        lastErrorDeg = Double.NaN;
+                        lastErrorTime = alignTimer.seconds();
 
                         follower.manual(0, 0, 0);
                         return;

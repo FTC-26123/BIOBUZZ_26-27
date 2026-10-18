@@ -119,10 +119,11 @@ public class TeleOp_AprilTagAlignmentSetupManual extends OpMode {
     // ---------------------- Helper Input Handlers ----------------------
 
     private void handleManualShootingControl(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.5) {
-            shooter.start();
-        } else if (gamepad2.right_bumper) {
+        if (gamepad2.right_bumper) {
             shooter.stop();
+        } else {
+            if (gamepad2.right_trigger > 0.5) shooter.start();
+            shooter.setFireRequested(gamepad2.right_trigger > 0.5);
         }
     }
 
@@ -133,20 +134,20 @@ public class TeleOp_AprilTagAlignmentSetupManual extends OpMode {
     }
 
     private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
+        if (gamepad2.y || gamepad2.right_bumper) {
             shooter.closeGate();
+        } else if (gamepad2.x) {
+            shooter.openGate();
         }
     }
 
     private void handleManualIntakeControl(Gamepad gamepad2) {
-        if (gamepad2.left_trigger > 0.5) {
-            intake.start();
+        if (gamepad2.left_bumper) {
+            intake.stop();
         } else if (gamepad2.back) {
             intake.out();
-        } else if (gamepad2.left_bumper) {
-            intake.stop();
+        } else if (gamepad2.left_trigger > 0.5) {
+            intake.start();
         }
     }
 
@@ -185,5 +186,12 @@ public class TeleOp_AprilTagAlignmentSetupManual extends OpMode {
         } else {
             aprilTagAlignment.setManualStrafing();
         }
+    }
+
+    @Override
+    public void stop() {
+        shooter.stop();
+        driveTrain.stop();
+        limelight.stop();
     }
 }

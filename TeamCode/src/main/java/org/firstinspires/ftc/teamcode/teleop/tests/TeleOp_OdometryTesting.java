@@ -35,7 +35,7 @@ public class TeleOp_OdometryTesting extends OpMode {
     public void init() {
         limelight.init(hardwareMap);
         aprilTagAlignment.init(limelight, TeleOpRuntime);
-        driveTrain.init(hardwareMap, aprilTagAlignment);
+        driveTrain.init(hardwareMap, odometryMovement);
         intake.init(hardwareMap);
         shooter.init(hardwareMap, intake);
         odometryMovement.init(hardwareMap, driveTrain);
@@ -57,10 +57,10 @@ public class TeleOp_OdometryTesting extends OpMode {
 
         // Handle Dpad Right speed switching and output manual joystick powers
         handleDrivetrainDpadSpeedSwitching(gamepad1);
-        driveTrain.drive(gamepad1.left_stick_y, gamepad1.left_stick_x, gamepad1.right_stick_x);
 
         // Update odometry computer pose and process manual distance driving inputs
         odometryMovement.update(gamepad1);
+        driveTrain.drive(gamepad1.left_stick_y, gamepad1.left_stick_x, gamepad1.right_stick_x);
 
         // ---------------- Telemetry Output ----------------
 
@@ -92,10 +92,11 @@ public class TeleOp_OdometryTesting extends OpMode {
     // ---------------------- Helper Input Handlers ----------------------
 
     private void handleManualShootingControl(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.5) {
-            shooter.start();
-        } else if (gamepad2.right_bumper) {
+        if (gamepad2.right_bumper) {
             shooter.stop();
+        } else {
+            if (gamepad2.right_trigger > 0.5) shooter.start();
+            shooter.setFireRequested(gamepad2.right_trigger > 0.5);
         }
     }
 
@@ -106,20 +107,20 @@ public class TeleOp_OdometryTesting extends OpMode {
     }
 
     private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
+        if (gamepad2.y || gamepad2.right_bumper) {
             shooter.closeGate();
+        } else if (gamepad2.x) {
+            shooter.openGate();
         }
     }
 
     private void handleManualIntakeControl(Gamepad gamepad2) {
-        if (gamepad2.left_trigger > 0.5) {
-            intake.start();
+        if (gamepad2.left_bumper) {
+            intake.stop();
         } else if (gamepad2.back) {
             intake.out();
-        } else if (gamepad2.left_bumper) {
-            intake.stop();
+        } else if (gamepad2.left_trigger > 0.5) {
+            intake.start();
         }
     }
 
@@ -158,5 +159,13 @@ public class TeleOp_OdometryTesting extends OpMode {
         } else {
             aprilTagAlignment.setManualStrafing();
         }
+    }
+
+    @Override
+    public void stop() {
+        odometryMovement.stopMoving();
+        shooter.stop();
+        driveTrain.stop();
+        limelight.stop();
     }
 }

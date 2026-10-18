@@ -197,7 +197,7 @@ public class red_forward extends LinearOpMode {
         LLResult result = limelight.getLatestResult();
 
         if (result == null
-                || !result.isValid()
+                || !org.firstinspires.ftc.teamcode.subsystems.Limelight.isFresh(result)
                 || result.getPipelineIndex() != YELLOW_PIPELINE) {
 
             return null;

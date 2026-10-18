@@ -101,12 +101,12 @@ public class TeleOp_TestIntakeShooter extends OpMode {
      * Runs intake at custom power on Left Trigger, reverse on Back, or stops on Left Bumper.
      */
     private void handleManualIntakeControl(Gamepad gamepad2) {
-        if (gamepad2.left_trigger > 0.3) {
-            intake.switchSpeed(customIntakePower);
+        if (gamepad2.left_bumper) {
+            intake.stop();
         } else if (gamepad2.back) {
             intake.switchSpeed(-customIntakePower);
-        } else if (gamepad2.left_bumper) {
-            intake.stop();
+        } else if (gamepad2.left_trigger > 0.3) {
+            intake.switchSpeed(customIntakePower);
         }
     }
 
@@ -114,15 +114,22 @@ public class TeleOp_TestIntakeShooter extends OpMode {
      * Spools shooter flywheel to preset velocity on Right Trigger, or stops on Right Bumper.
      */
     private void handleManualShooterControl(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.3) {
-            shooter.start();
-        } else if (gamepad2.right_bumper) {
+        if (gamepad2.right_bumper) {
             shooter.stop();
+        } else {
+            if (gamepad2.right_trigger > 0.3) shooter.start();
+            shooter.setFireRequested(gamepad2.right_trigger > 0.3);
         }
     }
     private void handleDrivetrainDpadSpeedSwitching(Gamepad gamepad1) {
         if (gamepad1.dpadRightWasPressed()) {
             driveTrain.switchSpeed();
         }
+    }
+
+    @Override
+    public void stop() {
+        shooter.stop();
+        driveTrain.stop();
     }
 }

@@ -13,6 +13,7 @@ public class Intake {
     // ---------------------- Hardware Motors ----------------------
     private DcMotor intake;
     private DcMotor windmill;
+    private long commandRevision;
 
     // ---------------------- Default Motor Power Constants ----------------------
 
@@ -49,6 +50,11 @@ public class Intake {
      * Runs intake and optional windmill inwards at default power to pull game elements into the robot.
      */
     public void start() {
+        commandRevision++;
+        startAutomatic();
+    }
+
+    void startAutomatic() {
         intakeStatus = "Running Inwards";
         intake.setPower(INTAKE_IN);
         if (windmill != null) {
@@ -60,6 +66,7 @@ public class Intake {
      * Runs intake and optional windmill in reverse at default power to eject game elements.
      */
     public void out() {
+        commandRevision++;
         intakeStatus = "Running Reverse";
         intake.setPower(INTAKE_OUT);
         if (windmill != null) {
@@ -71,6 +78,11 @@ public class Intake {
      * Stops intake and optional windmill motors completely.
      */
     public void stop() {
+        commandRevision++;
+        stopAutomatic();
+    }
+
+    void stopAutomatic() {
         intakeStatus = "Off";
         intake.setPower(0);
         if (windmill != null) {
@@ -82,6 +94,8 @@ public class Intake {
      * Sets custom speed/power for intake and optional windmill.
      */
     public void switchSpeed(double speed) {
+        commandRevision++;
+        speed = Double.isFinite(speed) ? Math.max(-1, Math.min(1, speed)) : 0;
         if (speed > 0) {
             intakeStatus = String.format(java.util.Locale.US, "Running Inwards at (%.2f)", speed);
         } else if (speed < 0) {
@@ -92,13 +106,15 @@ public class Intake {
 
         intake.setPower(speed);
         if (windmill != null) {
-            windmill.setPower(speed);
+            windmill.setPower(-speed);
         }
     }
 
     /**
      * @return Status description for telemetry ("Running Inwards", "Running Reverse", "Off").
      */
+    long getCommandRevision() { return commandRevision; }
+
     public String getIntakeStatus() {
         return intakeStatus;
     }

@@ -47,6 +47,7 @@ public class AprilTagAlignment {
     double curTime = 0;
     double lastTime = 0;
     private boolean targetWasVisible = false;
+    private boolean targetAcquired = false;
     double goalX = 0; // Desired target offset (centered)
 
     double smoothedRotError = 0;
@@ -84,6 +85,8 @@ public class AprilTagAlignment {
         this.runtime = runtime;
         this.kP_rotation = kPValueRot;
         this.kD_rotation = kDValueRot;
+        modifiableValues[0] = kPValueRot;
+        modifiableValues[1] = kDValueRot;
     }
 
     /**
@@ -94,6 +97,8 @@ public class AprilTagAlignment {
         this.runtime = runtime;
         this.kP_rotation = kPValueRot;
         this.kD_rotation = kDValueRot;
+        modifiableValues[0] = kPValueRot;
+        modifiableValues[1] = kDValueRot;
         this.kP_strafe = kPValueStrafe;
         this.kD_strafe = kDValueStrafe;
     }
@@ -117,6 +122,7 @@ public class AprilTagAlignment {
         strafeOutput = 0;
 
         targetWasVisible = false;
+        targetAcquired = false;
         targetLostTimer.reset();
     }
 
@@ -139,6 +145,7 @@ public class AprilTagAlignment {
         boolean targetVisible = limelight != null && limelight.isTargetVisible();
 
         if (targetVisible) {
+            targetAcquired = true;
             targetLostTimer.reset(); // Reset grace timer while target is in view
             double newRotError = goalX - limelight.getHorizontalDelta();
             double newStrafeError = goalX - limelight.get3DXDistance();
@@ -215,7 +222,7 @@ public class AprilTagAlignment {
      * Disables manual joystick rotation (`rotationMultiplier = 0`) and applies calculated PD power.
      */
     public void autoRotate() {
-        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
+        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetAcquired && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
 
         if (isTargetValid) {
             rotationMultiplier = 0; // Lock manual joystick rotation
@@ -242,7 +249,7 @@ public class AprilTagAlignment {
      * Disables manual joystick strafing (`strafeMultiplier = 0`) and applies calculated PD power.
      */
     public void autoStrafe() {
-        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
+        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetAcquired && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
 
         if (isTargetValid) {
             strafeMultiplier = 0; // Lock manual joystick strafe

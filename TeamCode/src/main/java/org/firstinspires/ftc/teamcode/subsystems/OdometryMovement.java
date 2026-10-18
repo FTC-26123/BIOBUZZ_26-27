@@ -9,8 +9,6 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.teamcode.odometry.GoBildaPinpointDriver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Subsystem responsible for closed-loop distance movements using the goBILDA Pinpoint Odometry Computer.
@@ -18,9 +16,10 @@ import org.slf4j.LoggerFactory;
  */
 public class OdometryMovement {
 
-    private static final Logger log = LoggerFactory.getLogger(OdometryMovement.class);
     private GoBildaPinpointDriver pinpoint;
     private MecanumDrive driveTrain;
+    private Pose2D cachedPose = new Pose2D(DistanceUnit.INCH, 0, 0, AngleUnit.DEGREES, 0);
+    private long lastLogNanos;
 
     // --------------------- Input & Target Variables ---------------------
     double inputDistance = 0;
@@ -128,14 +127,17 @@ public class OdometryMovement {
      */
     public void update(Gamepad gamepad1) {
         pinpoint.update();
+        cachedPose = pinpoint.getPosition();
         handleManualDistanceInput(gamepad1);
         updateDistanceMovement();
-        Log.d(TAG, "X" + getHorizantalValue() + "Error" + getError() + "Target" + getTargetDistance() + "Status" + getStatus() + "Start X" + getStartXInches() + "StrafeMultiplier" + getStrafeMultiplier() + "addedStrafe" + getAddedStrafe() + "ForwardMultiplier" + getForwardMultiplier() + "AddedForward" + getAddedForward());
+        if (System.nanoTime() - lastLogNanos >= 250_000_000L) {
+            lastLogNanos = System.nanoTime();
+            Log.d(TAG, "X" + getHorizantalValue() + "Error" + getError() + "Target" + getTargetDistance() + "Status" + getStatus() + "Start X" + getStartXInches() + "StrafeMultiplier" + getStrafeMultiplier() + "addedStrafe" + getAddedStrafe() + "ForwardMultiplier" + getForwardMultiplier() + "AddedForward" + getAddedForward());
+        }
     }
 
     private Pose2D getPose() {
-        pinpoint.update();
-        return pinpoint.getPosition();
+        return cachedPose;
     }
 
     /**
@@ -251,13 +253,11 @@ public class OdometryMovement {
         isStrafingX = false;
         targetDistance = 0;
         error = 0;
-        if (driveTrain != null) {
-            driveTrain.drive(0, 0, 0);
-        }
         forwardMultiplier = 1;
         strafeMultiplier = 1;
         addedStrafe = 0;
         addedForward = 0;
+        if (driveTrain != null) driveTrain.stop();
     }
 
     /**

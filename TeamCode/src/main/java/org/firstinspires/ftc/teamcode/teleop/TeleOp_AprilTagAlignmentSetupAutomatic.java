@@ -155,10 +155,11 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
     // ---------------------- Driver Control Helpers ----------------------
 
     private void handleManualShootingControl(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.5) {
-            shooter.start();
-        } else if (gamepad2.right_bumper) {
+        if (gamepad2.right_bumper) {
             shooter.stop();
+        } else {
+            if (gamepad2.right_trigger > 0.5) shooter.start();
+            shooter.setFireRequested(gamepad2.right_trigger > 0.5);
         }
     }
 
@@ -169,20 +170,20 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
     }
 
     private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
+        if (gamepad2.y || gamepad2.right_bumper) {
             shooter.closeGate();
+        } else if (gamepad2.x) {
+            shooter.openGate();
         }
     }
 
     private void handleManualIntakeControl(Gamepad gamepad2) {
-        if (gamepad2.left_trigger > 0.5) {
-            intake.start();
+        if (gamepad2.left_bumper) {
+            intake.stop();
         } else if (gamepad2.back) {
             intake.out();
-        } else if (gamepad2.left_bumper) {
-            intake.stop();
+        } else if (gamepad2.left_trigger > 0.5) {
+            intake.start();
         }
     }
 
@@ -244,7 +245,7 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
                 targetLostTime = TeleOpRuntime.seconds();
             }
             if (curTime - targetLostTime > TARGET_LOST_TIMEOUT) {
-                driveTrain.drive(0, 0, 0);
+                driveTrain.stop();
                 telemetry.addData("CALIBRATION ALERT", "NO APRILTAG VISIBLE - POINT CAMERA AT TAG!");
                 return;
             }
@@ -372,5 +373,12 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
             handleAutoRotation(gamepad1);
             // handleAutoStrafe(gamepad1);
         }
+    }
+
+    @Override
+    public void stop() {
+        shooter.stop();
+        driveTrain.stop();
+        limelight.stop();
     }
 }
