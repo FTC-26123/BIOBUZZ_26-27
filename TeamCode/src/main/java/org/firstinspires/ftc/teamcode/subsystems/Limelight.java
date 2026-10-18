@@ -40,9 +40,10 @@ public class Limelight {
         try {
             imu = hwMap.get(IMU.class, "imu");
             Log.d(TAG, "IMU found " + imu);
+            //Intentionally left undone as a reminder to fix it for new robot
             RevHubOrientationOnRobot revHubOrientationOnRobot = new RevHubOrientationOnRobot(
-                    RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
-                    RevHubOrientationOnRobot.UsbFacingDirection.FORWARD
+                    RevHubOrientationOnRobot.LogoFacingDirection.,
+                    RevHubOrientationOnRobot.UsbFacingDirection.
             );
             imu.initialize(new IMU.Parameters(revHubOrientationOnRobot));
         } catch (Exception e) {

@@ -2,6 +2,9 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
+
 /**
  * Subsystem responsible for automated AprilTag alignment using Limelight vision feedback.
  * Employs PD (Proportional-Derivative) control with exponential smoothing filter for rotation and strafing.
@@ -140,7 +143,16 @@ public class AprilTagAlignment {
 
         if (targetVisible) {
             targetLostTimer.reset(); // Reset grace timer while target is in view
-            double newRotError = goalX - limelight.getHorizontalDelta();
+
+            // Prefer 3D MegaTag2 IMU-anchored orientation (rock-solid, zero jumping when tags flicker)
+            Pose3D botPose = limelight.getBotPose();
+            double newRotError;
+            if (botPose != null) {
+                newRotError = -botPose.getOrientation().getYaw(AngleUnit.DEGREES);
+            } else {
+                newRotError = goalX - limelight.getHorizontalDelta();
+            }
+
             double newStrafeError = goalX - limelight.get3DXDistance();
 
             // First frame target acquired: initialize error history without derivative spike
