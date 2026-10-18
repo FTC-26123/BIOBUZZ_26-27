@@ -120,6 +120,8 @@ public class HiveAim {
         this.limelight = limelight;
     }
 
+    public boolean isAligned() { return aligned; }
+
     private static class TagCenter {
 
         final double right;
@@ -134,6 +136,9 @@ public class HiveAim {
     }
 
     private TagCenter readFourTags(LLResult result) {
+
+        // botpose is the robot's field pose, not target-relative forward/right/up.
+        // Keep per-tag camera-space geometry and the explicit mounting transforms below.
 
         visibleTags = 0;
 

@@ -22,3 +22,5 @@ jobs:
           java-version: '17'
       - name: Check robot control behavior
         run: python tools/test_controls.py
+      - name: Check autonomous behavior
+        run: python tools/test_autonomous.py

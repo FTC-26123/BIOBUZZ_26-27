@@ -22,6 +22,16 @@ Vision consumers reject invalid or stale results. Autonomous alignment requires 
 
 Odometry updates cache one sensor sample for the loop, and the odometry test connects its movement controller to the drivetrain. Stopping a movement clears injected offsets before commanding zero power.
 
+## Autonomous stage limits and visual arrival
+
+Both autonomous routines now use bounded stages with a 27-second execution budget and a five-second parking reserve. Path stages have an eight-second deadline and stop after two seconds without meaningful pose progress (0.25 inches or one degree). These are configurable execution guards, not Pedro tuning values; verify them against measured route times. A failed aim/search or an active-stage deadline skips later collection/aim attempts and enters a bounded park when the Pinpoint reports READY and its pose is finite. Sensor faults, invalid pose, no-progress faults, and the overall deadline stop the drivetrain directly rather than attempting an untrusted park.
+
+Path completion now waits for Pedro's full `isBusy()` completion criteria instead of only reaching the parametric endpoint. Stage name, elapsed time, result, and failure reason are reported in telemetry. Camera-derived and path commands are selected before the follower's motor update.
+
+The yellow-ball seeker shares one parsed camera observation between movement, completion, and telemetry. It rejects invalid angles/areas, stale results, and wrong pipelines. Close off-axis balls keep turning with forward power zero. Visual arrival requires both the existing closeness threshold and horizontal error within four degrees, held for 150 ms across distinct frames. A frozen frame cannot confirm arrival. This confirms only visual positioning; it is not a possession sensor and does not add autonomous intake/firing.
+
+The existing color-height model and pixel thresholds are preserved setup assumptions and still need camera validation. HiveAim retains target-relative tag geometry and mounting transforms; a robot's field `botpose` is not a target-relative forward/right/up vector.
+
 ## Remaining robot-dependent work
 
 `Constants.create()` now builds a real Pedro 3 follower once `Constants.foresightConfig` is supplied. Until then it fails with an explicit setup message. Pedro 3.0.1 requires robot-specific controller, braking, maximum velocity, and deceleration values; values from another robot would not be a valid repair. Paste the complete generated configuration after the team's tuning session. Existing motor directions and odometry geometry still need verification on this robot.
@@ -38,6 +48,8 @@ Before field use, verify:
 6. Test odometry motion and stop at low power with space around the robot before trusting autonomous paths.
 
 Run `python tools/test_controls.py` with a JDK available through `JAVA_HOME` or `PATH` for the focused software regression checks. These exercise production control behavior with hardware fakes. A successful build or regression run does not establish motor direction, shot accuracy, camera geometry, or autonomous path performance.
+
+Run `python tools/test_autonomous.py` for autonomous acquisition, snapshot reuse, failure routing, cancellation, localization guards, and deadline checks. Both complete autonomous OpModes are compiled in that harness and the real Android build. GitHub Actions runs both suites.
 
 ## API references
 
