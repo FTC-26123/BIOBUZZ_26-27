@@ -2,9 +2,6 @@ package org.firstinspires.ftc.teamcode.subsystems;
 
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-
 /**
  * Subsystem responsible for automated AprilTag alignment using Limelight vision feedback.
  * Employs PD (Proportional-Derivative) control with exponential smoothing filter for rotation and strafing.
@@ -50,6 +47,7 @@ public class AprilTagAlignment {
     double curTime = 0;
     double lastTime = 0;
     private boolean targetWasVisible = false;
+    private boolean targetAcquired = false;
     double goalX = 0; // Desired target offset (centered)
 
     double smoothedRotError = 0;
@@ -87,6 +85,8 @@ public class AprilTagAlignment {
         this.runtime = runtime;
         this.kP_rotation = kPValueRot;
         this.kD_rotation = kDValueRot;
+        modifiableValues[0] = kPValueRot;
+        modifiableValues[1] = kDValueRot;
     }
 
     /**
@@ -97,6 +97,8 @@ public class AprilTagAlignment {
         this.runtime = runtime;
         this.kP_rotation = kPValueRot;
         this.kD_rotation = kDValueRot;
+        modifiableValues[0] = kPValueRot;
+        modifiableValues[1] = kDValueRot;
         this.kP_strafe = kPValueStrafe;
         this.kD_strafe = kDValueStrafe;
     }
@@ -120,6 +122,7 @@ public class AprilTagAlignment {
         strafeOutput = 0;
 
         targetWasVisible = false;
+        targetAcquired = false;
         targetLostTimer.reset();
     }
 
@@ -142,17 +145,9 @@ public class AprilTagAlignment {
         boolean targetVisible = limelight != null && limelight.isTargetVisible();
 
         if (targetVisible) {
+            targetAcquired = true;
             targetLostTimer.reset(); // Reset grace timer while target is in view
-
-            // Prefer 3D MegaTag2 IMU-anchored orientation (rock-solid, zero jumping when tags flicker)
-            Pose3D botPose = limelight.getBotPose();
-            double newRotError;
-            if (botPose != null) {
-                newRotError = -botPose.getOrientation().getYaw(AngleUnit.DEGREES);
-            } else {
-                newRotError = goalX - limelight.getHorizontalDelta();
-            }
-
+            double newRotError = goalX - limelight.getHorizontalDelta();
             double newStrafeError = goalX - limelight.get3DXDistance();
 
             // First frame target acquired: initialize error history without derivative spike
@@ -227,7 +222,7 @@ public class AprilTagAlignment {
      * Disables manual joystick rotation (`rotationMultiplier = 0`) and applies calculated PD power.
      */
     public void autoRotate() {
-        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
+        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetAcquired && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
 
         if (isTargetValid) {
             rotationMultiplier = 0; // Lock manual joystick rotation
@@ -254,7 +249,7 @@ public class AprilTagAlignment {
      * Disables manual joystick strafing (`strafeMultiplier = 0`) and applies calculated PD power.
      */
     public void autoStrafe() {
-        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
+        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetAcquired && targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
 
         if (isTargetValid) {
             strafeMultiplier = 0; // Lock manual joystick strafe

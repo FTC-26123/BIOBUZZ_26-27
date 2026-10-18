@@ -141,6 +141,14 @@ public class MecanumDrive {
         frontRightMotorSpeed = -y - x - rx;
         backRightMotorSpeed = -y + x - rx;
 
+        double denominator = Math.max(1.0, Math.max(
+                Math.max(Math.abs(frontLeftMotorSpeed), Math.abs(backLeftMotorSpeed)),
+                Math.max(Math.abs(frontRightMotorSpeed), Math.abs(backRightMotorSpeed))));
+        frontLeftMotorSpeed /= denominator;
+        backLeftMotorSpeed /= denominator;
+        frontRightMotorSpeed /= denominator;
+        backRightMotorSpeed /= denominator;
+
         // Apply global speed multiplier and write power to physical motors
         frontLeftMotor.setPower(frontLeftMotorSpeed * speedMultiplier);
         backLeftMotor.setPower(backLeftMotorSpeed * speedMultiplier);
@@ -149,10 +157,19 @@ public class MecanumDrive {
     }
 
     /**
-     * Sets global drive speed scaling factor (e.g. 0.25, 0.50, 0.75, 1.0).
+     * Immediately zeros all motors, bypassing vision and odometry offsets.
      */
+    public void stop() {
+        frontLeftMotorSpeed = frontRightMotorSpeed = backLeftMotorSpeed = backRightMotorSpeed = 0;
+        frontLeftMotor.setPower(0);
+        frontRightMotor.setPower(0);
+        backLeftMotor.setPower(0);
+        backRightMotor.setPower(0);
+    }
+
+    /** Sets global drive speed scaling factor, clamped to [0, 1]. */
     public void setSpeedMultiplier(double multiplier) {
-        speedMultiplier = multiplier;
+        speedMultiplier = Double.isFinite(multiplier) ? Math.max(0, Math.min(1, multiplier)) : 0;
     }
 
     /**

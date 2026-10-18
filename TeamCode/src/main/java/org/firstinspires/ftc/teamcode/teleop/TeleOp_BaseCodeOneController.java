@@ -72,6 +72,7 @@ public class TeleOp_BaseCodeOneController extends OpMode {
         shooter.update();
 
         // ---------------- Telemetry Status Output ----------------
+        telemetry.addLine("Hold A: vision align; hold RT: fire when ready");
         telemetry.addData("Robot Speed Multiplier G1 Dpad Right", driveTrain.getSpeedMultiplier());
 
         telemetry.addData("Shooter Status G1 RT/RB", shooter.getShooterStatus());
@@ -88,10 +89,11 @@ public class TeleOp_BaseCodeOneController extends OpMode {
     // ---------------------- Single Driver Input Handlers ----------------------
 
     private void handleManualShootingControl(Gamepad gamepad1) {
-        if (gamepad1.right_trigger > 0.5) {
-            shooter.start();
-        } else if (gamepad1.right_bumper) {
+        if (gamepad1.right_bumper) {
             shooter.stop();
+        } else {
+            if (gamepad1.right_trigger > 0.5) shooter.start();
+            shooter.setFireRequested(gamepad1.right_trigger > 0.5);
         }
     }
 
@@ -102,20 +104,20 @@ public class TeleOp_BaseCodeOneController extends OpMode {
     }
 
     private void handleManualGateControl(Gamepad gamepad1) {
-        if (gamepad1.x) {
-            shooter.openGate();
-        } else if (gamepad1.y) {
+        if (gamepad1.y || gamepad1.right_bumper) {
             shooter.closeGate();
+        } else if (gamepad1.x) {
+            shooter.openGate();
         }
     }
 
     private void handleManualIntakeControl(Gamepad gamepad1) {
-        if (gamepad1.left_trigger > 0.5) {
-            intake.start();
+        if (gamepad1.left_bumper) {
+            intake.stop();
         } else if (gamepad1.back) {
             intake.out();
-        } else if (gamepad1.left_bumper) {
-            intake.stop();
+        } else if (gamepad1.left_trigger > 0.5) {
+            intake.start();
         }
     }
 
@@ -126,7 +128,7 @@ public class TeleOp_BaseCodeOneController extends OpMode {
     }
 
     private void handleAutoRotation(Gamepad gamepad1) {
-        if (gamepad1.left_trigger > 0.3) {
+        if (gamepad1.a) {
             aprilTagAlignment.autoRotate();
         } else {
             aprilTagAlignment.setManualRotation();
@@ -139,5 +141,12 @@ public class TeleOp_BaseCodeOneController extends OpMode {
         } else {
             aprilTagAlignment.setManualStrafing();
         }
+    }
+
+    @Override
+    public void stop() {
+        shooter.stop();
+        driveTrain.stop();
+        limelight.stop();
     }
 }

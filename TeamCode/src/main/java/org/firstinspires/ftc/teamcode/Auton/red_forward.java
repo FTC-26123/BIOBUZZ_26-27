@@ -10,22 +10,16 @@ import com.pedropathing.paths.Path;
 import com.pedropathing.ivy.Command;
 import com.pedropathing.ivy.Scheduler;
 
-import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.pedro.Constants;
 
-import java.util.List;
 
 import static com.pedropathing.ivy.Scheduler.schedule;
 import static com.pedropathing.ivy.commands.Commands.lazy;
-import static com.pedropathing.ivy.groups.Groups.sequential;
-import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
 @Autonomous(name = "AutoPathYellow", group = "Autonomous")
 public class red_forward extends LinearOpMode {
@@ -33,6 +27,9 @@ public class red_forward extends LinearOpMode {
     private Follower follower;
     private Limelight3A limelight;
     private HiveAim hiveAim;
+    private YellowBallSeeker seeker;
+    private AutoPlan plan;
+    private com.qualcomm.hardware.gobilda.GoBildaPinpointDriver pinpoint;
 
     private final PoseFactory poseFactory =
             PoseFactory.degrees();
@@ -52,277 +49,18 @@ public class red_forward extends LinearOpMode {
     private final Pose parkControl1 =
             poseFactory.of(27.3674, 48.8626, 0);
 
-    private static final int YELLOW_PIPELINE = 0;
-
-    private static final double TURN_KP = 0.025;
-    private static final double MAX_TURN = 0.35;
-    private static final double SEARCH_TURN = 0.15;
-
-    private static final double FAST_FORWARD = 0.55;
-    private static final double SLOW_FORWARD = 0.25;
-
-    private static final double TURN_ONLY_ERROR = 10.0;
-    private static final double SLOW_ERROR = 4.0;
-
-    // Temporary example camera calibration.
-    private static final double CAMERA_HEIGHT_IN = 12.0;
-    private static final double IMAGE_CENTER_Y = 240.0;
-
-    private static final double POLLEN_HEIGHT_IN = 2.8;
-    private static final double HEIGHT_TOLERANCE_IN = 0.7;
-
-    private static final double MIN_BOTTOM_OFFSET_PX = 12.0;
-    private static final double BALL_CLOSE_BOTTOM_Y = 380.0;
-
-    private static final double SEARCH_TIMEOUT_SECONDS = 6.0;
-
-    private final ElapsedTime searchTimer = new ElapsedTime();
-
     public Command autoRoutine() {
-
-        return sequential(
-
-                follow(follower, shoot1()),
-
-                hiveAim.alignAndCalculate(
-                        "Shoot 1",
-                        YELLOW_PIPELINE
-                ),
-
-                seekYellowBalls(),
-
-                goToShoot2FromCurrentPosition(),
-
-                hiveAim.alignAndCalculate(
-                        "Shoot 2",
-                        YELLOW_PIPELINE
-                ),
-
-                parkFromCurrent()
-        );
-    }
-
-    private Command seekYellowBalls() {
-
-        return Command.build()
-
-                .setStart(() -> {
-
-                    searchTimer.reset();
-
-                    limelight.pipelineSwitch(
-                            YELLOW_PIPELINE
-                    );
-                })
-
-                .setExecute(() -> {
-
-                    LLResultTypes.ColorResult target =
-                            getBestYellowTarget();
-
-                    if (target == null) {
-
-                        follower.manual(
-                                0,
-                                0,
-                                SEARCH_TURN
-                        );
-
-                        return;
-                    }
-
-                    double tx = target.getTargetXDegrees();
-
-                    double turn = clamp(
-                            TURN_KP * tx,
-                            -MAX_TURN,
-                            MAX_TURN
-                    );
-
-                    double forward;
-
-                    if (Math.abs(tx) > TURN_ONLY_ERROR) {
-
-                        forward = 0;
-
-                    } else if (Math.abs(tx) > SLOW_ERROR) {
-
-                        forward = SLOW_FORWARD;
-
-                    } else {
-
-                        forward = FAST_FORWARD;
-                    }
-
-                    double bottomY = getBottomY(target);
-
-                    if (Double.isFinite(bottomY)
-                            && bottomY >= BALL_CLOSE_BOTTOM_Y) {
-
-                        forward = 0;
-                        turn = 0;
-                    }
-
-                    follower.manual(
-                            forward,
-                            0,
-                            turn
-                    );
-                })
-
-                .setDone(() -> {
-
-                    if (searchTimer.seconds()
-                            >= SEARCH_TIMEOUT_SECONDS) {
-
-                        return true;
-                    }
-
-                    LLResultTypes.ColorResult target =
-                            getBestYellowTarget();
-
-                    return target != null
-                            && getBottomY(target)
-                            >= BALL_CLOSE_BOTTOM_Y;
-                })
-
-                .setEnd(endCondition -> {
-
-                    follower.manual(0, 0, 0);
-                });
-    }
-
-    private LLResultTypes.ColorResult getBestYellowTarget() {
-
-        LLResult result = limelight.getLatestResult();
-
-        if (result == null
-                || !result.isValid()
-                || result.getPipelineIndex() != YELLOW_PIPELINE) {
-
-            return null;
-        }
-
-        List<LLResultTypes.ColorResult> targets =
-                result.getColorResults();
-
-        if (targets == null || targets.isEmpty()) {
-            return null;
-        }
-
-        LLResultTypes.ColorResult bestTarget = null;
-
-        double biggestArea = -1;
-
-        for (LLResultTypes.ColorResult target : targets) {
-
-            if (!isPollen(target)) {
-                continue;
-            }
-
-            double area = target.getTargetArea();
-
-            if (area > biggestArea) {
-
-                biggestArea = area;
-                bestTarget = target;
-            }
-        }
-
-        return bestTarget;
-    }
-
-    private boolean isPollen(
-            LLResultTypes.ColorResult target) {
-
-        double estimatedHeight =
-                estimateRealHeight(target);
-
-        if (!Double.isFinite(estimatedHeight)) {
-            return false;
-        }
-
-        return Math.abs(
-                estimatedHeight - POLLEN_HEIGHT_IN
-        ) <= HEIGHT_TOLERANCE_IN;
-    }
-
-    private double estimateRealHeight(
-            LLResultTypes.ColorResult target) {
-
-        double[] bounds = getVerticalBounds(target);
-
-        if (bounds == null) {
-            return Double.NaN;
-        }
-
-        double topY = bounds[0];
-        double bottomY = bounds[1];
-
-        double pixelHeight = bottomY - topY;
-        double bottomOffset = bottomY - IMAGE_CENTER_Y;
-
-        if (pixelHeight <= 0
-                || bottomOffset <= MIN_BOTTOM_OFFSET_PX) {
-
-            return Double.NaN;
-        }
-
-        return CAMERA_HEIGHT_IN
-                * pixelHeight
-                / bottomOffset;
-    }
-
-    private double[] getVerticalBounds(
-            LLResultTypes.ColorResult target) {
-
-        List<List<Double>> corners =
-                target.getTargetCorners();
-
-        if (corners == null || corners.isEmpty()) {
-            return null;
-        }
-
-        double topY = Double.POSITIVE_INFINITY;
-        double bottomY = Double.NEGATIVE_INFINITY;
-
-        for (List<Double> corner : corners) {
-
-            if (corner == null || corner.size() < 2) {
-                continue;
-            }
-
-            double y = corner.get(1);
-
-            if (!Double.isFinite(y)) {
-                continue;
-            }
-
-            topY = Math.min(topY, y);
-            bottomY = Math.max(bottomY, y);
-        }
-
-        if (!Double.isFinite(topY)
-                || !Double.isFinite(bottomY)
-                || bottomY <= topY) {
-
-            return null;
-        }
-
-        return new double[]{
-                topY,
-                bottomY
-        };
-    }
-
-    private double getBottomY(
-            LLResultTypes.ColorResult target) {
-
-        double[] bounds = getVerticalBounds(target);
-
-        return bounds == null
-                ? Double.NaN
-                : bounds[1];
+        plan = new AutoPlan(follower, () -> pinpoint.getDeviceStatus()
+                == com.qualcomm.hardware.gobilda.GoBildaPinpointDriver.DeviceStatus.READY);
+        return plan
+                .add("Shoot position 1", () -> AutoPlan.follow(follower, this::shoot1), 8, true, () -> true)
+                .add("Aim 1", () -> hiveAim.alignAndCalculate("Shoot 1", YellowBallSeeker.PIPELINE),
+                        3, false, hiveAim::isAligned)
+                .add("Seek yellow", seeker::command, 6.5, false, seeker::acquired)
+                .add("Shoot position 2", this::goToShoot2FromCurrentPosition, 8, true, () -> true)
+                .add("Aim 2", () -> hiveAim.alignAndCalculate("Shoot 2", YellowBallSeeker.PIPELINE),
+                        3, false, hiveAim::isAligned)
+                .park(this::parkFromCurrent).command();
     }
 
     private Command goToShoot2FromCurrentPosition() {
@@ -339,7 +77,7 @@ public class red_forward extends LinearOpMode {
                     shoot2
             );
 
-            return follow(follower, path);
+            return AutoPlan.follow(follower, () -> path);
         });
     }
 
@@ -358,7 +96,7 @@ public class red_forward extends LinearOpMode {
                     park
             );
 
-            return follow(follower, path);
+            return AutoPlan.follow(follower, () -> path);
         });
     }
 
@@ -373,23 +111,13 @@ public class red_forward extends LinearOpMode {
         );
     }
 
-    private double clamp(
-            double value,
-            double minimum,
-            double maximum) {
-
-        return Math.max(
-                minimum,
-                Math.min(maximum, value)
-        );
-    }
-
     @Override
     public void runOpMode() {
 
         Scheduler.reset();
 
         follower = Constants.create(hardwareMap);
+        pinpoint = hardwareMap.get(com.qualcomm.hardware.gobilda.GoBildaPinpointDriver.class, "pinpoint");
 
         follower.setPose(start);
         follower.update();
@@ -404,9 +132,8 @@ public class red_forward extends LinearOpMode {
                 limelight
         );
 
-        limelight.pipelineSwitch(
-                YELLOW_PIPELINE
-        );
+        seeker = new YellowBallSeeker(follower, limelight);
+        limelight.pipelineSwitch(YellowBallSeeker.PIPELINE);
 
         limelight.start();
 
@@ -428,8 +155,9 @@ public class red_forward extends LinearOpMode {
 
             while (opModeIsActive()) {
 
-                follower.update();
+                seeker.sample();
                 Scheduler.execute();
+                follower.update();
 
                 telemetry.addData(
                         "x",
@@ -450,38 +178,8 @@ public class red_forward extends LinearOpMode {
 
                 hiveAim.addTelemetry(telemetry);
 
-                LLResultTypes.ColorResult target =
-                        getBestYellowTarget();
-
-                if (target != null) {
-
-                    telemetry.addData(
-                            "Yellow TX",
-                            target.getTargetXDegrees()
-                    );
-
-                    telemetry.addData(
-                            "Yellow area",
-                            target.getTargetArea()
-                    );
-
-                    telemetry.addData(
-                            "Estimated height (in)",
-                            estimateRealHeight(target)
-                    );
-
-                    telemetry.addData(
-                            "Bottom Y",
-                            getBottomY(target)
-                    );
-
-                } else {
-
-                    telemetry.addData(
-                            "Yellow target",
-                            "NONE"
-                    );
-                }
+                seeker.addTelemetry(telemetry);
+                plan.addTelemetry(telemetry);
 
                 if (follower.currentPath() != null) {
 

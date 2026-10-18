@@ -81,10 +81,11 @@ public class TeleOp_TestIntakeShooterDrivetrain extends OpMode {
      * Controls shooter start on Right Trigger (> 0.5) and stop on Right Bumper.
      */
     private void handleManualShootingControl(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.5) {
-            shooter.start();
-        } else if (gamepad2.right_bumper) {
+        if (gamepad2.right_bumper) {
             shooter.stop();
+        } else {
+            if (gamepad2.right_trigger > 0.5) shooter.start();
+            shooter.setFireRequested(gamepad2.right_trigger > 0.5);
         }
     }
 
@@ -101,10 +102,10 @@ public class TeleOp_TestIntakeShooterDrivetrain extends OpMode {
      * Opens launcher gate on Gamepad 2 X and closes gate on Gamepad 2 Y.
      */
     private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
+        if (gamepad2.y || gamepad2.right_bumper) {
             shooter.closeGate();
+        } else if (gamepad2.x) {
+            shooter.openGate();
         }
     }
 
@@ -112,12 +113,12 @@ public class TeleOp_TestIntakeShooterDrivetrain extends OpMode {
      * Controls intake start on Left Trigger (> 0.5), reverse on Back button, and stop on Left Bumper.
      */
     private void handleManualIntakeControl(Gamepad gamepad2) {
-        if (gamepad2.left_trigger > 0.5) {
-            intake.switchSpeed(customIntakePower);
+        if (gamepad2.left_bumper) {
+            intake.stop();
         } else if (gamepad2.back) {
             intake.out();
-        } else if (gamepad2.left_bumper) {
-            intake.stop();
+        } else if (gamepad2.left_trigger > 0.5) {
+            intake.switchSpeed(customIntakePower);
         }
     }
 
@@ -144,5 +145,11 @@ public class TeleOp_TestIntakeShooterDrivetrain extends OpMode {
         if (gamepad1.dpadRightWasPressed()) {
             driveTrain.switchSpeed();
         }
+    }
+
+    @Override
+    public void stop() {
+        shooter.stop();
+        driveTrain.stop();
     }
 }

@@ -19,8 +19,6 @@ import org.firstinspires.ftc.teamcode.pedro.Constants;
 
 import static com.pedropathing.ivy.Scheduler.schedule;
 import static com.pedropathing.ivy.commands.Commands.lazy;
-import static com.pedropathing.ivy.groups.Groups.sequential;
-import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
 @Autonomous(name = "red_cycle", group = "Autonomous")
 public class red_cycle extends LinearOpMode {
@@ -28,6 +26,8 @@ public class red_cycle extends LinearOpMode {
     private Follower follower;
     private Limelight3A limelight;
     private HiveAim hiveAim;
+    private AutoPlan plan;
+    private com.qualcomm.hardware.gobilda.GoBildaPinpointDriver pinpoint;
 
     private final PoseFactory poseFactory =
             PoseFactory.degrees();
@@ -57,33 +57,20 @@ public class red_cycle extends LinearOpMode {
             poseFactory.of(13.7021, 91.8842, 256);
 
     public Command autoRoutine() {
-
-        return sequential(
-
-                follow(follower, readyGarden()),
-
-                follow(follower, garden()),
-
-                follow(follower, shoot1()),
-
-                hiveAim.alignAndCalculate(
-                        "Shoot 1",
-                        HiveAim.TAG_PIPELINE
-                ),
-
-                flowerReadyFromCurrent(),
-
-                follow(follower, flower()),
-
-                follow(follower, shoot2()),
-
-                hiveAim.alignAndCalculate(
-                        "Shoot 2",
-                        HiveAim.TAG_PIPELINE
-                ),
-
-                parkFromCurrent()
-        );
+        plan = new AutoPlan(follower, () -> pinpoint.getDeviceStatus()
+                == com.qualcomm.hardware.gobilda.GoBildaPinpointDriver.DeviceStatus.READY);
+        return plan
+                .add("Ready garden", () -> AutoPlan.follow(follower, this::readyGarden), 8, true, () -> true)
+                .add("Garden", () -> AutoPlan.follow(follower, this::garden), 8, true, () -> true)
+                .add("Shoot position 1", () -> AutoPlan.follow(follower, this::shoot1), 8, true, () -> true)
+                .add("Aim 1", () -> hiveAim.alignAndCalculate("Shoot 1", HiveAim.TAG_PIPELINE),
+                        3, false, hiveAim::isAligned)
+                .add("Ready flower", this::flowerReadyFromCurrent, 8, true, () -> true)
+                .add("Flower", () -> AutoPlan.follow(follower, this::flower), 8, true, () -> true)
+                .add("Shoot position 2", () -> AutoPlan.follow(follower, this::shoot2), 8, true, () -> true)
+                .add("Aim 2", () -> hiveAim.alignAndCalculate("Shoot 2", HiveAim.TAG_PIPELINE),
+                        3, false, hiveAim::isAligned)
+                .park(this::parkFromCurrent).command();
     }
 
     public Path readyGarden() {
@@ -141,7 +128,7 @@ public class red_cycle extends LinearOpMode {
                     flowerReady
             );
 
-            return follow(follower, path);
+            return AutoPlan.follow(follower, () -> path);
         });
     }
 
@@ -189,7 +176,7 @@ public class red_cycle extends LinearOpMode {
                     pointpark
             );
 
-            return follow(follower, path);
+            return AutoPlan.follow(follower, () -> path);
         });
     }
 
@@ -199,6 +186,7 @@ public class red_cycle extends LinearOpMode {
         Scheduler.reset();
 
         follower = Constants.create(hardwareMap);
+        pinpoint = hardwareMap.get(com.qualcomm.hardware.gobilda.GoBildaPinpointDriver.class, "pinpoint");
 
         follower.setPose(start);
         follower.update();
@@ -234,8 +222,8 @@ public class red_cycle extends LinearOpMode {
 
             while (opModeIsActive()) {
 
-                follower.update();
                 Scheduler.execute();
+                follower.update();
 
                 telemetry.addData(
                         "x",
@@ -255,6 +243,7 @@ public class red_cycle extends LinearOpMode {
                 );
 
                 hiveAim.addTelemetry(telemetry);
+                plan.addTelemetry(telemetry);
 
                 if (follower.currentPath() != null) {
 

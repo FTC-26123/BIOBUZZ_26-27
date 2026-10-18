@@ -28,6 +28,14 @@ public class Limelight {
     private double verticalDelta = 0;   // Ty: vertical offset angle to target
     private double targetArea = 0;      // Ta: target area (% of camera image)
 
+    private long lastLogNanos;
+    public static final long MAX_RESULT_AGE_MS = 200;
+
+    public static boolean isFresh(LLResult result) {
+        return result != null && result.isValid() && result.getStaleness() >= 0
+                && result.getStaleness() <= MAX_RESULT_AGE_MS;
+    }
+
     public static final String TAG = "Limelight";
 
     /**
@@ -40,10 +48,9 @@ public class Limelight {
         try {
             imu = hwMap.get(IMU.class, "imu");
             Log.d(TAG, "IMU found " + imu);
-            //Intentionally left undone as a reminder to fix it for new robot
             RevHubOrientationOnRobot revHubOrientationOnRobot = new RevHubOrientationOnRobot(
-                    RevHubOrientationOnRobot.LogoFacingDirection.,
-                    RevHubOrientationOnRobot.UsbFacingDirection.
+                    RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
+                    RevHubOrientationOnRobot.UsbFacingDirection.FORWARD
             );
             imu.initialize(new IMU.Parameters(revHubOrientationOnRobot));
         } catch (Exception e) {
@@ -63,7 +70,8 @@ public class Limelight {
      * Stops camera polling and processing.
      */
     public void stop() {
-        limelight.stop();
+        if (limelight != null) limelight.stop();
+        clearTarget();
     }
 
     /**
@@ -88,7 +96,8 @@ public class Limelight {
      * Parses the Limelight 3D pose, horizontal/vertical target deltas, and logs diagnostic output.
      */
     private void handlePosition(LLResult llResult) {
-        if (llResult != null && llResult.isValid()) {
+        if (isFresh(llResult) && Double.isFinite(llResult.getTx())
+                && Double.isFinite(llResult.getTy()) && Double.isFinite(llResult.getTa())) {
             if (imu != null) {
                 botPose = llResult.getBotpose_MT2(); // MegaTag 2 IMU-assisted 3D pose
             } else {
@@ -99,7 +108,11 @@ public class Limelight {
             double ty = llResult.getTy();
             double ta = llResult.getTa();
 
-            if (tx != horizontalDelta || ty != verticalDelta || ta != targetArea) {
+            horizontalDelta = tx;
+            verticalDelta = ty;
+            targetArea = ta;
+            if (System.nanoTime() - lastLogNanos >= 250_000_000L) {
+                lastLogNanos = System.nanoTime();
                 this.horizontalDelta = tx;
                 this.verticalDelta = ty;
                 this.targetArea = ta;
@@ -115,11 +128,16 @@ public class Limelight {
                 }
             }
         } else {
-            targetVisible = false;
-            horizontalDelta = 0;
-            verticalDelta = 0;
-            targetArea = 0;
+            clearTarget();
         }
+    }
+
+    private void clearTarget() {
+        botPose = null;
+        targetVisible = false;
+        horizontalDelta = 0;
+        verticalDelta = 0;
+        targetArea = 0;
     }
 
     // --------------------- Getters ---------------------
