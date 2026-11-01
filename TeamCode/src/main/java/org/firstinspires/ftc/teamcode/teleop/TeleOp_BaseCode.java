@@ -32,7 +32,7 @@ public class TeleOp_BaseCode extends OpMode {
      */
     @Override
     public void init() {
-        limelight.init(hardwareMap);
+//        limelight.init(hardwareMap);
         aprilTagAlignment.init(limelight, TeleOpRuntime);
         driveTrain.init(hardwareMap, aprilTagAlignment);
         intake.init(hardwareMap);
@@ -45,7 +45,7 @@ public class TeleOp_BaseCode extends OpMode {
     @Override
     public void start() {
         TeleOpRuntime.reset();
-        limelight.start();
+//        limelight.start();
     }
 
     /**
@@ -54,13 +54,13 @@ public class TeleOp_BaseCode extends OpMode {
     @Override
     public void loop() {
         // Limelight vision & AprilTag alignment updates
-        limelight.update();
+//        limelight.update();
         aprilTagAlignment.update();
         handleAutoRotation(gamepad1);
         // handleAutoStrafe(gamepad1);
 
         // Driver 1 Drivetrain Control
-        handleDrivtrainDpadSpeedSwitching(gamepad1);
+        handleDrivetrainDpadSpeedSwitching(gamepad1);
         driveTrain.drive(gamepad1.left_stick_y, gamepad1.left_stick_x, gamepad1.right_stick_x);
 
         // Driver 2 Intake Control
@@ -121,7 +121,7 @@ public class TeleOp_BaseCode extends OpMode {
         }
     }
 
-    private void handleDrivtrainDpadSpeedSwitching(Gamepad gamepad1) {
+    private void handleDrivetrainDpadSpeedSwitching(Gamepad gamepad1) {
         if (gamepad1.dpadRightWasPressed()) {
             driveTrain.switchSpeed();
         }

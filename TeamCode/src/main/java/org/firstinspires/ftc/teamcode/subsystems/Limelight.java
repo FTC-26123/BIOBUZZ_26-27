@@ -37,18 +37,18 @@ public class Limelight {
     public void init(HardwareMap hwMap) {
         limelight = hwMap.get(Limelight3A.class, "limelight");
         Log.d(TAG, "Limelight found " + limelight);
-        try {
-            imu = hwMap.get(IMU.class, "imu");
-            Log.d(TAG, "IMU found " + imu);
-            //Intentionally left undone as a reminder to fix it for new robot
-            RevHubOrientationOnRobot revHubOrientationOnRobot = new RevHubOrientationOnRobot(
-                    RevHubOrientationOnRobot.LogoFacingDirection.,
-                    RevHubOrientationOnRobot.UsbFacingDirection.
-            );
-            imu.initialize(new IMU.Parameters(revHubOrientationOnRobot));
-        } catch (Exception e) {
-            imu = null; // IMU optional fallback
-        }
+//        try {
+//            imu = hwMap.get(IMU.class, "imu");
+//            Log.d(TAG, "IMU found " + imu);
+//            //Intentionally left undone as a reminder to fix it for new robot
+//            RevHubOrientationOnRobot revHubOrientationOnRobot = new RevHubOrientationOnRobot(
+//                    RevHubOrientationOnRobot.LogoFacingDirection.,
+//                    RevHubOrientationOnRobot.UsbFacingDirection.
+//            );
+//            imu.initialize(new IMU.Parameters(revHubOrientationOnRobot));
+//        } catch (Exception e) {
+//            imu = null; // IMU optional fallback
+//        }
         limelight.pipelineSwitch(0);
     }
 

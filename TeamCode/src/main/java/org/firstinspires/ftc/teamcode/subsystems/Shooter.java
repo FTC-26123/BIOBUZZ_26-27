@@ -40,7 +40,7 @@ public class Shooter {
         } catch (Exception e) {
             gate = null; // Windmill hardware motor not configured/installed
         }
-        shooter.setDirection(DcMotorSimple.Direction.REVERSE);
+        shooter.setDirection(DcMotorSimple.Direction.FORWARD);
     }
 
     /**
