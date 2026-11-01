@@ -24,7 +24,7 @@ Only these two wrappers are registered. Older flower/adaptive wrappers failed a 
 
 
 
-1. Run the existing Pedro drivetrain/localizer and Foresight tuners. Paste the measured `ForesightConfig` produced by `ForesightTuner` into `Constants.foresightConfig`. It deliberately has no guessed default: Init reports the missing tuning rather than returning a null follower. Existing team drivetrain directions and Pinpoint offsets are preserved and still need physical verification.
+1. Run the existing Pedro drivetrain/localizer and Foresight tuners. Paste the measured `ForesightConfig` produced by `ForesightTuner` into `Constants.foresightConfig`. It deliberately has no guessed default: Init reports the missing tuning rather than returning a null follower. Drivetrain directions now match the active MecanumDrive subsystem (left REVERSE, right FORWARD); Pinpoint offsets are preserved and still need physical verification.
 
 2. Configure the required hardware names: `frontLeftMotor`, `frontRightMotor`, `backLeftMotor`, `backRightMotor`, `pinpoint`, `shooter`, `intake`, `windmill`, `gate`, `limelight`, `Webcam 1` (Logitech USB camera). Gate closed/open positions are 0.50/0.27. Match the existing subsystem conventions: shooter FORWARD with positive encoder velocity; intake REVERSE with negative intake power; windmill FORWARD with positive power. Verify these with the robot raised before loading balls. Shooter uses RUN_USING_ENCODER; intake and windmill use RUN_WITHOUT_ENCODER with BRAKE.
 
@@ -43,6 +43,22 @@ Only these two wrappers are registered. Older flower/adaptive wrappers failed a 
 9. Start with four pollen preloads and an otherwise reset field. Coordinates are field-centered inches, +X right, +Y up; Pedro heading zero points +X. Red starts at (-0.360, -1.564259) m, heading 90 degrees; blue is its 180-degree mirror, (+0.360, +1.564259) m, heading 270 degrees. Init displays the placement. Verify localizer heading and alliance-half clearance on the real field.
 
 
+
+## Motor wiring checked against the team repository
+
+| Hardware name | SDK direction | Inward / launch command |
+| --- | --- | --- |
+| `intake` | REVERSE | -0.8 power |
+| `windmill` (transfer) | FORWARD | +1.0 power |
+| `shooter` | FORWARD | positive ticks/second |
+| `frontLeftMotor`, `backLeftMotor` | REVERSE | positive power drives forward |
+| `frontRightMotor`, `backRightMotor` | FORWARD | positive power drives forward |
+
+These match the active `subsystems/Intake.java`, `Shooter.java` and `MecanumDrive.java` in FTC-26123/BIOBUZZ_26-27 master. The older Pedro constants reversed both right motors; this revision changes them to FORWARD to match the active drivetrain. Direction and power sign are separate: the reversed intake needs a **negative logical command** to pull inward. `Intake.switchSpeed(+speed)` now uses that same inward convention and reverses both mechanisms for a negative speed.
+
+`windmill` is required, not optional. Autonomous initialization configures the shooter for encoder velocity control, the intake/transfer for power control with BRAKE, stops all three motors and closes the gate. Stop and completed feed pulses stop both intake and transfer.
+
+Use **26123 Motor Direction Check** with the robot supported and mechanisms clear. It needs neither cameras nor Pedro tuning. After Start, hold **right bumper** plus one control: **A** runs intake at -0.25; **B** runs windmill at +0.25; **X** commands shooter at +600 ticks/s; **D-pad up** runs all drive wheels at +0.15. Only one check runs at a time. Gate remains closed; releasing the bumper or pressing Stop clears commands. Verify encoder readings and physical direction before an autonomous field run. Software tests cannot confirm wiring or real motor motion.
 
 ## Behavior and limits
 
