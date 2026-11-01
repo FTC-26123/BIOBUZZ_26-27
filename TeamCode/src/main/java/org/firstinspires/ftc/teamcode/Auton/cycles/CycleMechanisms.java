@@ -34,6 +34,7 @@ public final class CycleMechanisms {
         windmill.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         stop();
     }
+    public double intakeSpeed(){return intake.getVelocity();}
     public double speed(){return flywheel.getVelocity();}
     public double releaseDelay(double now){return feeder.remaining(now,intake.getVelocity(),lastShot);}
     public double lastFeedDuration(){return feeder.lastObserved;}
