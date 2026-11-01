@@ -15,7 +15,7 @@ public final class GardenSweep {
     public String status="Waiting for pollen image";
     public void reset(Pose pose){scan=pose;goal=null;arrived=-1;lastPlan=-1;replans=0;paused=false;inLane=false;}
     public boolean update(Follower follower,CycleMechanisms mechanisms,LLResult frame,boolean blue,double now){
-        if(!SpillCollector.fresh(frame,0)){
+        if(!SpillCollector.fresh(frame,VisionRules.POLLEN_PIPELINE)){
             paused=true;mechanisms.collect(false);follower.stop();follower.drivetrain.stop();status="Stale image: stopped";return false;
         }
         Pose p=follower.pose();com.pedropathing.math.Velocity v=follower.velocity();double sign=blue?-1:1;
@@ -23,7 +23,7 @@ public final class GardenSweep {
         double age=(frame.getStaleness()+frame.getCaptureLatency()+frame.getTargetingLatency()+frame.getParseLatency())/1000;
         Pose captured=new Pose(p.x()-v.vx*age,p.y()-v.vy*age,p.heading()-v.omega*age);
         double best=Double.POSITIVE_INFINITY;double[] target=null;
-        for(com.qualcomm.hardware.limelightvision.LLResultTypes.ColorResult blob:frame.getColorResults()){
+        for(com.qualcomm.hardware.limelightvision.LLResultTypes.DetectorResult blob:SpillCollector.pollen(frame)){
             double[] xy=SpillCollector.project(blob.getTargetXDegrees(),blob.getTargetYDegrees(),captured,.03556);
             if(xy==null)continue;double x=xy[0]*sign,y=xy[1]*sign;
             if(x< -1.80||x> -1.40||y< -1.82||y> -1.65)continue;

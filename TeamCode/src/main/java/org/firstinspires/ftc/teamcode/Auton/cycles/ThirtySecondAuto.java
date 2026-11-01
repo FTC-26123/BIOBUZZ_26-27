@@ -31,6 +31,7 @@ public abstract class ThirtySecondAuto extends OpMode {
     private CycleMechanisms mechanisms;
     private GoBildaPinpointDriver pinpoint;
     private Limelight3A camera;
+    private WebcamTags tags;
     private CycleRoute route;
     private CycleRoute.Stage stage;
     private final ElapsedTime timer=new ElapsedTime();
@@ -45,7 +46,8 @@ public abstract class ThirtySecondAuto extends OpMode {
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
         follower.setPose(route.initial); follower.update();
         mechanisms=new CycleMechanisms(hardwareMap);
-        camera=hardwareMap.get(Limelight3A.class,"limelight");camera.pipelineSwitch(1);camera.setPollRateHz(100);camera.start();
+        camera=hardwareMap.get(Limelight3A.class,"limelight");camera.pipelineSwitch(VisionRules.POLLEN_PIPELINE);camera.setPollRateHz(100);camera.start();
+        tags=new WebcamTags(hardwareMap);
         telemetry.addData("Place robot (m)",String.format("%.3f, %.3f",route.initial.x()*.0254,route.initial.y()*.0254));
         telemetry.addData("Pedro heading (deg)",Math.toDegrees(route.initial.heading()));
         telemetry.addLine("Verify hardware calibration: 4 pollen preloads, camera pitch +10 degrees.");
@@ -86,7 +88,6 @@ public abstract class ThirtySecondAuto extends OpMode {
         mechanisms.target(preparedSpeed);
         shotBase=mechanisms.fired;lastProgress=stageStart;lastX=follower.pose().x();lastY=follower.pose().y();
         rollingStart=-1;haveRollingAim=false;emptyBase=mechanisms.emptyPulses;transitPath=new TransitPath(follower.pose(),stage.pose(),route.blue);
-        camera.pipelineSwitch(stage.action()==CycleRoute.Action.WAIT_TIP||stage.action()==CycleRoute.Action.VISION_COLLECT||stage.action()==CycleRoute.Action.SWEEP||(stage.action()==CycleRoute.Action.COLLECT&&stage.name().contains("cleanup"))?0:1);
         collector.reset(follower.pose());
         pathReplans+=garden.replans;garden.reset(follower.pose());movingSolution=null;lastSolve=-1;
         follower.follow(Paths.line(follower.pose(),stage.pose()).linear(follower.pose(),stage.pose()));
@@ -117,7 +118,7 @@ public abstract class ThirtySecondAuto extends OpMode {
             vision=garden.status;report();return;
         }
         if(stage.action()==CycleRoute.Action.VISION_COLLECT||stage.action()==CycleRoute.Action.VISION_NECTAR){
-            boolean collected=collector.update(follower,mechanisms,camera.getLatestResult(),0,route.blue,stage.count(),now);
+            boolean collected=collector.update(follower,mechanisms,camera.getLatestResult(),VisionRules.POLLEN_PIPELINE,route.blue,stage.count(),now);
             vision=collector.status+"; attempts "+collector.attempts;
             if(collected||now-stageStart>stage.limit())next();
             report();return;
@@ -171,7 +172,7 @@ public abstract class ThirtySecondAuto extends OpMode {
                 mechanisms.close();vision="Waiting for released balls to reach the floor";
                 LLResult floor=camera.getLatestResult();
                 boolean groundTarget=false;
-                if(SpillCollector.fresh(floor,0))for(com.qualcomm.hardware.limelightvision.LLResultTypes.ColorResult blob:floor.getColorResults()){
+                if(SpillCollector.fresh(floor,VisionRules.POLLEN_PIPELINE))for(com.qualcomm.hardware.limelightvision.LLResultTypes.DetectorResult blob:SpillCollector.pollen(floor)){
                     double[] xy=SpillCollector.project(blob.getTargetXDegrees(),blob.getTargetYDegrees(),p,SpillCollector.BALL_RADIUS);
                     if(xy!=null&&xy[0]*(route.blue?-1:1)<-.05){groundTarget=true;break;}
                 }
@@ -236,7 +237,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         shotStatus=String.format(java.util.Locale.US,"v %.2f -> %.2f, remaining %.2f m, aim %.1f deg, RPM ticks %.0f/%.0f, valid %s, feed %s",speed,futureSpeed,current.remaining(),Math.toDegrees(Math.atan2(Math.sin(releasePose.heading()-h),Math.cos(releasePose.heading()-h))),mechanisms.speed(),movingSolution==null?0:movingSolution.ticks(),direct!=null,permit);
         if(complete&&arrived){next();return;}
         if(now-stageStart>stage.limit()){
-            if(route.strategy==CycleRoute.Strategy.RUSH_TIPS&&!vision.startsWith("Old capture"))beginPark();
+            if(route.strategy==CycleRoute.Strategy.RUSH_TIPS&&!vision.contains("No fresh"))beginPark();
             else finish("Rolling stage timeout: "+stage.name());
         }
     }
@@ -247,17 +248,11 @@ public abstract class ThirtySecondAuto extends OpMode {
         return Math.abs(x)+ex<1.790&&Math.abs(y)+ey<1.790&&x*(route.blue?-1:1)+ex<-.002;
     }
     private boolean visionReady(){
-        LLResult frame=camera.getLatestResult();
-        if(frame==null||!frame.isValid()||frame.getPipelineIndex()!=1){vision="No fresh tag - holding fire";return false;}
-        // A newly received frame can still describe the distant past. Include camera processing time.
-        double age=frame.getStaleness()+frame.getCaptureLatency()+frame.getTargetingLatency()+frame.getParseLatency();
-        if(!Double.isFinite(age)||age<0||age>180){vision="Old capture - holding fire";return false;}
         boolean initialCell=index==1||stage.action()==CycleRoute.Action.BONUS_FIRE||stage.action()==CycleRoute.Action.ROLL_NEAR;
         int first=route.blue?(initialCell?42:38):(initialCell?34:30);
-        for(LLResultTypes.FiducialResult tag:frame.getFiducialResults())if(tag.getFiducialId()>=first&&tag.getFiducialId()<first+4){vision="Verified cell "+first;return true;}
-        vision="Wrong cell - holding fire";return false;
+        boolean ready=tags.ready(first);vision=tags.status;return ready;
     }
-    private void finish(String why){finishedAt=timer.seconds();done=true;result=why;follower.stop();follower.drivetrain.stop();mechanisms.stop();camera.stop();}
+    private void finish(String why){finishedAt=timer.seconds();done=true;result=why;follower.stop();follower.drivetrain.stop();mechanisms.stop();camera.stop();if(tags!=null)tags.close();}
     private void report(){
         telemetry.addData("Auto stage",stage==null?"Init":stage.name());telemetry.addData("Auto result",result);
         telemetry.addData("Auto elapsed",done?finishedAt:timer.seconds());telemetry.addData("Confirmed feed events",mechanisms.fired);
@@ -267,5 +262,5 @@ public abstract class ThirtySecondAuto extends OpMode {
         if(adaptive()){telemetry.addData("Moving feed events",movingFeeds);telemetry.addData("Live path replans",pathReplans+garden.replans);}
         telemetry.update();
     }
-    @Override public void stop(){if(follower!=null){follower.stop();follower.drivetrain.stop();}if(mechanisms!=null)mechanisms.stop();if(camera!=null)camera.stop();}
+    @Override public void stop(){if(follower!=null){follower.stop();follower.drivetrain.stop();}if(mechanisms!=null)mechanisms.stop();if(camera!=null)camera.stop();if(tags!=null)tags.close();}
 }
