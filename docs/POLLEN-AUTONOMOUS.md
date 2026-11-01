@@ -56,7 +56,7 @@ These four autonomous wrappers are registered. Older flower/adaptive wrappers fa
 | `frontLeftMotor`, `backLeftMotor` | REVERSE | positive power drives forward |
 | `frontRightMotor`, `backRightMotor` | FORWARD | positive power drives forward |
 
-These match the active `subsystems/Intake.java`, `Shooter.java` and `MecanumDrive.java` in FTC-26123/BIOBUZZ_26-27 master. The older Pedro constants reversed both right motors; this revision changes them to FORWARD to match the active drivetrain. Direction and power sign are separate: the reversed intake needs a **negative logical command** to pull inward. `Intake.switchSpeed(+speed)` now uses that same inward convention and reverses both mechanisms for a negative speed.
+These match the active `subsystems/Intake.java`, `Shooter.java` and `MecanumDrive.java` in FTC-26123/BIOBUZZ_26-27 master. The older Pedro constants reversed both right motors; this revision changes them to FORWARD to match the active drivetrain. Direction and power sign are separate: the reversed intake needs a **negative logical command** to pull inward. The latest default-branch intake API keeps the roller and windmill separate; that behavior is preserved. The autonomous controller coordinates its own inward roller and transfer commands.
 
 `windmill` is required, not optional. Autonomous initialization configures the shooter for encoder velocity control, the intake/transfer for power control with BRAKE, stops all three motors and closes the gate. Stop and completed feed pulses stop both intake and transfer.
 
@@ -117,3 +117,9 @@ Run `powershell -File tools/auton/check-models.ps1` with a JDK (`JAVA_HOME`) for
 The current finite-extraction and no-flower simulator results are recorded in the simulator counterpart documentation, `docs/FLOWER-AND-FLOOR-AUTO.md`. The tuned constants are user supplied; neither a successful Android build nor simulator results verifies the real camera/mechanism calibration.
 
 Latest final simulator trials with finite flower pickup: both Rushes scored 15/15, completed two tips, collected all twelve own preplaced balls and parked. Both no-flower routines scored 8/8, completed one tip, collected all four garden balls with zero flower pickups, and parked. Higher recovery scores up to eleven entries occurred in earlier trials but are variable; two no-flower tips are not validated.
+
+## Integration with the latest team default branch
+
+This branch starts from `840a102`, the merge of PR #11 (software PIDF shooter and speed-adjust TeleOp). The latest `Shooter.java`, `Intake.java`, `Limelight.java` and both new speed-adjust TeleOps are preserved without changes. In particular, TeleOp intake start operates only the roller; the latest shooter owns windmill feeding through its separate API.
+
+Cycle autonomous owns its motors while that OpMode is running: its shooter uses SDK encoder-velocity control and its timed single-ball gate/transfer interlocks. It does not also run the TeleOp Shooter software PIDF loop. Its velocity forecast and feed/shot calibration remain hardware estimates requiring validation. Both control paths explicitly configure their motor modes during initialization, so switching OpModes selects the intended owner. The autonomous source and supplied Pedro tuning match the previously tested branch; this update resolves integration against the newer team code.
