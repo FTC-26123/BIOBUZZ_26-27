@@ -5,7 +5,7 @@ import com.pedropathing.math.Pose;
 import com.qualcomm.hardware.limelightvision.*;
 import java.util.*;
 
-/** Ground-plane projection from measured color angles, never simulator ball positions.
+/** Ground-plane projection from neural-detector angles, never simulator ball positions.
  * Calibration: fixed camera 0.305m high, +10deg pitch, zero yaw/roll/offset.
  * Pickup attempts are estimates; only flywheel load confirms subsequent feed events. */
 public final class SpillCollector {
@@ -22,7 +22,17 @@ public final class SpillCollector {
     public static boolean fresh(LLResult frame,int pipeline){
         if(frame==null||frame.getPipelineIndex()!=pipeline)return false;
         double age=frame.getStaleness()+frame.getCaptureLatency()+frame.getTargetingLatency()+frame.getParseLatency();
-        return Double.isFinite(age)&&age>=0&&age<=180;
+        return Double.isFinite(age)&&age>=0&&age<=VisionRules.MAX_AGE_MS;
+    }
+    /** Empty fresh frames remain usable searches; never fall back to color/nectar results. */
+    public static List<LLResultTypes.DetectorResult> pollen(LLResult frame) {
+        List<LLResultTypes.DetectorResult> targets = new ArrayList<>();
+        if (!fresh(frame, VisionRules.POLLEN_PIPELINE)) return targets;
+        for (LLResultTypes.DetectorResult target : frame.getDetectorResults()) {
+            if (VisionRules.pollen(target.getClassName(), target.getConfidence(),
+                    target.getTargetXDegrees(), target.getTargetYDegrees())) targets.add(target);
+        }
+        return targets;
     }
     public static double[] project(double tx,double ty,Pose pose,double radius){
         double pitch=Math.toRadians(CAMERA_PITCH),t=Math.tan(Math.toRadians(ty));
@@ -84,12 +94,12 @@ public final class SpillCollector {
         double sign=blue?-1:1,best=Double.POSITIVE_INFINITY;
         double[] selected=null;
         List<double[]> observed=new ArrayList<>();
-        if(clustered)for(com.qualcomm.hardware.limelightvision.LLResultTypes.ColorResult ball:frame.getColorResults()){
-            double[] xy=project(ball.getTargetXDegrees(),ball.getTargetYDegrees(),p,pipeline==2?.04572:BALL_RADIUS);
+        if(clustered)for(com.qualcomm.hardware.limelightvision.LLResultTypes.DetectorResult ball:pollen(frame)){
+            double[] xy=project(ball.getTargetXDegrees(),ball.getTargetYDegrees(),p,BALL_RADIUS);
             if(xy!=null)observed.add(xy);
         }
-        for(LLResultTypes.ColorResult ball:frame.getColorResults()){
-            double[] xy=project(ball.getTargetXDegrees(),ball.getTargetYDegrees(),p,pipeline==2?.04572:BALL_RADIUS);
+        for(LLResultTypes.DetectorResult ball:pollen(frame)){
+            double[] xy=project(ball.getTargetXDegrees(),ball.getTargetYDegrees(),p,BALL_RADIUS);
             if(xy==null)continue;
             double x=xy[0]*sign,y=xy[1]*sign;
             // Confine pursuit to the alliance spill corridor; stay away from frame feet and center line.
@@ -112,6 +122,6 @@ public final class SpillCollector {
             // A fresh empty search is not a measured inventory count; continue with whatever was acquired.
             if(now-emptySince>.4){status="No further safe targets in view";return true;}
         }
-        status="Scanning color pipeline "+pipeline;return false;
+        status="Scanning neural pipeline "+pipeline;return false;
     }
 }
