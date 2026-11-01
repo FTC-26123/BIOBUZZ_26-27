@@ -80,7 +80,7 @@ public class Intake {
             windmill.setPower(0);
         }
 
-        intake.setPower(speed);
+        intake.setPower(-speed);
     }
 
     /**
