@@ -11,14 +11,23 @@ import java.util.*;
 public final class SpillCollector {
     public static final double CAMERA_PITCH=10, CAMERA_HEIGHT=.305, BALL_RADIUS=.03556;
     private final List<double[]> attempted=new ArrayList<>();
+    private final Deque<double[]> queued=new ArrayDeque<>();
+    private double plannedAt;
     private Pose scan,goal;
     private double arrived=-1;
     private double emptySince=-1;
     private boolean returning;
     public int attempts;
     public boolean clustered;
+    public boolean avoidFlowers;
+    /** Exclude known pot contact zones; detector class alone cannot identify a ball's source. */
+    public static boolean clearOfPots(double x,double y){
+        for(double[] pot:new double[][]{{-.5942,1.7283},{1.7283,.5942},{.5942,-1.7283},{-1.7283,-.5942}})
+            if(Math.hypot(x-pot[0],y-pot[1])<.42)return false;
+        return true;
+    }
     public String status="Scanning";
-    public void reset(Pose pose){scan=pose;goal=null;attempted.clear();attempts=0;arrived=-1;emptySince=-1;returning=false;}
+    public void reset(Pose pose){scan=pose;goal=null;queued.clear();attempted.clear();attempts=0;arrived=-1;emptySince=-1;returning=false;}
     public static boolean fresh(LLResult frame,int pipeline){
         if(frame==null||frame.getPipelineIndex()!=pipeline)return false;
         double age=frame.getStaleness()+frame.getCaptureLatency()+frame.getTargetingLatency()+frame.getParseLatency();
@@ -83,7 +92,16 @@ public final class SpillCollector {
             if(d<.55&&e<.04){
                 if(arrived<0)arrived=now;
                 if(now-arrived>.22){
-                    if(!returning){attempts++;if(attempts>=wanted){mechanisms.collect(false);return true;}goal=scan;returning=true;}
+                    if(!returning){attempts++;if(attempts>=wanted){mechanisms.collect(false);return true;}
+                        // Reuse a short-lived pixel map to traverse the observed spill row,
+                        // instead of driving back to the scan point after each ball.
+                        if(clustered&&wanted>1&&!queued.isEmpty()&&now-plannedAt<3){
+                            double[] next=queued.removeFirst();Pose nextGoal=approach(next,scan,blue?-1:1);
+                            if(safeApproach(p.x()*.0254,p.y()*.0254,nextGoal.x()*.0254,nextGoal.y()*.0254)){
+                                goal=nextGoal;attempted.add(next);arrived=-1;return false;
+                            }
+                        }
+                        queued.clear();goal=scan;returning=true;}
                     else {goal=null;returning=false;}
                     arrived=-1;
                 }
@@ -104,7 +122,7 @@ public final class SpillCollector {
             double x=xy[0]*sign,y=xy[1]*sign;
             // Confine pursuit to the alliance spill corridor; stay away from frame feet and center line.
             if(x>-.05||x<-1.79||Math.abs(y)<.30||Math.abs(y)>1.79)continue;
-            Pose candidate=approach(xy,scan,sign);double gx=candidate.x()*.0254*sign,gy=candidate.y()*.0254*sign;
+            Pose candidate=approach(xy,scan,sign);if(avoidFlowers&&!clearOfPots(candidate.x()*.0254,candidate.y()*.0254))continue;double gx=candidate.x()*.0254*sign,gy=candidate.y()*.0254*sign;
             // Only the narrow inner corridor may pass the legs; approach outer balls from the end.
             if(gx<-.28&&Math.abs(gy)<.80)continue;
             if(!safeApproach(p.x()*.0254,p.y()*.0254,gx*sign,gy*sign))continue;
@@ -117,6 +135,18 @@ public final class SpillCollector {
         if(selected!=null){
             emptySince=-1;
             goal=approach(selected,scan,sign);attempted.add(selected);follower.hold(goal);
+            queued.clear();plannedAt=now;
+            if(clustered&&wanted>1){
+                for(double[] other:observed){
+                    if(Math.hypot(other[0]-selected[0],other[1]-selected[1])<.065||Math.abs(other[1]-selected[1])>.15)continue;
+                    if(other[0]*sign>-.05||other[0]*sign< -1.79||Math.abs(other[1])<.30||Math.abs(other[1])>1.79)continue;
+                    Pose next=approach(other,scan,sign);
+                    if(avoidFlowers&&!clearOfPots(next.x()*.0254,next.y()*.0254))continue;
+                    if(next.x()*sign*.0254<-.28&&Math.abs(next.y()*.0254)<.80)continue;
+                    if(queued.stream().anyMatch(a->Math.hypot(a[0]-other[0],a[1]-other[1])<.065))continue;
+                    if(safeApproach(goal.x()*.0254,goal.y()*.0254,next.x()*.0254,next.y()*.0254))queued.addLast(other);
+                }
+            }
         }else {
             if(emptySince<0)emptySince=now;
             // A fresh empty search is not a measured inventory count; continue with whatever was acquired.

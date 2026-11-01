@@ -13,13 +13,14 @@ public abstract class ThirtySecondAuto extends OpMode {
     protected abstract CycleRoute.Start startingPoint();
     protected CycleRoute.Strategy strategy(){return CycleRoute.Strategy.FLOWERS;}
     private final SpillCollector collector=new SpillCollector();
+    private final FlowerPickup flowerPickup=new FlowerPickup();
     private final GardenSweep garden=new GardenSweep();
     private MovingShotSolver.Solution movingSolution;
     private double lastSolve=-1;
     private int movingFeeds;
     private int pathReplans;
     private double velocityTime=-1,lastVx,lastVy,accelX,accelY;
-    private boolean adaptive(){return route.strategy==CycleRoute.Strategy.ADAPTIVE_ALL||route.strategy==CycleRoute.Strategy.RUSH_TIPS;}
+    private boolean adaptive(){return route.strategy==CycleRoute.Strategy.ADAPTIVE_ALL||route.rushStyle();}
     private double rollingStart=-1;
     private double plannedReleaseHeading;
     private TransitPath transitPath;
@@ -42,7 +43,8 @@ public abstract class ThirtySecondAuto extends OpMode {
     private String result="Ready",vision="Waiting";
     @Override public void init(){
         route=new CycleRoute(startingPoint(),strategy()); follower=org.firstinspires.ftc.teamcode.pedro.Constants.create(hardwareMap);
-        collector.clustered=route.strategy==CycleRoute.Strategy.RUSH_TIPS;
+        collector.clustered=route.rushStyle();
+        collector.avoidFlowers=route.strategy==CycleRoute.Strategy.NO_FLOWERS;
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
         follower.setPose(route.initial); follower.update();
         mechanisms=new CycleMechanisms(hardwareMap);
@@ -67,17 +69,17 @@ public abstract class ThirtySecondAuto extends OpMode {
     }
     private void next(){
         // Load-event timing plus conservative flight/hinge allowance, not simulator tip state.
-        if(route.strategy==CycleRoute.Strategy.RUSH_TIPS&&stage!=null&&
-            (stage.name().equals("Shoot preloads en route to near flower")||stage.name().equals("Shoot while returning to near flower")))cellSafeAt=timer.seconds()+3.15;
+        if(route.rushStyle()&&stage!=null&&
+            (stage.name().equals("Shoot preloads en route to near flower")||stage.name().equals("Shoot preloads toward garden")||stage.name().equals("Shoot while returning to near flower")))cellSafeAt=timer.seconds()+3.15;
         mechanisms.close();
         if(parking){nextPark();return;}
         if(index>=route.stages.size()){beginPark();return;}
         // Bonus inventory is optional. Keep a measured-pose return budget for a partial pickup.
-        if(route.strategy==CycleRoute.Strategy.RUSH_TIPS&&index>=route.bonusIndex&&timer.seconds()+route.parkReserve(follower.pose())+.55>=29.5){beginPark();return;}
+        if(route.rushStyle()&&index>=route.bonusIndex&&timer.seconds()+route.parkReserve(follower.pose())+.55>=29.5){beginPark();return;}
         stage=route.stages.get(index++);stageStart=timer.seconds();settled=-1;
-        if(route.strategy==CycleRoute.Strategy.RUSH_TIPS&&index>route.bonusIndex)mechanisms.stop();
+        if(route.rushStyle()&&index>route.bonusIndex)mechanisms.stop();
         double preparedSpeed=stage.action()==CycleRoute.Action.BONUS_FIRE?1320:index==1?CycleMechanisms.SPEED:2200;
-        if(route.strategy==CycleRoute.Strategy.RUSH_TIPS&&index<=route.bonusIndex){
+        if(route.rushStyle()&&index<=route.bonusIndex){
             for(int upcoming=index-1;upcoming<route.bonusIndex;upcoming++){
                 CycleRoute.Stage fire=route.stages.get(upcoming);
                 if(fire.action()!=CycleRoute.Action.ROLL_NEAR&&fire.action()!=CycleRoute.Action.ROLL_FAR)continue;
@@ -88,6 +90,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         mechanisms.target(preparedSpeed);
         shotBase=mechanisms.fired;lastProgress=stageStart;lastX=follower.pose().x();lastY=follower.pose().y();
         rollingStart=-1;haveRollingAim=false;emptyBase=mechanisms.emptyPulses;transitPath=new TransitPath(follower.pose(),stage.pose(),route.blue);
+        flowerPickup.reset();
         collector.reset(follower.pose());
         pathReplans+=garden.replans;garden.reset(follower.pose());movingSolution=null;lastSolve=-1;
         follower.follow(Paths.line(follower.pose(),stage.pose()).linear(follower.pose(),stage.pose()));
@@ -109,7 +112,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         if(pinpoint.getDeviceStatus()!=GoBildaPinpointDriver.DeviceStatus.READY||!Double.isFinite(p.x()+p.y()+p.heading())){
             finish("Localization fault");report();return;
         }
-        boolean bonusPickup=route.strategy==CycleRoute.Strategy.RUSH_TIPS&&index>route.bonusIndex;
+        boolean bonusPickup=route.rushStyle()&&index>route.bonusIndex;
         if(!parking&&now>=29.5-route.parkReserve(p)){beginPark();report();return;}
         if(!parking&&!bonusPickup)mechanisms.spin();
         if(stage.action()==CycleRoute.Action.ROLL_NEAR||stage.action()==CycleRoute.Action.ROLL_FAR){rolling(now,p);report();return;}
@@ -125,8 +128,16 @@ public abstract class ThirtySecondAuto extends OpMode {
         }
         double distance=Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y());
         double error=Math.abs(Math.atan2(Math.sin(p.heading()-stage.pose().heading()),Math.cos(p.heading()-stage.pose().heading())));
+        if(stage.action()==CycleRoute.Action.FLOWER_COLLECT){
+            if(distance<.65&&error<Math.toRadians(3)){
+                follower.hold(stage.pose());mechanisms.collect(true);
+                if(flowerPickup.update(now,mechanisms.intakeSpeed(),stage.count())){next();report();return;}
+            }else{flowerPickup.reset();mechanisms.collect(distance<6&&error<Math.toRadians(8));}
+            vision="Drawing flower pollen; encoder transport and stack settling";
+            if(now-stageStart>stage.limit())beginPark();report();return;
+        }
         boolean precisionPickup=stage.name().contains("cleanup");
-        if(route.strategy==CycleRoute.Strategy.RUSH_TIPS&&stage.action()==CycleRoute.Action.COLLECT&&distance<(precisionPickup?.35:2.3)&&error<Math.toRadians(precisionPickup?1:3)){
+        if(route.rushStyle()&&stage.action()==CycleRoute.Action.COLLECT&&distance<(precisionPickup?.35:2.3)&&error<Math.toRadians(precisionPickup?1:3)){
             mechanisms.collect(true);if(settled<0)settled=now;if(now-settled>(precisionPickup?.18:.12))next();report();return;
         }
         if(Math.hypot(p.x()-lastX,p.y()-lastY)>.25){lastProgress=now;lastX=p.x();lastY=p.y();}
@@ -176,7 +187,7 @@ public abstract class ThirtySecondAuto extends OpMode {
                     double[] xy=SpillCollector.project(blob.getTargetXDegrees(),blob.getTargetYDegrees(),p,SpillCollector.BALL_RADIUS);
                     if(xy!=null&&xy[0]*(route.blue?-1:1)<-.05){groundTarget=true;break;}
                 }
-                if(now-settled>.8&&groundTarget)next();
+                if(now>=cellSafeAt&&now-settled>.8&&groundTarget)next();
             }
             else {
                 boolean target=visionReady();
@@ -210,7 +221,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         Pose releasePose=new Pose(p.x()+dx/.0254,p.y()+dy/.0254,p.heading()+measured.omega*delay);
         com.pedropathing.math.Velocity releaseVelocity=new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,measured.omega);
         if(lastSolve<0||now-lastSolve>.06){
-            double aimU=(mechanisms.fired%3-1)*.07;
+            double aimU=route.strategy==CycleRoute.Strategy.NO_FLOWERS&&near?-.16+(mechanisms.fired%3)*.04:(mechanisms.fired%3-1)*.07;
             movingSolution=MovingShotSolver.rolling(releasePose,releaseVelocity,route.blue,near,mechanisms.speed(),0,0,0,aimU*(route.blue?-1:1));
             if(movingSolution!=null){plannedReleaseHeading=movingSolution.heading();haveRollingAim=true;}
             lastSolve=now;
@@ -237,7 +248,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         shotStatus=String.format(java.util.Locale.US,"v %.2f -> %.2f, remaining %.2f m, aim %.1f deg, RPM ticks %.0f/%.0f, valid %s, feed %s",speed,futureSpeed,current.remaining(),Math.toDegrees(Math.atan2(Math.sin(releasePose.heading()-h),Math.cos(releasePose.heading()-h))),mechanisms.speed(),movingSolution==null?0:movingSolution.ticks(),direct!=null,permit);
         if(complete&&arrived){next();return;}
         if(now-stageStart>stage.limit()){
-            if(route.strategy==CycleRoute.Strategy.RUSH_TIPS&&!vision.contains("No fresh"))beginPark();
+            if(route.rushStyle()&&!vision.contains("No fresh"))beginPark();
             else finish("Rolling stage timeout: "+stage.name());
         }
     }

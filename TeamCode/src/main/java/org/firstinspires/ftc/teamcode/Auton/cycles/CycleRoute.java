@@ -6,8 +6,8 @@ import java.util.*;
 /** Field-centered inches, +X right, +Y up; Pedro heading 0 points +X. */
 public final class CycleRoute {
     public enum Start { RED_WEST, RED_EAST, BLUE_EAST, BLUE_WEST }
-    public enum Action { MOVE, COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, ROLL_NEAR, ROLL_FAR, PARK }
-    public enum Strategy { FLOWERS, TIPPED_POLLEN, ADAPTIVE_ALL, RUSH_TIPS }
+    public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, ROLL_NEAR, ROLL_FAR, PARK }
+    public enum Strategy { FLOWERS, TIPPED_POLLEN, ADAPTIVE_ALL, RUSH_TIPS, NO_FLOWERS }
     public static final class Stage {
         private final String name;
         private final Pose pose;
@@ -39,13 +39,14 @@ public final class CycleRoute {
         this.start=start; this.strategy=strategy; blue=start==Start.BLUE_EAST||start==Start.BLUE_WEST;
         boolean east=start==Start.RED_EAST||start==Start.BLUE_WEST;
         // Both starts lie on the alliance half of the bottom/top perimeter, clear of flowers.
-        initial=pose(strategy==Strategy.RUSH_TIPS?-.36:east?-.32385:-.90,-1.564259,90);
-        park=strategy==Strategy.RUSH_TIPS?pose(-1.55,.90,90):pose(-1.42,strategy==Strategy.ADAPTIVE_ALL?.56:.9144,180);
+        initial=pose(rushStyle()?-.36:east?-.32385:-.90,-1.564259,90);
+        park=rushStyle()?pose(-1.55,.90,90):pose(-1.42,strategy==Strategy.ADAPTIVE_ALL?.56:.9144,180);
         if(strategy==Strategy.RUSH_TIPS){rush();return;}
+        if(strategy==Strategy.NO_FLOWERS){noFlowers();return;}
         add("Preload launch",-.32385,-1.55,90,Action.FIRE,3,6);
         add("Back away from launch",-.32385,-1.30,90,Action.MOVE,0,3);
         if(strategy!=Strategy.TIPPED_POLLEN) {
-            add("Alliance-side flower",-1.415,-.5942,180,Action.COLLECT,0,5);
+            add("Alliance-side flower",-1.415,-.5942,180,Action.FLOWER_COLLECT,4,5);
             add("Outside support lane",-1.13,-.5942,90,Action.MOVE,0,3);
         } else {
             add("Wait for first tip and falling pollen",-.32385,-1.30,90,Action.WAIT_TIP,0,2.5);
@@ -74,7 +75,7 @@ public final class CycleRoute {
         } else {
             add("Clear far flower before turn",-.5942,1.10,-90,Action.MOVE,0,3);
             add("Face far flower",-.5942,1.10,90,Action.MOVE,0,3);
-            add("Far flower",-.5942,1.415,90,Action.COLLECT,0,4);
+            add("Far flower",-.5942,1.415,90,Action.FLOWER_COLLECT,4,5);
             add("Back clear of far flower",-.5942,1.10,90,Action.MOVE,0,3);
         }
         add("Return launch approach",-.40,1.30,-90,Action.MOVE,0,3);
@@ -89,7 +90,7 @@ public final class CycleRoute {
             add("Clear garden wall",-1.30,-1.15,180,Action.MOVE,0,3);
             add("Diagonal shot to free capacity",-1.30,-1.30,Math.toDegrees(Math.atan2(1.30-.392176,1.30-.32385)),Action.BONUS_FIRE,1,4);
             add("Face remaining flower",-1.15,-.90,180,Action.MOVE,0,3);
-            add("Collect remaining near flower",-1.415,-.5942,180,Action.COLLECT,1,4);
+            add("Collect remaining near flower",-1.415,-.5942,180,Action.FLOWER_COLLECT,1,4);
         }
         // Park as soon as the planned scoring is complete. No empty third-flower detour.
     }
@@ -100,11 +101,11 @@ public final class CycleRoute {
     private void rush(){
         add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,2);
         transit("Shoot preloads en route to near flower",true,3,-1.40,-1.43);
-        add("Near flower",-1.415,-.5942,180,Action.COLLECT,0,3);
+        add("Near flower",-1.415,-.5942,180,Action.FLOWER_COLLECT,3,4);
         transit("Shoot while crossing to far flower",false,4,-1.00,1.43);
-        add("Far flower",-.5942,1.415,90,Action.COLLECT,0,3);
+        add("Far flower",-.5942,1.415,90,Action.FLOWER_COLLECT,4,4);
         transit("Shoot while returning to near flower",false,4,-1.40,1.43);
-        add("Remaining near flower",-1.415,-.5942,180,Action.COLLECT,0,3);
+        add("Remaining near flower",-1.415,-.5942,180,Action.FLOWER_COLLECT,1,3);
         add("Face garden before third-tip pickup",-1.10,-1.35,210,Action.MOVE,0,2);
         add("Garden pollen for third tip",-1.50,-1.564259,180,Action.SWEEP,3,2.5);
         transit("Shoot garden batch en route to cleanup",true,4,-1.10,-1.35);
@@ -116,6 +117,24 @@ public final class CycleRoute {
         bonusIndex=stages.size();
         add("View teleop pickup diagonally",-1.10,-1.35,210,Action.MOVE,0,3);
         add("Collect teleop preload",-1.50,-1.564259,180,Action.SWEEP,0,2.0);
+    }
+    public boolean rushStyle(){return strategy==Strategy.RUSH_TIPS||strategy==Strategy.NO_FLOWERS;}
+    private void noFlowers(){
+        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,2);
+        transit("Shoot preloads toward garden",true,3,-1.40,-1.43);
+        add("Face garden pollen",-1.10,-1.35,210,Action.MOVE,0,2);
+        add("Collect first garden batch",-1.50,-1.564259,180,Action.SWEEP,3,3);
+        transit("Score garden pollen while crossing",false,4,-1.00,1.43);
+        add("Return outside frame to garden",-1.40,-1.43,180,Action.MOVE,0,4);
+        add("Garden cleanup without pots",-1.50,-1.575,180,Action.COLLECT,0,2);
+        add("Enter spill scan corridor",-.245,-.95,270,Action.MOVE,0,3);
+        add("View settled pollen from inner corridor",-.245,-.40,270,Action.MOVE,0,2);
+        add("Recover settled first-tip pollen",-.245,-.40,270,Action.VISION_COLLECT,3,4);
+        transit("Complete far-cell tip toward parking",false,4,-1.00,1.43);
+        add("Scan far-end floor pollen",-1.05,.95,90,Action.MOVE,0,2);
+        add("Recover far-end floor pollen",-1.05,.95,90,Action.VISION_COLLECT,2,2.5);
+        transit("Score recovered floor pollen toward park",false,2,-1.50,1.12);
+        bonusIndex=stages.size();
     }
     private void add(String name,double x,double y,double h,Action a,int count,double limit) {
         stages.add(new Stage(name,pose(x,y,h),a,count,limit));
@@ -133,7 +152,7 @@ public final class CycleRoute {
         double inches=0;Pose from=current;
         for(Pose to:parkingPath(current)){inches+=Math.hypot(to.x()-from.x(),to.y()-from.y());from=to;}
         // Include braking the fast pass, turning, and settling inside the loading zone.
-        return strategy==Strategy.RUSH_TIPS?1.15+inches*.0254/1.20:strategy==Strategy.ADAPTIVE_ALL?1.45+inches*.0254/1.20:1.05+inches*.0254/.85;
+        return rushStyle()?1.15+inches*.0254/1.20:strategy==Strategy.ADAPTIVE_ALL?1.45+inches*.0254/1.20:1.05+inches*.0254/.85;
     }
     private Pose pose(double x,double y,double heading) {
         return new Pose((blue?-x:x)/.0254,(blue?-y:y)/.0254,Math.toRadians(heading+(blue?180:0)));
