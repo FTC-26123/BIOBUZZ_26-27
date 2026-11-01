@@ -38,8 +38,14 @@ public class Constants {
         c.globalDistanceUnit.set(DistanceUnit.INCH);
         c.offsetUnits.set(DistanceUnit.INCH);
     });
+    /** Paste the measured output of ForesightTuner here before running autonomous. */
+    public static ForesightConfig foresightConfig;
+
     public static Follower create(HardwareMap h) {
-        // return new Follower(Drivetrain, Localizer, Foresight);
-        return null;
+        if (foresightConfig == null) {
+            throw new IllegalStateException("Run ForesightTuner and set Constants.foresightConfig before autonomous.");
+        }
+        return new Follower(new PinpointLocalizer(h, localizerConfig),
+                new Mecanum(h, drivetrainConfig), new Foresight(foresightConfig));
     }
 }
