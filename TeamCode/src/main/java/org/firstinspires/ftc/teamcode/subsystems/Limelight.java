@@ -50,6 +50,7 @@ public class Limelight {
 //            imu = null; // IMU optional fallback
 //        }
         limelight.pipelineSwitch(0);
+        limelight.pipelineSwitch(0);
     }
 
     /**
