@@ -40,11 +40,14 @@ public abstract class ThirtySecondAuto extends OpMode {
     private double stageStart,settled=-1,lastProgress, lastX,lastY,finishedAt;
     private boolean done,parking;
     private java.util.Iterator<Pose> parkSteps;
+    private java.util.Iterator<Pose> moveSteps;
+    private Pose moveTarget;
     private String result="Ready",vision="Waiting";
     @Override public void init(){
         route=new CycleRoute(startingPoint(),strategy()); follower=org.firstinspires.ftc.teamcode.pedro.Constants.create(hardwareMap);
         collector.clustered=route.rushStyle();
         collector.avoidFlowers=route.strategy==CycleRoute.Strategy.NO_FLOWERS;
+        collector.avoidFrame=collector.avoidFlowers;
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
         follower.setPose(route.initial); follower.update();
         mechanisms=new CycleMechanisms(hardwareMap);
@@ -65,7 +68,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         stage=new CycleRoute.Stage("Park loading zone",parkSteps.next(),CycleRoute.Action.PARK,0,5);
         stageStart=timer.seconds();settled=-1;lastProgress=stageStart;
         lastX=follower.pose().x();lastY=follower.pose().y();
-        follower.follow(Paths.line(follower.pose(),stage.pose()).linear(follower.pose(),stage.pose()));
+        followStage();
     }
     private void next(){
         // Load-event timing plus conservative flight/hinge allowance, not simulator tip state.
@@ -89,17 +92,34 @@ public abstract class ThirtySecondAuto extends OpMode {
         }
         mechanisms.target(preparedSpeed);
         shotBase=mechanisms.fired;lastProgress=stageStart;lastX=follower.pose().x();lastY=follower.pose().y();
-        rollingStart=-1;haveRollingAim=false;emptyBase=mechanisms.emptyPulses;transitPath=new TransitPath(follower.pose(),stage.pose(),route.blue);
+        rollingStart=-1;haveRollingAim=false;emptyBase=mechanisms.emptyPulses;transitPath=new TransitPath(follower.pose(),stage.pose(),route.blue,route.strategy==CycleRoute.Strategy.NO_FLOWERS);
         flowerPickup.reset();
         collector.reset(follower.pose());
         pathReplans+=garden.replans;garden.reset(follower.pose());movingSolution=null;lastSolve=-1;
-        follower.follow(Paths.line(follower.pose(),stage.pose()).linear(follower.pose(),stage.pose()));
+        followStage();
+    }
+    private void followStage(){
+        if(route.strategy==CycleRoute.Strategy.NO_FLOWERS&&(stage.action()==CycleRoute.Action.ROLL_NEAR||stage.action()==CycleRoute.Action.ROLL_FAR)){
+            moveSteps=null;moveTarget=null;follower.hold(follower.pose());return;
+        }
+        if(route.strategy==CycleRoute.Strategy.NO_FLOWERS){
+            moveSteps=FrameClearance.path(follower.pose(),stage.pose(),route.blue).iterator();advanceMove();
+        }else{moveTarget=null;follower.follow(Paths.line(follower.pose(),stage.pose()).linear(follower.pose(),stage.pose()));}
+    }
+    private void advanceMove(){
+        if(moveSteps!=null&&moveSteps.hasNext()){
+            moveTarget=moveSteps.next();follower.follow(Paths.line(follower.pose(),moveTarget).linear(follower.pose(),moveTarget));
+        }
     }
     @Override public void loop(){
         if(done){report();return;}
         double now=timer.seconds();
         if(now>=29.7){finish("30-second deadline");report();return;}
         follower.update();Pose p=follower.pose();
+        if(route.strategy==CycleRoute.Strategy.NO_FLOWERS){
+            if(!FrameClearance.clear(p.x()*.0254,p.y()*.0254)){finish("Frame clearance interlock");report();return;}
+            if(moveSteps!=null&&moveSteps.hasNext()&&moveTarget!=null&&Math.hypot(p.x()-moveTarget.x(),p.y()-moveTarget.y())<.65)advanceMove();
+        }
         int acknowledged=mechanisms.fired;mechanisms.update(now);
         if(mechanisms.fired>acknowledged&&Math.hypot(follower.velocity().vx,follower.velocity().vy)*.0254>.05)movingFeeds++;
         if(adaptive()){

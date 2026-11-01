@@ -127,9 +127,9 @@ public final class CycleRoute {
         transit("Score garden pollen while crossing",false,4,-1.00,1.43);
         add("Return outside frame to garden",-1.40,-1.43,180,Action.MOVE,0,4);
         add("Garden cleanup without pots",-1.50,-1.575,180,Action.COLLECT,0,2);
-        add("Enter spill scan corridor",-.245,-.95,270,Action.MOVE,0,3);
-        add("View settled pollen from inner corridor",-.245,-.40,270,Action.MOVE,0,2);
-        add("Recover settled first-tip pollen",-.245,-.40,270,Action.VISION_COLLECT,3,4);
+        add("Stay outside near support",-1.13,-1.05,90,Action.MOVE,0,3);
+        add("View settled pollen outside metal frame",-1.13,-.78,0,Action.MOVE,0,2);
+        add("Recover settled first-tip pollen",-1.13,-.78,0,Action.VISION_COLLECT,3,4);
         transit("Complete far-cell tip toward parking",false,4,-1.00,1.43);
         add("Scan far-end floor pollen",-1.05,.95,90,Action.MOVE,0,2);
         add("Recover far-end floor pollen",-1.05,.95,90,Action.VISION_COLLECT,2,2.5);
@@ -141,6 +141,7 @@ public final class CycleRoute {
     }
     /** Collision-clear return corridor; points are generated from the current measured pose. */
     public List<Pose> parkingPath(Pose current) {
+        if(strategy==Strategy.NO_FLOWERS)return FrameClearance.path(current,park,blue);
         double x=current.x()*.0254*(blue?-1:1), y=current.y()*.0254*(blue?-1:1);
         List<Pose> result=new ArrayList<>();
         if(y>1.25) {result.add(pose(x,1.15,-90));y=1.15;}

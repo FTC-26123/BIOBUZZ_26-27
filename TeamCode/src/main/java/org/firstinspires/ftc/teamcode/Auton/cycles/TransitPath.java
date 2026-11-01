@@ -21,16 +21,21 @@ public final class TransitPath {
 }
     private final List<double[]> points=new ArrayList<>();
     public final double length;
-    public TransitPath(Pose start,Pose end,boolean blue){
+    public TransitPath(Pose start,Pose end,boolean blue){this(start,end,blue,false);}
+    public TransitPath(Pose start,Pose end,boolean blue,boolean avoidFrame){
         double sign=blue?-1:1,x=start.x()*.0254*sign,y=start.y()*.0254*sign;
         double ex=end.x()*.0254*sign,ey=end.y()*.0254*sign;
         points.add(new double[]{x*sign,y*sign});
+        if(avoidFrame){
+            for(Pose waypoint:FrameClearance.path(start,end,blue))points.add(new double[]{waypoint.x()*.0254,waypoint.y()*.0254});
+        }else{
         // Outside corridor bypasses the hive support on transfers between field ends.
         if(Math.abs(ey-y)>.8){
             if(Math.abs(x+1.13)>.06)points.add(new double[]{-1.13*sign,y*sign});
             points.add(new double[]{-1.13*sign,ey*sign});
         }
         points.add(new double[]{end.x()*.0254,end.y()*.0254});
+        }
         double total=0;for(int i=1;i<points.size();i++)total+=Math.hypot(points.get(i)[0]-points.get(i-1)[0],points.get(i)[1]-points.get(i-1)[1]);length=total;
     }
     public double duration(){double peak=Math.min(SPEED,Math.sqrt(length*ACCEL));return peak<=0?0:length/peak+peak/ACCEL;}
