@@ -94,26 +94,27 @@ public final class CycleRoute {
         }
         // Park as soon as the planned scoring is complete. No empty third-flower detour.
     }
-    private void transit(String name,boolean near,int count,double x,double y){
+    private void transit(String name,boolean near,int count){
+        double x=-1.13, y=near?-.85:.85; // 86-degree reachable outer intake approach.
         double h=Math.toDegrees(Math.atan2((near?-.392176:.392176)-y,-.32385-x));
         stages.add(new Stage(name,pose(x,y,h),near?Action.ROLL_NEAR:Action.ROLL_FAR,count,7.5,false));
     }
     private void rush(){
         add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,2);
-        transit("Shoot preloads en route to near flower",true,3,-1.40,-1.43);
+        transit("Shoot preloads en route to near flower",true,3);
         add("Near flower",-1.415,-.5942,180,Action.FLOWER_COLLECT,3,4);
-        transit("Shoot while crossing to far flower",false,4,-1.00,1.43);
+        transit("Shoot while crossing to far flower",false,4);
         add("Far flower",-.5942,1.415,90,Action.FLOWER_COLLECT,4,4);
-        transit("Shoot while returning to near flower",false,4,-1.40,1.43);
+        transit("Shoot while returning to near flower",false,4);
         add("Remaining near flower",-1.415,-.5942,180,Action.FLOWER_COLLECT,1,3);
         add("Face garden before third-tip pickup",-1.10,-1.35,210,Action.MOVE,0,2);
         add("Garden pollen for third tip",-1.50,-1.564259,180,Action.SWEEP,3,2.5);
-        transit("Shoot garden batch en route to cleanup",true,4,-1.10,-1.35);
+        transit("Shoot garden batch en route to cleanup",true,4);
         add("Face remaining garden safely",-1.40,-1.43,180,Action.MOVE,0,2);
         add("Garden cleanup before final cycle",-1.50,-1.575,180,Action.COLLECT,0,2);
         add("View first spill",-.60,-.78,270,Action.MOVE,0,3);
         add("Recycle released pollen",-.60,-.78,270,Action.VISION_COLLECT,1,2);
-        transit("Complete third tip en route to parking",true,4,-1.15,-1.22);
+        transit("Complete third tip en route to parking",true,4);
         bonusIndex=stages.size();
         add("View teleop pickup diagonally",-1.10,-1.35,210,Action.MOVE,0,3);
         add("Collect teleop preload",-1.50,-1.564259,180,Action.SWEEP,0,2.0);
@@ -121,22 +122,23 @@ public final class CycleRoute {
     public boolean rushStyle(){return strategy==Strategy.RUSH_TIPS||strategy==Strategy.NO_FLOWERS;}
     private void noFlowers(){
         add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,2);
-        transit("Shoot preloads toward garden",true,3,-1.40,-1.43);
+        transit("Shoot preloads toward garden",true,3);
         add("Face garden pollen",-1.10,-1.35,210,Action.MOVE,0,2);
         add("Collect first garden batch",-1.50,-1.564259,180,Action.SWEEP,3,3);
-        transit("Score garden pollen while crossing",false,4,-1.00,1.43);
+        transit("Score garden pollen while crossing",false,4);
         add("Return outside frame to garden",-1.40,-1.43,180,Action.MOVE,0,4);
         add("Garden cleanup without pots",-1.50,-1.575,180,Action.COLLECT,0,2);
         add("Stay outside near support",-1.13,-1.05,90,Action.MOVE,0,3);
         add("View settled pollen outside metal frame",-1.13,-.78,0,Action.MOVE,0,2);
         add("Recover settled first-tip pollen",-1.13,-.78,0,Action.VISION_COLLECT,3,4);
-        transit("Complete far-cell tip toward parking",false,4,-1.00,1.43);
+        transit("Complete far-cell tip toward parking",false,4);
         add("Scan far-end floor pollen",-1.05,.95,90,Action.MOVE,0,2);
         add("Recover far-end floor pollen",-1.05,.95,90,Action.VISION_COLLECT,2,2.5);
-        transit("Score recovered floor pollen toward park",false,2,-1.50,1.12);
+        transit("Score recovered floor pollen toward park",false,2);
         bonusIndex=stages.size();
     }
     private void add(String name,double x,double y,double h,Action a,int count,double limit) {
+        if(a==Action.FIRE||a==Action.BONUS_FIRE){ x=-1.13; y=(stages.isEmpty()||a==Action.BONUS_FIRE)?-.85:.85; }
         stages.add(new Stage(name,pose(x,y,h),a,count,limit));
     }
     /** Collision-clear return corridor; points are generated from the current measured pose. */

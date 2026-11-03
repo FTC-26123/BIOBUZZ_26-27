@@ -55,7 +55,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         tags=new WebcamTags(hardwareMap);
         telemetry.addData("Place robot (m)",String.format("%.3f, %.3f",route.initial.x()*.0254,route.initial.y()*.0254));
         telemetry.addData("Pedro heading (deg)",Math.toDegrees(route.initial.heading()));
-        telemetry.addLine("Verify hardware calibration: 4 pollen preloads, camera pitch +10 degrees.");
+        telemetry.addLine("Verify hardware calibration: 4 pollen preloads, camera pitch +10 degrees, shot elevation 86 degrees.");
         telemetry.update();
     }
     @Override public void start(){timer.reset();index=0;stage=null;cellSafeAt=0;done=false;parking=false;result="Running";next();}
@@ -240,9 +240,15 @@ public abstract class ThirtySecondAuto extends OpMode {
         }
         Pose releasePose=new Pose(p.x()+dx/.0254,p.y()+dy/.0254,p.heading()+measured.omega*delay);
         com.pedropathing.math.Velocity releaseVelocity=new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,measured.omega);
+        boolean atDestination=rollingStart>=0&&phase>=transitPath.duration()&&Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y())*.0254<.06;
+        // A stationary fallback aims for zero yaw, rather than chasing each measured yaw
+        // correction and feeding it back into the next heading target. The actual gate below
+        // still validates measured translation/yaw at release before opening the feeder.
+        com.pedropathing.math.Velocity planningVelocity=atDestination&&Math.hypot(vx,vy)<.08
+            ?new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,0):releaseVelocity;
         if(lastSolve<0||now-lastSolve>.06){
             double aimU=route.strategy==CycleRoute.Strategy.NO_FLOWERS&&near?-.16+(mechanisms.fired%3)*.04:(mechanisms.fired%3-1)*.07;
-            movingSolution=MovingShotSolver.rolling(releasePose,releaseVelocity,route.blue,near,mechanisms.speed(),0,0,0,aimU*(route.blue?-1:1));
+            movingSolution=MovingShotSolver.rolling(releasePose,planningVelocity,route.blue,near,mechanisms.speed(),0,0,0,aimU*(route.blue?-1:1));
             if(movingSolution!=null){plannedReleaseHeading=movingSolution.heading();haveRollingAim=true;}
             lastSolve=now;
         }
@@ -258,7 +264,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         if(movingSolution!=null)mechanisms.aim(movingSolution.ticks());
         MovingShotSolver.Solution direct=MovingShotSolver.evaluate(releasePose,releaseVelocity,route.blue,near,mechanisms.predictedReleaseSpeed(now),0,0,0);
         double speed=Math.hypot(vx,vy),futureSpeed=Math.hypot(futureVx,futureVy);
-        boolean arrived=rollingStart>=0&&phase>=transitPath.duration()&&Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y())*.0254<.06;
+        boolean arrived=atDestination;
         boolean fast=speed>.40&&futureSpeed>.75;
         // Finish an unsafe-in-transit shot at the actual pickup approach, never by making extra passes.
         boolean settledAtPickup=arrived&&speed<.08&&Math.abs(measured.omega)<.10;

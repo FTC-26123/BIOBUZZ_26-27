@@ -43,9 +43,9 @@ public class HiveAim {
     // Flywheel gear ratio (flywheel revolutions per motor revolution)
     public static double WHEEL_REVS_PER_MOTOR_REV = 1.0;
 
-    // Allowable launch angle bounds for iteration loop (degrees)
-    public static double MIN_LAUNCH_ANGLE = 30.0;
-    public static double MAX_LAUNCH_ANGLE = 75.0;
+    // Fixed measured exit elevation above forward horizontal (90 degrees is vertical)
+    public static double MIN_LAUNCH_ANGLE = 86.0;
+    public static double MAX_LAUNCH_ANGLE = 86.0;
 
     // Shooter exit height above the floor (inches)
     public static double SHOOTER_EXIT_HEIGHT_IN = 12.0;
