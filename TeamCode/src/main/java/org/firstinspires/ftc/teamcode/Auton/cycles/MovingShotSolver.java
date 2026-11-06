@@ -26,7 +26,9 @@ public final class MovingShotSolver {
         public double v(){return v;}
         public double time(){return time;}
 }
-    private static final double R=.03556,M=.026,ANGLE=Math.toRadians(55),G=9.80665;
+    /** Measured above robot-forward horizontal: 90 degrees points straight up. */
+    public static final double LAUNCH_ANGLE_DEGREES=86;
+    private static final double R=.03556,M=.026,ANGLE=Math.toRadians(LAUNCH_ANGLE_DEGREES),G=9.80665;
     private static final double AIM_V=-.065; // center low inside the rectangular portion, clear of the lip
     private MovingShotSolver() {}
     /** Coarse acquisition followed by a coupled heading/speed Newton solve. Unlike the
@@ -39,7 +41,7 @@ public final class MovingShotSolver {
     }
     public static Solution rolling(Pose pose,Velocity velocity,boolean blue,boolean initial,double seed,double delay,double ax,double ay,double aimU){
         double vx=velocity.vx*.0254,vy=velocity.vy*.0254,w=velocity.omega;
-        if(!Double.isFinite(pose.x()+pose.y()+pose.heading()+vx+vy+w+seed+delay+ax+ay)||delay<0||delay>1.5||Math.hypot(vx,vy)>1.6||Math.abs(w)>2.5)return null;
+        if(!Double.isFinite(pose.x()+pose.y()+pose.heading()+vx+vy+w+seed+delay+ax+ay+aimU)||delay<0||delay>1.5||Math.hypot(vx,vy)>1.6||Math.abs(w)>2.5)return null;
         double x=pose.x()*.0254+vx*delay+.5*ax*delay*delay,y=pose.y()*.0254+vy*delay+.5*ay*delay*delay,hx=blue?.32385:-.32385;
         vx+=ax*delay;vy+=ay*delay;
         int side=(initial?-1:1)*(blue?-1:1);double bearing=Math.atan2(side*.392176-y,hx-x);
@@ -50,7 +52,13 @@ public final class MovingShotSolver {
         double aimV=-.065,heading=bearing,ticks=seed,best=Double.POSITIVE_INFINITY;
         for(double candidate=800;candidate<=2240;candidate+=40){
             double lateral=-vx*Math.sin(bearing)+vy*Math.cos(bearing);
-            double aim=bearing-Math.atan2(lateral,candidate/28*Math.PI*.072*.75*Math.cos(ANGLE));
+            // Seed the heading from the horizontal displacement left after chassis carry.
+            // Near vertical, forward carry can require aiming behind the travel direction.
+            double vz=candidate/28*Math.PI*.072*.75*Math.sin(ANGLE);
+            double discriminant=vz*vz-2*G*(1.46-.2889397283);
+            if(discriminant<0)continue;
+            double flight=(vz+Math.sqrt(discriminant))/G;
+            double aim=Math.atan2(side*.392176-y-vy*flight,hx+aimU-x-vx*flight);
             Impact hit=impact(x,y,vx,vy,w,aim,candidate,side,hx);
             if(hit==null)continue;double score=(hit.u-aimU)*(hit.u-aimU)+(hit.v-aimV)*(hit.v-aimV);
             if(score<best){best=score;heading=aim;ticks=candidate;}
@@ -101,30 +109,7 @@ public final class MovingShotSolver {
         return solve(pose,inchesPerSecond,blue,initialCell,.045);
     }
     public static Solution solve(Pose pose,Velocity inchesPerSecond,boolean blue,boolean initialCell,double delay){
-        double vx=inchesPerSecond.vx*.0254,vy=inchesPerSecond.vy*.0254,omega=inchesPerSecond.omega;
-        if(!Double.isFinite(pose.x()+pose.y()+pose.heading()+vx+vy+omega+delay)||delay<0||delay>1.5||Math.hypot(vx,vy)>1.6||Math.abs(omega)>2.5)return null;
-        double px=pose.x()*.0254+vx*delay,py=pose.y()*.0254+vy*delay;
-        int side=(initialCell?-1:1)*(blue?-1:1);double hx=blue?.32385:-.32385;
-        double bearing=Math.atan2(side*.392176-py,hx-px),heading=pose.heading()+omega*delay,ticks=2100;
-        if(Math.abs(Math.atan2(Math.sin(heading-bearing),Math.cos(heading-bearing)))>.35)heading=bearing;
-        Impact impact=null;
-        for(int k=0;k<9;k++){
-            impact=impact(px,py,vx,vy,omega,heading,ticks,side,hx);
-            if(impact==null){ticks=Math.min(2240,ticks+70);continue;}
-            if(Math.abs(impact.u)<.002&&Math.abs(impact.v-AIM_V)<.012)break;
-            Impact a=impact(px,py,vx,vy,omega,heading+.002,ticks,side,hx),b=impact(px,py,vx,vy,omega,heading,ticks+4,side,hx);
-            if(a==null||b==null)return null;
-            if(Math.abs(impact.u)<.002){double derivative=(b.v-impact.v)/4;if(Math.abs(derivative)<1e-8)return null;ticks=Math.max(800,Math.min(2240,ticks+Math.max(-180,Math.min(180,-(impact.v-AIM_V)/derivative))));continue;}
-            double j00=(a.u-impact.u)/.002,j10=(a.v-impact.v)/.002,j01=(b.u-impact.u)/4,j11=(b.v-impact.v)/4,det=j00*j11-j01*j10;
-            if(Math.abs(det)<1e-8)return null;
-            double dh=(-impact.u*j11+j01*(impact.v-AIM_V))/det,dt=(-j00*(impact.v-AIM_V)+j10*impact.u)/det;
-            heading+=Math.max(-.15,Math.min(.15,dh));ticks=Math.max(800,Math.min(2240,ticks+Math.max(-180,Math.min(180,dt))));
-        }
-        impact=impact(px,py,vx,vy,omega,heading,ticks,side,hx);
-        if(impact==null)return null;
-        double miss=Math.hypot(Math.max(0,Math.abs(impact.u)-.005),Math.max(0,Math.abs(impact.v-AIM_V)-.025));
-        if(miss>.005)return null;
-        return new Solution(ticks,heading-omega*delay,impact.time,miss);
+        return rolling(pose,inchesPerSecond,blue,initialCell,1900,delay,0,0);
     }
     private static Impact impact(double x,double y,double vx,double vy,double omega,double h,double ticks,int side,double hx){
         return impactBall(x,y,vx,vy,omega,h,ticks,side,hx,R,M);
@@ -135,9 +120,10 @@ public final class MovingShotSolver {
         double[] p={x+mx,y+my,.2889397283,c*speed*Math.cos(ANGLE)+vx-my*omega,s*speed*Math.cos(ANGLE)+vy+mx*omega,speed*Math.sin(ANGLE)};
         double[] spin={s*1000*Math.PI/30,-c*1000*Math.PI/30,0};
         double old=(p[1]-side*.392176)*side*Math.sqrt(3)/2+(p[2]-1.51257)*.5;
-        if(old<=radius)return null;
+        // A steep shot may start behind the extended face plane, rise outside the
+        // cell, then enter on its descent. Only inward crossings are candidates.
         double dt=1.0/240;
-        for(int k=1;k<=300;k++){
+        for(int k=1;k<=960;k++){
             double[] before=p.clone();rk4(p,spin,dt,radius,mass);for(int j=0;j<3;j++)spin[j]*=Math.exp(-dt*.18);
             double next=(p[1]-side*.392176)*side*Math.sqrt(3)/2+(p[2]-1.51257)*.5;
             if(old>radius&&next<=radius){double a=(old-radius)/(old-next),ix=before[0]+a*(p[0]-before[0]),iy=before[1]+a*(p[1]-before[1]),iz=before[2]+a*(p[2]-before[2]);

@@ -26,7 +26,7 @@ These four autonomous wrappers are registered. Older flower/adaptive wrappers fa
 
 
 
-1. The team-provided tuned `ForesightConfig` is now included in `Constants`, with Pinpoint offsets x = -5.161768995870755 in and y = -3.5600169624869284 in. The follower factory is fully configured; there is no missing-tuning initialization block. The supplied lateral controller is retained exactly, using the primary lateral gain in both piecewise ranges as confirmed by the user. Drivetrain directions now match the active MecanumDrive subsystem (left REVERSE, right FORWARD); Pinpoint offsets are preserved and still need physical verification.
+1. The team-provided tuned `ForesightConfig` is now included in `Constants`, with Pinpoint offsets x = -5.161768995870755 in and y = -3.5600169624869284 in. The follower factory is fully configured; there is no missing-tuning initialization block. The supplied lateral controller uses the secondary lateral gain below 2.5 inches and the primary lateral gain from 2.5 inches, matching the updated team constants. Drivetrain directions now match the active MecanumDrive subsystem (left REVERSE, right FORWARD); Pinpoint offsets are preserved and still need physical verification.
 
 2. Configure the required hardware names: `frontLeftMotor`, `frontRightMotor`, `backLeftMotor`, `backRightMotor`, `pinpoint`, `shooter`, `intake`, `windmill`, `gate`, `limelight`, `Webcam 1` (Logitech USB camera). Gate closed/open positions are 0.50/0.27. Match the existing subsystem conventions: shooter FORWARD with positive encoder velocity; intake REVERSE with negative intake power; windmill FORWARD with positive power. Verify these with the robot raised before loading balls. Shooter uses RUN_USING_ENCODER; intake and windmill use RUN_WITHOUT_ENCODER with BRAKE.
 
@@ -123,3 +123,10 @@ Latest final simulator trials with finite flower pickup: both Rushes scored 15/1
 This branch starts from `840a102`, the merge of PR #11 (software PIDF shooter and speed-adjust TeleOp). The latest `Shooter.java`, `Intake.java`, `Limelight.java` and both new speed-adjust TeleOps are preserved without changes. In particular, TeleOp intake start operates only the roller; the latest shooter owns windmill feeding through its separate API.
 
 Cycle autonomous owns its motors while that OpMode is running: its shooter uses SDK encoder-velocity control and its timed single-ball gate/transfer interlocks. It does not also run the TeleOp Shooter software PIDF loop. Its velocity forecast and feed/shot calibration remain hardware estimates requiring validation. Both control paths explicitly configure their motor modes during initialization, so switching OpModes selects the intended owner. The autonomous source and supplied Pedro tuning match the previously tested branch; this update resolves integration against the newer team code.
+
+
+## Measured exit elevation update
+
+The launcher is approximately 86 degrees above forward horizontal (90 degrees is straight up). MovingShotSolver and HiveAim now use that fixed angle. The numerical solver follows descending arcs for up to four seconds and seeds motion compensation from flight-time chassis carry. Rush and NoFlowers firing transfers end at reachable outer approaches, red (-1.13, +/-0.85 m), mirrored for blue. Stationary fallback aiming no longer feeds measured correction yaw back into its target; permission still verifies actual release motion.
+
+Four complete simulator trials scored 15/15 and two tips for each Rush, and 8/8 and one tip for each NoFlowers; all parked. These full routes used stationary fallback shots (zero fast releases). Independent 1 m/s projectile fixtures passed, but fast releases in full routes remain unverified. These results replace the earlier 55-degree route benchmarks. Exit speed transfer, muzzle position and spin still require physical calibration.
