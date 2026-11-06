@@ -6,6 +6,7 @@ import java.util.*;
 /** Field-centered inches, +X right, +Y up; Pedro heading 0 points +X. */
 public final class CycleRoute {
     public enum Start { RED_WEST, RED_EAST, BLUE_EAST, BLUE_WEST }
+    public enum Lineup { LEGACY, SOLO, PARTNER }
     public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, ROLL_NEAR, ROLL_FAR, PARK }
     public enum Strategy { FLOWERS, TIPPED_POLLEN, ADAPTIVE_ALL, RUSH_TIPS, NO_FLOWERS }
     public static final class Stage {
@@ -28,6 +29,8 @@ public final class CycleRoute {
     public final Start start;
     public final boolean blue;
     public final Strategy strategy;
+    public final Lineup lineup;
+    private final boolean innerStart;
     public final Pose initial;
     public final Pose park;
     public int bonusIndex;
@@ -36,12 +39,22 @@ public final class CycleRoute {
         this(start,Strategy.FLOWERS);
     }
     public CycleRoute(Start start,Strategy strategy) {
-        this.start=start; this.strategy=strategy; blue=start==Start.BLUE_EAST||start==Start.BLUE_WEST;
-        boolean east=start==Start.RED_EAST||start==Start.BLUE_WEST;
-        // Both starts lie on the alliance half of the bottom/top perimeter, clear of flowers.
-        initial=pose(rushStyle()?-.36:east?-.32385:-.90,-1.564259,90);
-        park=rushStyle()?pose(-1.55,.90,90):pose(-1.42,strategy==Strategy.ADAPTIVE_ALL?.56:.9144,180);
-        if(strategy==Strategy.RUSH_TIPS){rush();return;}
+        this(start,strategy,Lineup.LEGACY);
+    }
+    public CycleRoute(Start start,Strategy strategy,Lineup lineup) {
+        this.start=start;
+        this.strategy=strategy;
+        this.lineup=lineup;
+        blue=start==Start.BLUE_EAST||start==Start.BLUE_WEST;
+        innerStart=start==Start.RED_EAST||start==Start.BLUE_WEST;
+        double startX=lineup==Lineup.LEGACY&&rushStyle()?-.36:innerStart?-.36:-.90;
+        if(lineup==Lineup.LEGACY&&!rushStyle()&&innerStart)startX=-.32385;
+        initial=pose(startX,-1.564259,90);
+        park=partnerOpener()?pose(-.36,-1.48,90)
+            :rushStyle()?pose(-1.55,.90,90):pose(-1.42,strategy==Strategy.ADAPTIVE_ALL?.56:.9144,180);
+        if(lineup==Lineup.PARTNER){partner(startX);return;}
+        if(lineup==Lineup.SOLO){rush(startX);return;}
+        if(strategy==Strategy.RUSH_TIPS){rush(startX);return;}
         if(strategy==Strategy.NO_FLOWERS){noFlowers();return;}
         add("Preload launch",-.32385,-1.55,90,Action.FIRE,3,6);
         add("Back away from launch",-.32385,-1.30,90,Action.MOVE,0,3);
@@ -97,10 +110,11 @@ public final class CycleRoute {
     private void transit(String name,boolean near,int count){
         double x=-1.13, y=near?-.85:.85; // 86-degree reachable outer intake approach.
         double h=Math.toDegrees(Math.atan2((near?-.392176:.392176)-y,-.32385-x));
-        stages.add(new Stage(name,pose(x,y,h),near?Action.ROLL_NEAR:Action.ROLL_FAR,count,7.5,false));
+        double limit=lineup==Lineup.PARTNER?9.5:7.5;
+        stages.add(new Stage(name,pose(x,y,h),near?Action.ROLL_NEAR:Action.ROLL_FAR,count,limit,false));
     }
-    private void rush(){
-        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,2);
+    private void rush(double startX){
+        add("Clear starting wall",startX,-1.43,90,Action.MOVE,0,2);
         transit("Shoot preloads en route to near flower",true,3);
         add("Near flower",-1.415,-.5942,180,Action.FLOWER_COLLECT,3,4);
         transit("Shoot while crossing to far flower",false,4);
@@ -112,14 +126,41 @@ public final class CycleRoute {
         transit("Shoot garden batch en route to cleanup",true,4);
         add("Face remaining garden safely",-1.40,-1.43,180,Action.MOVE,0,2);
         add("Garden cleanup before final cycle",-1.50,-1.575,180,Action.COLLECT,0,2);
-        add("View first spill",-.60,-.78,270,Action.MOVE,0,3);
-        add("Recycle released pollen",-.60,-.78,270,Action.VISION_COLLECT,1,2);
+        double spillScanX=avoidFrame()?-1.13:-.60;
+        double spillScanHeading=avoidFrame()?0:270;
+        add("View first spill",spillScanX,-.78,spillScanHeading,Action.MOVE,0,3);
+        add("Recycle released pollen",spillScanX,-.78,spillScanHeading,Action.VISION_COLLECT,1,2);
         transit("Complete third tip en route to parking",true,4);
         bonusIndex=stages.size();
         add("View teleop pickup diagonally",-1.10,-1.35,210,Action.MOVE,0,3);
         add("Collect teleop preload",-1.50,-1.564259,180,Action.SWEEP,0,2.0);
     }
     public boolean rushStyle(){return strategy==Strategy.RUSH_TIPS||strategy==Strategy.NO_FLOWERS;}
+    public boolean partnerOpener(){
+        return lineup==Lineup.PARTNER&&innerStart;
+    }
+
+    public boolean avoidFrame(){
+        return lineup!=Lineup.LEGACY||strategy==Strategy.NO_FLOWERS;
+    }
+
+    private void partner(double startX){
+        add("Clear starting wall in assigned lane",startX,-1.43,90,Action.MOVE,0,2);
+        if(partnerOpener()){
+            // Keep the near board in the webcam view at the steep launch angle.
+            add("Open near hive for partner",-.36,-1.43,90,Action.ROLL_NEAR,3,6);
+            add("Return to inner handoff spot",-.36,-1.48,90,Action.MOVE,0,3);
+        }else{
+            add("Enter outside partner lane",-1.13,-1.33,90,Action.MOVE,0,2);
+            // The far-cell tag interlock holds the feeder until the opener turns the hive.
+            add("Wait for partner tip and score preloads",-1.13,.85,-29,Action.ROLL_FAR,4,12);
+            add("Face assigned garden pollen",-1.10,-1.35,210,Action.MOVE,0,4);
+            add("Collect assigned garden pollen",-1.50,-1.564259,180,Action.SWEEP,4,3);
+            transit("Score garden pollen on far cell",false,4);
+        }
+        bonusIndex=stages.size();
+    }
+
     private void noFlowers(){
         add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,2);
         transit("Shoot preloads toward garden",true,3);
@@ -143,7 +184,7 @@ public final class CycleRoute {
     }
     /** Collision-clear return corridor; points are generated from the current measured pose. */
     public List<Pose> parkingPath(Pose current) {
-        if(strategy==Strategy.NO_FLOWERS)return FrameClearance.path(current,park,blue);
+        if(avoidFrame())return FrameClearance.path(current,park,blue);
         double x=current.x()*.0254*(blue?-1:1), y=current.y()*.0254*(blue?-1:1);
         List<Pose> result=new ArrayList<>();
         if(y>1.25) {result.add(pose(x,1.15,-90));y=1.15;}
