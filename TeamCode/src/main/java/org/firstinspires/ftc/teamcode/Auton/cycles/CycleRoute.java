@@ -5,7 +5,30 @@ import java.util.*;
 
 /** Field-centered inches, +X right, +Y up; Pedro heading 0 points +X. */
 public final class CycleRoute {
-    public enum Start { RED_WEST, RED_EAST, BLUE_EAST, BLUE_WEST }
+    public enum Start {
+        RED_WEST(false, false), RED_EAST(false, true),
+        BLUE_EAST(true, false), BLUE_WEST(true, true);
+
+        final boolean blue;
+        final boolean inner;
+
+        Start(boolean blue, boolean inner) {
+            this.blue = blue;
+            this.inner = inner;
+        }
+
+        double wallX() {
+            return inner ? -.36 : -.90;
+        }
+
+        Pose wallPose() {
+            return alliancePose(blue, wallX(), -1.564259, 90);
+        }
+
+        Pose loadingZone() {
+            return alliancePose(blue, -1.55, .90, 90);
+        }
+    }
     public enum Lineup { LEGACY, SOLO, PARTNER }
     public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, ROLL_NEAR, ROLL_FAR, PARK }
     public enum Strategy { FLOWERS, TIPPED_POLLEN, ADAPTIVE_ALL, RUSH_TIPS, NO_FLOWERS }
@@ -45,13 +68,16 @@ public final class CycleRoute {
         this.start=start;
         this.strategy=strategy;
         this.lineup=lineup;
-        blue=start==Start.BLUE_EAST||start==Start.BLUE_WEST;
-        innerStart=start==Start.RED_EAST||start==Start.BLUE_WEST;
-        double startX=lineup==Lineup.LEGACY&&rushStyle()?-.36:innerStart?-.36:-.90;
-        if(lineup==Lineup.LEGACY&&!rushStyle()&&innerStart)startX=-.32385;
-        initial=pose(startX,-1.564259,90);
+        blue=start.blue;
+        innerStart=start.inner;
+        double startX=start.wallX();
+        if(lineup==Lineup.LEGACY){
+            if(rushStyle())startX=-.36;
+            else if(innerStart)startX=-.32385;
+        }
+        initial=lineup==Lineup.LEGACY?pose(startX,-1.564259,90):start.wallPose();
         park=partnerOpener()?pose(-.36,-1.48,90)
-            :rushStyle()?pose(-1.55,.90,90):pose(-1.42,strategy==Strategy.ADAPTIVE_ALL?.56:.9144,180);
+            :rushStyle()?start.loadingZone():pose(-1.42,strategy==Strategy.ADAPTIVE_ALL?.56:.9144,180);
         if(lineup==Lineup.PARTNER){partner(startX);return;}
         if(lineup==Lineup.SOLO){rush(startX);return;}
         if(strategy==Strategy.RUSH_TIPS){rush(startX);return;}
@@ -199,6 +225,10 @@ public final class CycleRoute {
         return rushStyle()?1.15+inches*.0254/1.20:strategy==Strategy.ADAPTIVE_ALL?1.45+inches*.0254/1.20:1.05+inches*.0254/.85;
     }
     private Pose pose(double x,double y,double heading) {
+        return alliancePose(blue, x, y, heading);
+    }
+
+    private static Pose alliancePose(boolean blue, double x, double y, double heading) {
         return new Pose((blue?-x:x)/.0254,(blue?-y:y)/.0254,Math.toRadians(heading+(blue?180:0)));
     }
 }
