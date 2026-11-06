@@ -2,6 +2,8 @@
 
 Choose an OpMode under **26123 Match Lineup**. Each row uses the same wall mark for both modes. Positions are field-centered meters and headings use Pedro's convention: 0° faces +X, 90° faces +Y. Place the rear of the robot against the wall with its front pointing into the field.
 
+![Top-down field map showing all four starting marks, inward robot headings, partner roles, and loading-zone parking.](autonomous-start-map.svg)
+
 | Wall mark | Robot center (X, Y) | Heading | Solo OpMode | Partner OpMode |
 | --- | --- | --- | --- | --- |
 | Red East (inner) | (-0.36, -1.564) | 90° | 26123 Red East Solo | 26123 Red East Partner (Opener) |
