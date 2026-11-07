@@ -83,7 +83,7 @@ public abstract class DelayedBasketTwoAuto extends OpMode {
                     if(now>8){park("Could not reach Basket 2 mark");break;}
                 }
                 if(Math.hypot(p.x()-target.x(),p.y()-target.y())<2&&!follower.holding())follower.hold(target);
-                if(at(p,target,.65,2,3)){
+                if(at(p,target,1.0,2,3)){
                     if(waypoints.hasNext())nextWaypoint();
                     else if(state==State.PARK)finish("Parked");
                     else waitForAim();
@@ -91,7 +91,7 @@ public abstract class DelayedBasketTwoAuto extends OpMode {
                 break;
             case WAIT:
                 shooter.updateSpinupOnly();
-                if(at(p,route.shot,.65,2,3)){if(stableSince<0)stableSince=now;}else stableSince=-1;
+                if(at(p,route.shot,1.0,2,3)){if(stableSince<0)stableSince=now;}else stableSince=-1;
                 if(stableSince>=0&&DelayedBasketTwoRoute.readyToFeed(now,now-stableSince)){
                     state=State.SHOOT;result="Shooting Basket 2";feed(now);
                 }
