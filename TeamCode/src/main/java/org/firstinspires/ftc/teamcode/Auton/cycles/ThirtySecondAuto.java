@@ -160,7 +160,10 @@ public abstract class ThirtySecondAuto extends OpMode {
         follower.update();Pose p=follower.pose();
         if(route.avoidFrame()){
             if(!FrameClearance.clear(p.x()*.0254,p.y()*.0254)){finish("Frame clearance interlock");report();return;}
-            if(moveSteps!=null&&moveSteps.hasNext()&&moveTarget!=null&&Math.hypot(p.x()-moveTarget.x(),p.y()-moveTarget.y())<.65)advanceMove();
+            if(moveSteps!=null&&moveSteps.hasNext()&&moveTarget!=null
+                &&Math.hypot(p.x()-moveTarget.x(),p.y()-moveTarget.y())<.65
+                &&Math.abs(Math.atan2(Math.sin(p.heading()-moveTarget.heading()),Math.cos(p.heading()-moveTarget.heading())))<Math.toRadians(2)
+                &&Math.hypot(follower.velocity().vx,follower.velocity().vy)<3)advanceMove();
         }
         int acknowledged=mechanisms.fired;mechanisms.update(now);
         if(mechanisms.fired>acknowledged&&Math.hypot(follower.velocity().vx,follower.velocity().vy)*.0254>.05)movingFeeds++;
@@ -199,7 +202,9 @@ public abstract class ThirtySecondAuto extends OpMode {
             if((collected&&!waitForSpill)||now-stageStart>stage.limit())next();
             report();return;
         }
-        double distance=Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y());
+        // A nearby final goal must not bypass an unfinished retreat/turn waypoint.
+        double distance=moveSteps!=null&&moveSteps.hasNext()?Double.POSITIVE_INFINITY
+            :Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y());
         double error=Math.abs(Math.atan2(Math.sin(p.heading()-stage.pose().heading()),Math.cos(p.heading()-stage.pose().heading())));
         if(stage.action()==CycleRoute.Action.FLOWER_COLLECT){
             if(distance<.65&&error<Math.toRadians(3)){

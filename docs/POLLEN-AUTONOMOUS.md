@@ -52,6 +52,8 @@ Each Team role pursues pollen within its own alliance-normalized quadrant. Picku
 
 ## Verification scope
 
+Wall pickup returns retreat to a 1.42 m inset while retaining the pickup heading, then turn before continuing. Wall approaches complete their turn inboard. Intermediate clearance waypoints require position, heading, and low speed before advancing. `tools/auton/PathClearanceChecks.java` samples the swept 18-inch chassis along both alliances' stage and parking paths, including a grid of wall pickup poses. These geometric checks assume the configured chassis size and do not model tracking error or another robot.
+
 The FTC Android app build checks the six registered OpModes and their SDK/Pedro interfaces. Standalone feeder, flywheel, and vision contract checks run through tools/auton/check-models.ps1.
 
 The flowerless routes have 66 ordering, four-shot, starting-mark, and frame-bypass checks, plus 64 raised/lowered basket-height checks. The route helpers come from the simulator basket lineup. Simulator role tests used an injected teammate batch to exercise basket availability. Simulated shot counts and tips describe that field model. Forty-four additional fixture checks cover Limelight projection, both alliances and baskets, capture-age compensation, invalid observations, and measured range changing the calculated shooting speed. The updated Limelight shooting flow and the real robot's CRServo feed still require physical autonomous trials.
