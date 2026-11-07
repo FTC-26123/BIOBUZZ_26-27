@@ -20,7 +20,8 @@ public final class DelayedBasketTwoRoute {
             CycleRoute.Lineup.FOUR_PARK).stages.get(1).pose();
         double heading=2*Math.PI-near.heading()+(blue?Math.PI:0);
         shot=new Pose(sign*near.x(),-sign*near.y(),Math.atan2(Math.sin(heading),Math.cos(heading)));
-        park=pose(-1.55,CycleRoute.OUR_PARK_Y_METERS,270);
+        park=blue ? new Pose(131.44-70.75,19.94-70.75,Math.PI/2)
+            : pose(-1.55,CycleRoute.OUR_PARK_Y_METERS,270);
     }
     private Pose pose(double x,double y,double degrees){
         double heading=Math.toRadians(degrees+(blue?180:0));
@@ -35,6 +36,13 @@ public final class DelayedBasketTwoRoute {
     }
     public List<Pose> parkingPath(Pose from){
         List<Pose> result=new ArrayList<>();
+        if(blue){
+            // Preserve the clear approach corridor for an early abort; after shooting drive straight to park.
+            if(Math.hypot(from.x()-shot.x(),from.y()-shot.y())>1e-6)
+                result.addAll(FrameClearance.path(from,shot,true));
+            result.add(park);
+            return result;
+        }
         Pose upper=pose(-1.06,.94,Math.toDegrees(shot.heading())-(blue?180:0));
         Pose lower=new Pose(upper.x(),sign*.50/.0254,shot.heading());
         result.addAll(FrameClearance.path(from,upper,blue));

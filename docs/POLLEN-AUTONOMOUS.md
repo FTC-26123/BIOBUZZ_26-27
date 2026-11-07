@@ -45,7 +45,7 @@ Legacy unregistered autonomous helpers remain in the repository; the eight menu 
 
 ## Teammate parking
 
-All eight active autons park in the near alliance slot rather than the middle of the loading area. A farther slot is reserved for a teammate. See the lineup map and coordinate table. Slot centers are 0.55 m apart, leaving 0.0928 m (3.65 inches) between two 18-inch footprints. Both shooting families now use the mark one inch farther from the hive; shooter speed is unchanged. This reserves physical space; coordinate the other robot's route and parking eligibility with the alliance.
+Blue Basket 2 Wait 15 parks directly at visualizer (131.44, 19.94), reserving the nearer slot (131.77, 45.55) for its teammate. The other seven active autons use the near alliance slot and reserve the farther slot for a teammate. See the lineup map and coordinate table. Slot centers are 0.55 m apart, leaving 0.0928 m (3.65 inches) between two 18-inch footprints. Both shooting families now use the mark one inch farther from the hive; shooter speed is unchanged. This reserves physical space; coordinate the other robot's route and parking eligibility with the alliance.
 
 ## Verification scope
 

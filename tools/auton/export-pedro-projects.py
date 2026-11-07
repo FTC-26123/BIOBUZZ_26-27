@@ -29,7 +29,7 @@ for name, rows in routes.items():
     for index, (x, y) in enumerate([(-.5942,1.7283),(1.7283,.5942),(.5942,-1.7283),(-1.7283,-.5942)]):
         shape(f'Fixed flower pot {index+1}', [(x+.08*math.cos(a*math.pi/8), y+.08*math.sin(a*math.pi/8)) for a in range(16)], '#b87913')
     sign = -1 if name.startswith('Blue') else 1
-    x, y = -1.55*sign, 1.19*sign
+    x, y = -1.55*sign, (.64 if name == "BlueBasket2Wait15Shoot4Park" else 1.19)*sign
     shape('Reserved teammate space', [(x-.2286,y-.2286),(x+.2286,y-.2286),(x+.2286,y+.2286),(x-.2286,y+.2286)], '#8959a8')
     doc = dict(version='2.0.0', startPoint=dict(x=rows[0][1], y=rows[0][2], headingDeg=rows[0][3]), lines=lines,
         sequence=sequence, shapes=shapes, fieldPoints=[], activePaths=[], robot=dict(

@@ -64,7 +64,7 @@ for name,color in [('RedBasket2Wait15Shoot4Park','#c02655'),('BlueBasket2Wait15S
     tx,ty=(shot[1]+10,shot[2]-13) if name.startswith('Red') else (shot[1]-32,shot[2]+12)
     ax.annotate('Aim + wait\nFeed at 15 s',xy=(shot[1],shot[2]),xytext=(tx,ty),fontsize=11,color=color,weight='bold',
         bbox=dict(fc='white',ec='none',alpha=.94,pad=3),arrowprops=dict(arrowstyle='-',color=color),zorder=11)
-for x,y in [(-1.55,1.19),(1.55,-1.19)]:
+for x,y in [(-1.55,1.19),(1.55,-.64)]:
     x=x/.0254+70.75;y=y/.0254+70.75
     ax.add_patch(Rectangle((x-9,y-9),18,18,fc='#dccfe9',ec='#775588',ls='--',alpha=.7,zorder=4))
     ax.text(x,y,'ALLY',ha='center',va='center',fontsize=9,color='#624276',weight='bold',zorder=9)
@@ -77,7 +77,7 @@ for name in starts:
 lines.append(('SHOOTING MARKS (inches)',12,'#0f172a'))
 for name in shots:
     _,x,y,h=shots[name];lines.append((f'{"Red" if name.startswith("Red") else "Blue"}: ({x:.4f}, {y:.4f})',11,'#334155'))
-lines += [('SEQUENCE',12,'#0f172a'),('1. Drive clear of wall; aim for Basket 2',11,'#334155'),('2. Spin flywheel; all feeders OFF',11,'#334155'),('3. At 15 s + settled aim: feed four',11,'#334155'),('4. Stop mechanisms; park in near slot',11,'#334155'),('TEAMMATE REQUIRED',12,'#0f172a'),('Basket 2 starts down.',11,'#334155'),('Partner must tip Basket 1 before 15 s.',11,'#334155'),('No camera / basket-state sensor.',11,'#334155'),('DEFAULT SHOOTER',12,'#0f172a'),('1500 ticks/s; same hive distance',11,'#334155'),('as the current Basket 1 mark.',11,'#334155'),('MARKERS',12,'#0f172a'),('Circle: start | Star: aim and wait',11,'#334155'),('P: park | Dashed: teammate space',11,'#334155')]
+lines += [('SEQUENCE',12,'#0f172a'),('1. Drive clear of wall; aim for Basket 2',11,'#334155'),('2. Spin flywheel; all feeders OFF',11,'#334155'),('3. At 15 s + settled aim: feed four',11,'#334155'),('4. Stop mechanisms; drive to marked park',11,'#334155'),('TEAMMATE REQUIRED',12,'#0f172a'),('Basket 2 starts down.',11,'#334155'),('Partner must tip Basket 1 before 15 s.',11,'#334155'),('No camera / basket-state sensor.',11,'#334155'),('DEFAULT SHOOTER',12,'#0f172a'),('1500 ticks/s; same hive distance',11,'#334155'),('as the current Basket 1 mark.',11,'#334155'),('MARKERS',12,'#0f172a'),('Circle: start | Star: aim and wait',11,'#334155'),('P: park | Dashed: teammate space',11,'#334155')]
 y=1
 for text,size,color in lines:
     key.text(0,y,text,fontsize=size,color=color,weight='bold' if size>=12 else 'normal',va='top',transform=key.transAxes)
