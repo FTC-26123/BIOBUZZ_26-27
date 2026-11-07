@@ -1,26 +1,29 @@
-# Basket autonomous lineup
+# Flowerless autonomous setup
 
-Choose **Red Basket 1**, **Red Basket 1 Team**, or **Red Basket 2 Team**, or the corresponding Blue option. **Basket 1** is the basket that starts raised. **Basket 2** starts lowered and rises after the opening tip.
+There are six selectable autonomous programs under **26123 Flowerless**.
 
-![Overhead rendering of the official FIRST BIOBUZZ field CAD with each alliance's basket starts, robot headings, and parking assignments.](autonomous-start-map.png)
-
-The field image uses the bundled official FIRST BIOBUZZ STEP CAD v26-27.2. Colored robot footprints, arrows, basket names, and parking markers are setup overlays. Field coordinates and geometry retain the CAD orientation. Source attribution and conversion details are in [the simulator field provenance](https://github.com/d-mankotia/BIOBUZZ-sim/blob/main/FIELD-SOURCES.md).
-
-| Selection | Red robot center and Pedro heading | Blue robot center and Pedro heading |
+| Red | Blue | Full sequence |
 | --- | --- | --- |
-| Basket 1 / Basket 1 Team | (-0.36, -1.564 m), 90Â° | (+0.36, +1.564 m), 270Â° |
-| Basket 2 Team | (-0.90, +1.564 m), 270Â° | (+0.90, -1.564 m), 90Â° |
-| Park Only | Basket 1 start when alliance is Red | Basket 1 start when alliance is Blue |
+| Red Basket 1 Shoot 4 and Park | Blue Basket 1 Shoot 4 and Park | Shoot the four preloads into Basket 1, then park. |
+| Red Basket 1 Recover and Shoot | Blue Basket 1 Recover and Shoot | Shoot four, move forward, observe Basket 1 reaching its lower stop, collect loose pollen, wait for the teammate to raise Basket 1, shoot again, then park. |
+| Red Park Only | Blue Park Only | Leave the separate Park Only wall mark and drive around the frame to park. |
 
-Coordinates are field-centered. 0Â° faces +X and 90Â° faces +Y. Place the physical robot at the selected mark before pressing Start. Initialize sets the Pinpoint pose to that mark.
+![Overhead rendering of the official FIRST BIOBUZZ field CAD, showing Basket 1 shooting starts, separate Park Only starts, inward headings, and final parking points.](autonomous-start-map.png)
 
-- **Basket 1** opens on the raised basket and runs the solo flower and garden route across the alliance half. It reserves time to park.
-- **Basket 1 Team** opens with three preloads. It stays in the opening quadrant for scoring and looks for fallen pollen with Limelight neural pipeline 7 and the `yellow_pollen` label. It uses the local garden as a fallback. After the other basket tips, the robot can fire into Basket 1 again when the webcam confirms it is raised.
-- **Basket 2 Team** starts by its assigned quadrant and waits for Basket 2 to rise. It uses the same loose-pollen search and checks the local pot as a fallback. The scoring robot never feeds into a lowered basket.
-- **Park Only** defaults to Red. After Init and before Start, press **X** to select Blue or **B** to select Red. It clears the wall, drives around the frame, and stops in the loading zone with the scoring mechanisms idle.
+The field image uses the official FIRST BIOBUZZ STEP CAD v26-27.2 bundled with the simulator. Colored footprints, arrows, basket labels, and parking markers are setup overlays. Source attribution and conversion details are in [the simulator field provenance](https://github.com/d-mankotia/BIOBUZZ-sim/blob/main/FIELD-SOURCES.md).
 
-The two Team routines use separate spots in the loading zone. Basket 1 Team leaves its scoring quadrant when it heads there to park. Agree on basket roles and parking slots with the other driver before selecting a Team routine. Basket 2 Team parks without shooting if the other robot never opens its basket.
+| Routine family | Red robot center (m) | Red Pedro heading | Blue robot center (m) | Blue Pedro heading |
+| --- | --- | --- | --- | --- |
+| Shoot 4 and Park | (-0.360, -1.564259) | 90 degrees | (+0.360, +1.564259) | 270 degrees |
+| Recover and Shoot | (-0.360, -1.564259) | 90 degrees | (+0.360, +1.564259) | 270 degrees |
+| Park Only | (-0.900, -1.564259) | 90 degrees | (+0.900, +1.564259) | 270 degrees |
 
-These are complete FTC autonomous OpModes. Press Init and then Start once. Each scoring routine handles preloads, collection, repeat feeding, and its timed return to park. The Team routines repeat recovery and shooting when their basket is available. Fresh Limelight measurements set shooting speed for the fixed 86-degree launcher, and the webcam verifies basket availability. Configure Limelight tag pipeline 1 for shooting and neural pipeline 7 for yellow_pollen collection. An unavailable target or time pressure leads to parking.
+Coordinates refer to the robot's pose origin at the field center convention. Positive X points right and positive Y points up in the map. All starting arrows point into the field. Place the robot at the exact selected mark before Start. Initialize sets Pinpoint to that mark.
 
-See [hardware configuration and calibration](POLLEN-AUTONOMOUS.md). Physical robot and paired-robot field trials remain required.
+All scoring programs start with four pollen preloads. The first volley advances only after four confirmed feed events. A failed shot or missing observation can lead to parking with remaining preloads.
+
+The recovery program uses loose floor pollen from the first tip. Flower-contact areas are excluded from detector pursuit. The camera search is bounded and yields to parking when it cannot acquire targets. It uses fresh expected-basket Limelight measurements to calculate shooting speed for the 86-degree launcher. The USB webcam verifies that Basket 1 has reached the lower stop before recovery and has returned to raised height before the second volley. The teammate must shoot the opposite basket to raise Basket 1 again.
+
+Scoring stays within the Basket 1 quadrant. The return to the loading zone travels outside the metal frame. All routines reserve time for parking and stop at their destination or their deadline. Agree on the shared parking area with the teammate.
+
+See [hardware, camera, and feeder setup](POLLEN-AUTONOMOUS.md). The new sequences require physical robot trials.

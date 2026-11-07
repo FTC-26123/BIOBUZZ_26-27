@@ -29,7 +29,8 @@ public final class CycleRoute {
             return alliancePose(blue, -1.55, .90, 90);
         }
     }
-    public enum Lineup { LEGACY, SOLO, PARTNER, BASKET_ONE_TEAM, BASKET_TWO_TEAM }
+    public enum Lineup { LEGACY, SOLO, PARTNER, BASKET_ONE_TEAM, BASKET_TWO_TEAM,
+        FOUR_PARK, FOUR_RECOVER_TEAM }
     public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, ROLL_NEAR, ROLL_FAR, PARK }
     public enum Strategy { FLOWERS, TIPPED_POLLEN, ADAPTIVE_ALL, RUSH_TIPS, NO_FLOWERS }
     public static final class Stage {
@@ -80,6 +81,11 @@ public final class CycleRoute {
         }
         initial=lineup==Lineup.BASKET_TWO_TEAM?pose(-.90,1.564259,-90)
             :lineup==Lineup.LEGACY?pose(startX,-1.564259,90):start.wallPose();
+        if(floorOnly()){
+            park=pose(-1.55,.90,90);
+            floorRoute();
+            return;
+        }
         if(basketTeam()){
             // Split the loading zone along its length so both robots can park.
             park=pose(-1.55,basketOne()?.66:1.17,90);
@@ -172,6 +178,20 @@ public final class CycleRoute {
         add("Collect teleop preload",-1.50,-1.564259,180,Action.SWEEP,0,2.0);
     }
     public boolean rushStyle(){return strategy==Strategy.RUSH_TIPS||strategy==Strategy.NO_FLOWERS;}
+    public boolean floorOnly(){return lineup==Lineup.FOUR_PARK||lineup==Lineup.FOUR_RECOVER_TEAM;}
+
+    private void floorRoute(){
+        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
+        add("Shoot four preloads into Basket 1",-.36,-1.43,90,Action.ROLL_NEAR,4,12);
+        if(lineup==Lineup.FOUR_RECOVER_TEAM){
+            add("Move forward toward the spill",-.36,-1.18,90,Action.MOVE,0,3);
+            add("Wait for Basket 1 to tip and settle",-.36,-1.18,90,Action.WAIT_TIP,0,10);
+            add("Face the loose pollen spill",-1.12,-1.42,-22,Action.MOVE,0,3);
+            add("Recover fallen pollen with Limelight",-1.12,-1.42,-22,Action.VISION_COLLECT,4,7);
+            add("Wait for teammate and shoot Basket 1 again",-1.13,-.85,29.6,Action.ROLL_NEAR,4,30);
+        }
+        bonusIndex=stages.size();
+    }
     public boolean basketTeam(){
         return lineup==Lineup.BASKET_ONE_TEAM||lineup==Lineup.BASKET_TWO_TEAM;
     }
@@ -259,7 +279,7 @@ public final class CycleRoute {
         double inches=0;Pose from=current;
         for(Pose to:parkingPath(current)){inches+=Math.hypot(to.x()-from.x(),to.y()-from.y());from=to;}
         // Include braking the fast pass, turning, and settling inside the loading zone.
-        if(basketTeam())return 1.90+inches*.0254/1.20;
+        if(basketTeam()||floorOnly())return 1.90+inches*.0254/1.20;
         return rushStyle()?1.15+inches*.0254/1.20:strategy==Strategy.ADAPTIVE_ALL?1.45+inches*.0254/1.20:1.05+inches*.0254/.85;
     }
     private Pose pose(double x,double y,double heading) {
