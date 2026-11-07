@@ -16,6 +16,8 @@ public abstract class ThirtySecondAuto extends OpMode {
     private final SpillCollector collector=new SpillCollector();
     private final FlowerPickup flowerPickup=new FlowerPickup();
     private final GardenSweep garden=new GardenSweep();
+    private final LimelightShotPose shotVision=new LimelightShotPose();
+    private int visionPipeline=VisionRules.POLLEN_PIPELINE;
     private MovingShotSolver.Solution movingSolution;
     private double lastSolve=-1;
     private int movingFeeds;
@@ -30,7 +32,12 @@ public abstract class ThirtySecondAuto extends OpMode {
     private int emptyBase;
     private double cellSafeAt;
     private double raisedCellSince=-1;
+    private double loweredCellSince=-1;
     private boolean partnerTipConfirmed;
+    private boolean usedBasketFallback;
+    private boolean basketCycleDry;
+    private double basketSearchSeconds;
+    private double basketSettleSeconds;
     private Follower follower;
     private CycleMechanisms mechanisms;
     private GoBildaPinpointDriver pinpoint;
@@ -49,8 +56,10 @@ public abstract class ThirtySecondAuto extends OpMode {
     @Override public void init(){
         route=new CycleRoute(startingPoint(),strategy(),lineup()); follower=org.firstinspires.ftc.teamcode.pedro.Constants.create(hardwareMap);
         collector.clustered=route.rushStyle();
-        collector.avoidFlowers=route.strategy==CycleRoute.Strategy.NO_FLOWERS||route.lineup==CycleRoute.Lineup.PARTNER;
+        collector.avoidFlowers=route.strategy==CycleRoute.Strategy.NO_FLOWERS||route.lineup==CycleRoute.Lineup.PARTNER||route.basketTeam();
         collector.avoidFrame=route.avoidFrame();
+        if(route.basketTeam())collector.quadrantEnd=route.basketOne()?-1:1;
+        if(route.floorOnly())collector.quadrantEnd=-1;
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
         follower.setPose(route.initial); follower.update();
         mechanisms=new CycleMechanisms(hardwareMap);
@@ -61,7 +70,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         telemetry.addLine("Verify hardware calibration: 4 pollen preloads, camera pitch +10 degrees, shot elevation 86 degrees.");
         telemetry.update();
     }
-    @Override public void start(){timer.reset();index=0;stage=null;cellSafeAt=0;partnerTipConfirmed=false;done=false;parking=false;result="Running";next();}
+    @Override public void start(){timer.reset();index=0;stage=null;cellSafeAt=0;partnerTipConfirmed=false;usedBasketFallback=false;basketCycleDry=false;done=false;parking=false;result="Running";next();}
     private void beginPark(){
         mechanisms.stop();parking=true;result="Parking";
         parkSteps=route.parkingPath(follower.pose()).iterator();nextPark();
@@ -79,6 +88,26 @@ public abstract class ThirtySecondAuto extends OpMode {
             (stage.name().equals("Shoot preloads en route to near flower")||stage.name().equals("Shoot preloads toward garden")||stage.name().equals("Shoot while returning to near flower")))cellSafeAt=timer.seconds()+3.15;
         mechanisms.close();
         if(parking){nextPark();return;}
+        if(route.basketTeam()){
+            if(index==route.basketFallbackIndex){
+                // One pass can collect several adjacent balls. Try feeding the recovered batch
+                // before spending time on the fallback, unless the previous pass fed nothing.
+                if(collector.hasAttemptedPickup()&&(!basketCycleDry||usedBasketFallback))index=route.basketReloadIndex;
+                else if(usedBasketFallback){beginPark();return;}
+                else usedBasketFallback=true;
+            }
+            if(index>=route.stages.size()){
+                basketCycleDry=mechanisms.fired==shotBase;
+                index=route.basketRecoveryIndex;
+            }
+            if(index==route.basketRecoveryIndex){
+                // The opening Basket 1 and later full batches may still be in flight.
+                // Leave time for the flight, the damped hinge and the roll-out.
+                boolean opening=stage==route.stages.get(1);
+                basketSettleSeconds=opening&&route.basketOne()?4.8:0;
+                basketSearchSeconds=basketCycleDry||opening&&!route.basketOne()?2.0:5.7;
+            }
+        }
         if(index>=route.stages.size()){
             if(route.partnerOpener())finish("Holding inner lane for TeleOp");
             else beginPark();
@@ -87,7 +116,12 @@ public abstract class ThirtySecondAuto extends OpMode {
         // Bonus inventory is optional. Keep a measured-pose return budget for a partial pickup.
         if(route.rushStyle()&&index>=route.bonusIndex&&timer.seconds()+route.parkReserve(follower.pose())+.55>=29.5){beginPark();return;}
         stage=route.stages.get(index++);stageStart=timer.seconds();settled=-1;
+        boolean shooting=stage.action()==CycleRoute.Action.ROLL_NEAR||stage.action()==CycleRoute.Action.ROLL_FAR
+            ||stage.action()==CycleRoute.Action.FIRE||stage.action()==CycleRoute.Action.BONUS_FIRE;
+        int pipeline=shooting?VisionRules.SHOT_PIPELINE:VisionRules.POLLEN_PIPELINE;
+        if(pipeline!=visionPipeline){camera.pipelineSwitch(pipeline);visionPipeline=pipeline;}
         raisedCellSince=-1;
+        loweredCellSince=-1;
         if(route.rushStyle()&&index>route.bonusIndex)mechanisms.stop();
         double preparedSpeed=stage.action()==CycleRoute.Action.BONUS_FIRE?1320:index==1?CycleMechanisms.SPEED:2200;
         if(route.rushStyle()&&index<=route.bonusIndex){
@@ -149,9 +183,20 @@ public abstract class ThirtySecondAuto extends OpMode {
             vision=garden.status;report();return;
         }
         if(stage.action()==CycleRoute.Action.VISION_COLLECT||stage.action()==CycleRoute.Action.VISION_NECTAR){
+            if(route.basketTeam()&&now-stageStart<basketSettleSeconds){
+                follower.hold(stage.pose());
+                vision="Waiting for the opening spill to settle";
+                report();return;
+            }
             boolean collected=collector.update(follower,mechanisms,camera.getLatestResult(),VisionRules.POLLEN_PIPELINE,route.blue,stage.count(),now);
             vision=collector.status+"; attempts "+collector.attempts;
-            if(collected||now-stageStart>stage.limit())next();
+            if(route.floorOnly()&&now-stageStart>stage.limit()&&!collector.hasAttemptedPickup()){
+                beginPark();report();return;
+            }
+            // Let a just-fired batch settle or dump before deciding the quadrant is empty.
+            boolean waitForSpill=route.basketTeam()&&collector.attempts==0&&now-stageStart<basketSearchSeconds
+                ||route.floorOnly()&&!collector.hasAttemptedPickup();
+            if((collected&&!waitForSpill)||now-stageStart>stage.limit())next();
             report();return;
         }
         double distance=Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y());
@@ -173,8 +218,15 @@ public abstract class ThirtySecondAuto extends OpMode {
         boolean precision=stage.action()==CycleRoute.Action.FIRE||stage.action()==CycleRoute.Action.BONUS_FIRE;
         if(precision){
             double releaseDelay=mechanisms.releaseDelay(now);
-            if(lastSolve<0||now-lastSolve>.06){movingSolution=MovingShotSolver.solve(p,follower.velocity(),route.blue,index==1||stage.action()==CycleRoute.Action.BONUS_FIRE,releaseDelay);lastSolve=now;}
-            MovingShotSolver.Solution direct=MovingShotSolver.evaluate(p,follower.velocity(),route.blue,index==1||stage.action()==CycleRoute.Action.BONUS_FIRE,mechanisms.speed(),accelX,accelY,releaseDelay);
+            boolean near=index==1||stage.action()==CycleRoute.Action.BONUS_FIRE;
+            Pose shotPose=shotVision.measured(camera.getLatestResult(),p,follower.velocity(),route.blue,near,accelX,accelY);
+            if(shotPose==null){
+                mechanisms.feed(now,false);vision=shotVision.status;
+                if(now-stageStart>stage.limit())beginPark();
+                report();return;
+            }
+            if(lastSolve<0||now-lastSolve>.06){movingSolution=MovingShotSolver.solve(shotPose,follower.velocity(),route.blue,near,releaseDelay);lastSolve=now;}
+            MovingShotSolver.Solution direct=MovingShotSolver.evaluate(shotPose,follower.velocity(),route.blue,near,mechanisms.speed(),accelX,accelY,releaseDelay);
             if(direct!=null)movingSolution=direct;
             if(movingSolution!=null&&distance<3.2){
                 double h=movingSolution.heading();
@@ -209,9 +261,20 @@ public abstract class ThirtySecondAuto extends OpMode {
             else if(stage.action()==CycleRoute.Action.COLLECT){mechanisms.collect(true);if(now-settled>.18)next();}
             else if(stage.action()==CycleRoute.Action.WAIT_TIP){
                 mechanisms.close();vision="Waiting for released balls to reach the floor";
+                if(route.floorOnly()){
+                    boolean lowered=tags.readyLoweredCell(route.blue?42:34,p,route.blue,true);
+                    vision=tags.status;
+                    if(!lowered)loweredCellSince=-1;
+                    else {
+                        if(loweredCellSince<0)loweredCellSince=now;
+                        if(now-loweredCellSince>=.65)next();
+                    }
+                    if(now-stageStart>stage.limit())beginPark();
+                    report();return;
+                }
                 LLResult floor=camera.getLatestResult();
                 boolean groundTarget=false;
-                if(SpillCollector.fresh(floor,VisionRules.POLLEN_PIPELINE))for(com.qualcomm.hardware.limelightvision.LLResultTypes.DetectorResult blob:SpillCollector.pollen(floor)){
+                if(SpillCollector.fresh(floor,VisionRules.POLLEN_PIPELINE))for(LLResultTypes.DetectorResult blob:SpillCollector.pollen(floor)){
                     double[] xy=SpillCollector.project(blob.getTargetXDegrees(),blob.getTargetYDegrees(),p,SpillCollector.BALL_RADIUS);
                     if(xy!=null&&xy[0]*(route.blue?-1:1)<-.05){groundTarget=true;break;}
                 }
@@ -225,7 +288,7 @@ public abstract class ThirtySecondAuto extends OpMode {
             }
         }
         if(!done&&now-stageStart>stage.limit()){
-            if(stage.action()==CycleRoute.Action.WAIT_TIP||bonusPickup)beginPark();
+            if(stage.action()==CycleRoute.Action.WAIT_TIP||bonusPickup||route.basketTeam()&&!parking)beginPark();
             else finish("Stage timeout: "+stage.name());
         }
         report();
@@ -234,6 +297,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         boolean near=stage.action()==CycleRoute.Action.ROLL_NEAR;
         double delay=mechanisms.releaseDelay(now);
         com.pedropathing.math.Velocity measured=follower.velocity();double vx=measured.vx*.0254,vy=measured.vy*.0254;
+        Pose shotPose=shotVision.measured(camera.getLatestResult(),p,measured,route.blue,near,accelX,accelY);
         double dx=vx*delay,dy=vy*delay,futureVx=vx,futureVy=vy;
         double phase=rollingStart<0?0:now-rollingStart;
         TransitPath.Sample current=transitPath.sample(phase);TransitPath.Sample future=transitPath.sample(phase+delay);
@@ -246,7 +310,8 @@ public abstract class ThirtySecondAuto extends OpMode {
             futureVx=future.vx()+(vx-current.vx())*decay;
             futureVy=future.vy()+(vy-current.vy())*decay;
         }
-        Pose releasePose=new Pose(p.x()+dx/.0254,p.y()+dy/.0254,p.heading()+measured.omega*delay);
+        Pose launchFrom=shotPose==null?p:shotPose;
+        Pose releasePose=new Pose(launchFrom.x()+dx/.0254,launchFrom.y()+dy/.0254,p.heading()+measured.omega*delay);
         com.pedropathing.math.Velocity releaseVelocity=new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,measured.omega);
         boolean atDestination=rollingStart>=0&&phase>=transitPath.duration()&&Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y())*.0254<.06;
         // A stationary fallback aims for zero yaw, rather than chasing each measured yaw
@@ -254,7 +319,8 @@ public abstract class ThirtySecondAuto extends OpMode {
         // still validates measured translation/yaw at release before opening the feeder.
         com.pedropathing.math.Velocity planningVelocity=atDestination&&Math.hypot(vx,vy)<.08
             ?new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,0):releaseVelocity;
-        if(lastSolve<0||now-lastSolve>.06){
+        if(shotPose==null)movingSolution=null;
+        if(shotPose!=null&&(lastSolve<0||now-lastSolve>.06||movingSolution==null)){
             double aimU=route.strategy==CycleRoute.Strategy.NO_FLOWERS&&near?-.16+(mechanisms.fired%3)*.04:(mechanisms.fired%3-1)*.07;
             movingSolution=MovingShotSolver.rolling(releasePose,planningVelocity,route.blue,near,mechanisms.speed(),0,0,0,aimU*(route.blue?-1:1));
             if(movingSolution!=null){plannedReleaseHeading=movingSolution.heading();haveRollingAim=true;}
@@ -270,19 +336,23 @@ public abstract class ThirtySecondAuto extends OpMode {
         TransitPath.Sample target=transitPath.sample(rollingStart<0?0:now-rollingStart+.10);
         follower.hold(new Pose(target.x()/.0254,target.y()/.0254,turnFits?h:p.heading()));
         if(movingSolution!=null)mechanisms.aim(movingSolution.ticks());
-        MovingShotSolver.Solution direct=MovingShotSolver.evaluate(releasePose,releaseVelocity,route.blue,near,mechanisms.predictedReleaseSpeed(now),0,0,0);
+        MovingShotSolver.Solution direct=shotPose==null?null:MovingShotSolver.evaluate(releasePose,releaseVelocity,route.blue,near,mechanisms.predictedReleaseSpeed(now),0,0,0);
         double speed=Math.hypot(vx,vy),futureSpeed=Math.hypot(futureVx,futureVy);
         boolean arrived=atDestination;
         boolean fast=speed>.40&&futureSpeed>.75;
         // Finish an unsafe-in-transit shot at the actual pickup approach, never by making extra passes.
         boolean settledAtPickup=arrived&&speed<.08&&Math.abs(measured.omega)<.10;
-        boolean fresh=rollingVisionReady(now,p,near,arrived),complete=mechanisms.fired-shotBase>=stage.count()||mechanisms.emptyPulses-emptyBase>=1;
+        boolean openingFour=route.floorOnly()&&index==2;
+        boolean complete=mechanisms.fired-shotBase>=stage.count()
+            ||!openingFour&&mechanisms.emptyPulses-emptyBase>=1;
+        boolean fresh=rollingVisionReady(now,p,near,arrived)&&shotPose!=null;
+        if(shotPose==null)vision=shotVision.status;
         boolean permit=!complete&&now>=cellSafeAt&&rollingStart>=0&&(fast||settledAtPickup)&&movingSolution!=null&&direct!=null&&fresh&&chassisFits(p,h)&&chassisFits(releasePose,h);
         mechanisms.feedPredicted(now,permit,fresh&&!complete);
         shotStatus=String.format(java.util.Locale.US,"v %.2f -> %.2f, remaining %.2f m, aim %.1f deg, RPM ticks %.0f/%.0f, valid %s, feed %s",speed,futureSpeed,current.remaining(),Math.toDegrees(Math.atan2(Math.sin(releasePose.heading()-h),Math.cos(releasePose.heading()-h))),mechanisms.speed(),movingSolution==null?0:movingSolution.ticks(),direct!=null,permit);
         if(complete&&arrived){next();return;}
         if(now-stageStart>stage.limit()){
-            if(route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
+            if(route.floorOnly()||route.basketTeam()||route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
             else finish("Rolling stage timeout: "+stage.name());
         }
     }
@@ -293,6 +363,14 @@ public abstract class ThirtySecondAuto extends OpMode {
         return Math.abs(x)+ex<1.790&&Math.abs(y)+ey<1.790&&x*(route.blue?-1:1)+ex<-.002;
     }
     private boolean rollingVisionReady(double now,Pose pose,boolean near,boolean arrived){
+        if(route.basketTeam()||route.floorOnly()){
+            int first=route.blue?(near?42:38):(near?34:30);
+            boolean raised=tags.readyRaisedCell(first,pose,route.blue,near);
+            vision=tags.status;
+            if(!raised){raisedCellSince=-1;return false;}
+            if(raisedCellSince<0)raisedCellSince=now;
+            return now-raisedCellSince>=.65;
+        }
         if(route.lineup!=CycleRoute.Lineup.PARTNER||near)return visionReady();
         if(!arrived){
             vision="Approaching partner shot position";
@@ -326,6 +404,9 @@ public abstract class ThirtySecondAuto extends OpMode {
         telemetry.addData("Vision interlock",vision);telemetry.addData("Pedro pose",follower.pose());
         telemetry.addData("Feeder release estimate (s)",mechanisms.releaseDelay(timer.seconds()));telemetry.addData("Last confirmed feed (s)",mechanisms.lastFeedDuration());
         telemetry.addData("Fast shot gate",shotStatus);
+        telemetry.addData("Shooting angle (deg)",MovingShotSolver.LAUNCH_ANGLE_DEGREES);
+        telemetry.addData("Limelight shooting",shotVision.status);
+        telemetry.addData("Limelight basket range (m)",shotVision.rangeMeters);
         if(adaptive()){telemetry.addData("Moving feed events",movingFeeds);telemetry.addData("Live path replans",pathReplans+garden.replans);}
         telemetry.update();
     }

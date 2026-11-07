@@ -1,20 +1,29 @@
-# Solo and partner autonomous lineup
+# Flowerless autonomous setup
 
-Choose an OpMode under **26123 Match Lineup**. Each row uses the same wall mark for both modes. Positions are field-centered meters and headings use Pedro's convention: 0° faces +X, 90° faces +Y. Place the rear of the robot against the wall with its front pointing into the field.
+There are six selectable autonomous programs under **26123 Flowerless**.
 
-![Top-down field map showing all four starting marks, inward robot headings, partner roles, and loading-zone parking.](autonomous-start-map.svg)
+| Red | Blue | Full sequence |
+| --- | --- | --- |
+| Red Basket 1 Shoot 4 and Park | Blue Basket 1 Shoot 4 and Park | Shoot the four preloads into Basket 1, then park. |
+| Red Basket 1 Recover and Shoot | Blue Basket 1 Recover and Shoot | Shoot four, move forward, observe Basket 1 reaching its lower stop, collect loose pollen, wait for the teammate to raise Basket 1, shoot again, then park. |
+| Red Park Only | Blue Park Only | Leave the separate Park Only wall mark and drive around the frame to park. |
 
-| Wall mark | Robot center (X, Y) | Heading | Solo OpMode | Partner OpMode |
+![Overhead rendering of the official FIRST BIOBUZZ field CAD, showing Basket 1 shooting starts, separate Park Only starts, inward headings, and final parking points.](autonomous-start-map.png)
+
+The field image uses the official FIRST BIOBUZZ STEP CAD v26-27.2 bundled with the simulator. Colored footprints, arrows, basket labels, and parking markers are setup overlays. Source attribution and conversion details are in [the simulator field provenance](https://github.com/d-mankotia/BIOBUZZ-sim/blob/main/FIELD-SOURCES.md).
+
+| Routine family | Red robot center (m) | Red Pedro heading | Blue robot center (m) | Blue Pedro heading |
 | --- | --- | --- | --- | --- |
-| Red East (inner) | (-0.36, -1.564) | 90° | 26123 Red East Solo | 26123 Red East Partner (Opener) |
-| Red West (outer) | (-0.90, -1.564) | 90° | 26123 Red West Solo | 26123 Red West Partner (Scorer) |
-| Blue West (inner) | (+0.36, +1.564) | 270° | 26123 Blue West Solo | 26123 Blue West Partner (Opener) |
-| Blue East (outer) | (+0.90, +1.564) | 270° | 26123 Blue East Solo | 26123 Blue East Partner (Scorer) |
+| Shoot 4 and Park | (-0.360, -1.564259) | 90 degrees | (+0.360, +1.564259) | 270 degrees |
+| Recover and Shoot | (-0.360, -1.564259) | 90 degrees | (+0.360, +1.564259) | 270 degrees |
+| Park Only | (-0.900, -1.564259) | 90 degrees | (+0.900, +1.564259) | 270 degrees |
 
-**Solo.** Run the Rush flower and garden cycles from the selected wall mark. The route uses outer-frame paths and reserves time to reach the loading zone.
+Coordinates refer to the robot's pose origin at the field center convention. Positive X points right and positive Y points up in the map. All starting arrows point into the field. Place the robot at the exact selected mark before Start. Initialize sets Pinpoint to that mark.
 
-**Park Only.** Choose `26123 Red East Park Only`, `26123 Red West Park Only`, `26123 Blue East Park Only`, or `26123 Blue West Park Only`. Use the corresponding mark and heading on the map. The robot leaves the wall, takes the outside route around the frame, and stops in its alliance's loading zone. It uses the drivetrain and Pinpoint.
+All scoring programs start with four pollen preloads. The first volley advances only after four confirmed feed events. A failed shot or missing observation can lead to parking with remaining preloads.
 
-**Partner.** Pair the inner Opener with the outer Scorer on the same alliance. The Opener sends three preload pollen into the opening cell, then backs into the inner handoff spot with the remaining preload for TeleOp. The Scorer owns the outer travel lane, garden pollen, and loading-zone park. It stages outside the frame and waits for a fresh far-cell webcam tag at raised height for at least 0.65 seconds before feeding. The webcam height check uses the configured mount (0.305 m above the floor, 10° upward pitch) and the Pinpoint position. It then shoots its preloads, collects the garden pollen, returns for the second batch, and parks. If the opening hive never turns, the Scorer times out and parks with its preloads.
+The recovery program uses loose floor pollen from the first tip. Flower-contact areas are excluded from detector pursuit. The camera search is bounded and yields to parking when it cannot acquire targets. It uses fresh expected-basket Limelight measurements to calculate shooting speed for the 86-degree launcher. The USB webcam verifies that Basket 1 has reached the lower stop before recovery and has returned to raised height before the second volley. The teammate must shoot the opposite basket to raise Basket 1 again.
 
-With another team's robot, agree on the same lane, hive, and park assignments before selecting Partner. The routines use fixed role assignments and the visible hive state. The simulator runs one drivetrain at a time. The partner validation uses an injected opening batch to exercise the hive tip and camera interlock.
+Scoring stays within the Basket 1 quadrant. The return to the loading zone travels outside the metal frame. All routines reserve time for parking and stop at their destination or their deadline. Agree on the shared parking area with the teammate.
+
+See [hardware, camera, and feeder setup](POLLEN-AUTONOMOUS.md). The new sequences require physical robot trials.
