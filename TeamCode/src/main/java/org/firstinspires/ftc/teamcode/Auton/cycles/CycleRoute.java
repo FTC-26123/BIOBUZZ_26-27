@@ -5,6 +5,8 @@ import java.util.*;
 
 /** Field-centered inches, +X right, +Y up; Pedro heading 0 points +X. */
 public final class CycleRoute {
+    // Two 18-inch footprints along the loading wall, with a 3.65-inch gap.
+    public static final double OUR_PARK_Y_METERS=.64,TEAMMATE_PARK_Y_METERS=1.19;
     public enum Start {
         RED_WEST(false, false), RED_EAST(false, true),
         BLUE_EAST(true, false), BLUE_WEST(true, true);
@@ -26,7 +28,11 @@ public final class CycleRoute {
         }
 
         Pose loadingZone() {
-            return alliancePose(blue, -1.55, .90, 90);
+            return alliancePose(blue, -1.55, OUR_PARK_Y_METERS, 90);
+        }
+
+        public Pose teammateParking() {
+            return alliancePose(blue, -1.55, TEAMMATE_PARK_Y_METERS, 90);
         }
     }
     public enum Lineup { LEGACY, SOLO, PARTNER, BASKET_ONE_TEAM, BASKET_TWO_TEAM,
@@ -82,7 +88,7 @@ public final class CycleRoute {
         initial=lineup==Lineup.BASKET_TWO_TEAM?pose(-.90,1.564259,-90)
             :lineup==Lineup.LEGACY?pose(startX,-1.564259,90):start.wallPose();
         if(floorOnly()){
-            park=pose(-1.55,.90,90);
+            park=start.loadingZone();
             floorRoute();
             return;
         }

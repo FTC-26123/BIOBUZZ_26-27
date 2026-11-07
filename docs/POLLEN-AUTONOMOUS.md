@@ -41,11 +41,17 @@ The 86-degree launch angle is a physical configuration. Autonomous does not use 
 
 Legacy unregistered autonomous helpers remain in the repository; the four menu entries use `FixedShotParkAuto` or `ParkOnlyAuto`, with no camera initialization.
 
+## Teammate parking
+
+All four active autons park in the near alliance slot rather than the middle of the loading area. A farther slot is reserved for a teammate. See the lineup map and coordinate table. Slot centers are 0.55 m apart, leaving 0.0928 m (3.65 inches) between two 18-inch footprints. The fixed shot mark and shooter speed are unchanged. This reserves physical space; coordinate the other robot's route and parking eligibility with the alliance.
+
 ## Verification scope
 
 Wall pickup returns retreat to a 1.42 m inset while retaining the pickup heading, then turn before continuing. Wall approaches complete their turn inboard. Intermediate clearance waypoints require position, heading, and low speed before advancing. `tools/auton/PathClearanceChecks.java` samples the swept 18-inch chassis along both alliances' stage and parking paths, including a grid of wall pickup poses. These geometric checks assume the configured chassis size and do not model tracking error or another robot.
 
 The FTC Android app build checks the four registered autonomous OpModes and their SDK/Pedro interfaces. Standalone feeder, flywheel, and vision contract checks run through tools/auton/check-models.ps1.
+
+The 5,234 teammate-parking checks sample both active route families against a stationary 18-inch teammate in the reserved slot, verify mirrored centers, and require at least 9 cm between the parked footprints.
 
 The 21 fixed-shot checks cover the requested Red coordinates, exact Blue rotation, stationary shooting stage, parking, and release counting under feeding, no-load and stalled-transport scenarios. Updated swept-chassis checks pass. The Android build compiles against the latest main-branch Shooter and Intake implementation.
 

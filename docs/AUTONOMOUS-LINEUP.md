@@ -7,7 +7,7 @@ There are four selectable autonomous programs under **26123 Flowerless**.
 | Red Basket 1 Shoot 4 and Park | Blue Basket 1 Shoot 4 and Park | Drive to the fixed shooting mark, use the team Shooter default for four preloads, then park. |
 | Red Park Only | Blue Park Only | Leave the separate Park Only wall mark and drive around the frame to park. |
 
-![Overhead rendering of the official FIRST BIOBUZZ field CAD, showing Basket 1 shooting starts, separate Park Only starts, inward headings, and final parking points.](autonomous-start-map.png)
+![Official FIRST BIOBUZZ CAD with all four colored autonomous routes, their starts and shooting marks, our parking slots, and reserved teammate spaces.](autonomous-start-map.png)
 
 The field image uses the official FIRST BIOBUZZ STEP CAD v26-27.2 bundled with the simulator. Colored footprints, arrows, basket labels, and parking markers are setup overlays. Source attribution and conversion details are in [the simulator field provenance](https://github.com/d-mankotia/BIOBUZZ-sim/blob/main/FIELD-SOURCES.md).
 
@@ -17,6 +17,21 @@ The field image uses the official FIRST BIOBUZZ STEP CAD v26-27.2 bundled with t
 | Park Only | (-0.900, -1.564259) | 90 degrees | (+0.900, +1.564259) | 270 degrees |
 
 Coordinates refer to the robot's pose origin at the field center convention. Positive X points right and positive Y points up in the map. All starting arrows point into the field. Place the robot at the exact selected mark before Start. Initialize sets Pinpoint to that mark.
+
+## Parking with a teammate
+
+Both autonomous choices for an alliance use **our near slot**, leaving the farther slot available for a teammate. Positions below use Pedro visualizer inches. Blue mirrors Red by a 180-degree rotation about field center.
+
+| Alliance | Our robot parks (X, Y) | Reserved teammate center (X, Y) | Heading |
+| --- | --- | --- | --- |
+| Red | (9.73, 95.95) | (9.73, 117.60) | 90 degrees |
+| Blue | (131.77, 45.55) | (131.77, 23.90) | 270 degrees |
+
+The robot-code centers are Red (-1.55, +0.64) m and Blue (+1.55, -0.64) m. The reserved teammate centers are Red (-1.55, +1.19) m and Blue (+1.55, -1.19) m. Two 18-inch square robots have a 3.65-inch gap at these marks. The routes avoid the reserved footprint even when a teammate is already parked there. The dashed boxes are suggested teammate spaces, not an autonomous command for their robot. Coordinate the teammate's approach and confirm their actual footprint and the event's parking requirements.
+
+The four route colors identify alternative programs; only one runs on our robot. Circles mark starting poses, stars mark shooting positions, and P squares mark our own final slots.
+
+[Download the printable route and parking map](autonomous-route-map.pdf).
 
 ## Fixed shooting positions
 
