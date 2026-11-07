@@ -24,7 +24,7 @@ public final class WebcamTags {
         portal = VisionPortal.easyCreateWithDefaults(hardwareMap.get(WebcamName.class, NAME), processor);
     }
     public boolean ready(int first) {
-        return ready(first, null, false, false);
+        return ready(first, null, false, false, true);
     }
 
     /** Far-board IDs can be visible underneath the hive before the tip. */
@@ -33,10 +33,14 @@ public final class WebcamTags {
     }
 
     public boolean readyRaisedCell(int first, Pose robot, boolean blue, boolean near) {
-        return ready(first, robot, blue, near);
+        return ready(first, robot, blue, near, true);
     }
 
-    private boolean ready(int first, Pose raisedFrom, boolean blue, boolean near) {
+    public boolean readyLoweredCell(int first, Pose robot, boolean blue, boolean near) {
+        return ready(first, robot, blue, near, false);
+    }
+
+    private boolean ready(int first, Pose raisedFrom, boolean blue, boolean near, boolean raised) {
         if (closed) { status = "Webcam closed - holding fire"; return false; }
         long now = System.nanoTime();
         boolean fresh = false;
@@ -48,19 +52,21 @@ public final class WebcamTags {
             fresh = true;
             if (VisionRules.expectedTag(tag.id, first)) {
                 expected = true;
-                if (raisedFrom != null && !raised(tag, first, raisedFrom, blue, near)) continue;
+                if (raisedFrom != null && !matchesHeight(tag, first, raisedFrom, blue, near, raised)) continue;
                 status = "Webcam verified cell " + first;
                 return true;
             }
         }
         if (expected) {
-            status = "Cell still down or pose unavailable - holding fire";
+            status = raised ? "Cell still down or pose unavailable - holding fire"
+                    : "Waiting for tipped cell to reach the lower stop";
             return false;
         }
         status = fresh ? "Webcam wrong cell - holding fire" : "No fresh webcam tag - holding fire";
         return false;
     }
-    private boolean raised(AprilTagSingleDetection tag, int first, Pose robot, boolean blue, boolean near) {
+    private boolean matchesHeight(AprilTagSingleDetection tag, int first, Pose robot,
+                                  boolean blue, boolean near, boolean raised) {
         if (tag.ftcPose == null || tag.ftcPose.y <= 0) return false;
         // Undo camera pitch, then use the ray slope and odometry range to estimate
         // height. The slope is independent of tag range scale and output units.
@@ -69,11 +75,11 @@ public final class WebcamTags {
         double sign = blue ? -1 : 1;
         double end = near ? -1 : 1;
         double tagX = sign * (-.32385 - end * FAR_TAG_OFFSETS_INCHES[tag.id - first] * .0254);
-        double tagY = sign * end * .327341117;
+        double tagY = sign * end * (raised ? .327341117 : .289414654);
         double horizontalRange = Math.hypot(tagX - robot.x() * .0254, tagY - robot.y() * .0254);
         double height = CAMERA_HEIGHT_METERS + horizontalRange * up / Math.hypot(tag.ftcPose.x, forward);
         // The lower board is around 0.91 m, the raised board around 1.26 m.
-        return height >= 1.22 && height <= 1.34;
+        return raised ? height >= 1.22 && height <= 1.34 : height >= .86 && height <= 1.00;
     }
 
     public void close() {

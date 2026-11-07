@@ -3,9 +3,7 @@ package org.firstinspires.ftc.teamcode.Auton;
 import org.firstinspires.ftc.teamcode.Auton.cycles.CycleRoute;
 import org.firstinspires.ftc.teamcode.Auton.cycles.ParkOnlyAuto;
 
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 
-@Autonomous(name = "Park Only", group = "26123 Match Lineup")
 public final class ParkOnly extends ParkOnlyAuto {
     private boolean blue;
 

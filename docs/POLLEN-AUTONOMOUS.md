@@ -1,18 +1,18 @@
 # Complete basket autonomous programs
 
-The Driver Station offers seven programs under **26123 Match Lineup**.
+The Driver Station offers six programs under **26123 Flowerless**.
 
 | Red alliance | Blue alliance | Behavior |
 | --- | --- | --- |
-| Red Basket 1 | Blue Basket 1 | Open the initially raised basket, collect flower and garden pollen, run scoring transfers, and park. |
-| Red Basket 1 Team | Blue Basket 1 Team | Stay in the opening scoring quadrant, recover fallen pollen, use local garden pollen when needed, and shoot again when the assigned basket rises. |
-| Red Basket 2 Team | Blue Basket 2 Team | Wait for the other robot to tip Basket 1, shoot into Basket 2, recover local pollen or use the local pot, and repeat while time permits. |
+| Red Basket 1 Shoot 4 and Park | Blue Basket 1 Shoot 4 and Park | Shoot four preloads and park. |
+| Red Basket 1 Recover and Shoot | Blue Basket 1 Recover and Shoot | Shoot four, move forward, wait for the first tip, collect loose pollen, wait for the teammate to raise Basket 1, reshoot Basket 1, and park. |
+| Red Park Only | Blue Park Only | Leave a separate wall mark and park using the drivetrain and Pinpoint. |
 
-**Park Only** is one program for both alliances. After Init, X selects Blue and B selects Red. Default is Red. Place the robot at the matching Basket 1 start before Start.
+The scoring routines use floor pollen and exclude flower-contact areas from vision pickup. The previous menu entries have their Autonomous annotations removed. Each current entry is a full autonomous OpMode selected and started once.
 
-Every program is a complete autonomous OpMode. The scoring programs run preload shots, acquisition, shooting, repeat collection, and parking after one press of Start. Team programs reserve separate loading-zone stops and leave the scoring quadrant when they return to park. The measured return-path budget preempts optional work. A hard 29.7-second deadline stops outputs.
+A confirmed four-shot opening is required before recovery. The first tip is checked using the lowered Basket 1 tag height for 0.65 seconds. The second volley requires raised Basket 1 observations for 0.65 seconds, fresh Limelight shooting range, and a valid 86-degree trajectory. The recovery program holds its shots while waiting for the teammate and yields to the measured parking reserve. The hard scoring deadline is 29.7 seconds.
 
-See the [official CAD setup map and starting coordinates](AUTONOMOUS-LINEUP.md).
+See the [official CAD setup map and starting coordinates](AUTONOMOUS-LINEUP.md). Park Only uses a different wall mark from the shooting routines and the former Basket 2 start.
 
 ## Robot configuration
 
@@ -52,8 +52,8 @@ Each Team role pursues pollen within its own alliance-normalized quadrant. Picku
 
 ## Verification scope
 
-The FTC Android app build checks the seven registered OpModes and their SDK/Pedro interfaces. Standalone feeder, flywheel, and vision contract checks run through tools/auton/check-models.ps1.
+The FTC Android app build checks the six registered OpModes and their SDK/Pedro interfaces. Standalone feeder, flywheel, and vision contract checks run through tools/auton/check-models.ps1.
 
-The route logic comes from the tested simulator basket lineup. Simulator role tests used an injected teammate batch to exercise basket availability. Simulated shot counts and tips describe that field model. Forty-four additional fixture checks cover Limelight projection, both alliances and baskets, capture-age compensation, invalid observations, and measured range changing the calculated shooting speed. The updated Limelight shooting flow and the real robot's CRServo feed still require physical autonomous trials.
+The flowerless routes have 66 ordering, four-shot, starting-mark, and frame-bypass checks, plus 64 raised/lowered basket-height checks. The route helpers come from the simulator basket lineup. Simulator role tests used an injected teammate batch to exercise basket availability. Simulated shot counts and tips describe that field model. Forty-four additional fixture checks cover Limelight projection, both alliances and baskets, capture-age compensation, invalid observations, and measured range changing the calculated shooting speed. The updated Limelight shooting flow and the real robot's CRServo feed still require physical autonomous trials.
 
-The retired autonomous wrappers and their unused legacy HiveAim controller have been removed. The seven requested OpModes are the complete selectable autonomous lineup.
+The previous basket wrappers have their registration annotations removed. The six flowerless OpModes are the selectable autonomous lineup.

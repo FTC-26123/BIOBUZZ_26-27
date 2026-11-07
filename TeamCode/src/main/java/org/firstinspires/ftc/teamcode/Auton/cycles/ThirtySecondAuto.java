@@ -32,6 +32,7 @@ public abstract class ThirtySecondAuto extends OpMode {
     private int emptyBase;
     private double cellSafeAt;
     private double raisedCellSince=-1;
+    private double loweredCellSince=-1;
     private boolean partnerTipConfirmed;
     private boolean usedBasketFallback;
     private boolean basketCycleDry;
@@ -58,6 +59,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         collector.avoidFlowers=route.strategy==CycleRoute.Strategy.NO_FLOWERS||route.lineup==CycleRoute.Lineup.PARTNER||route.basketTeam();
         collector.avoidFrame=route.avoidFrame();
         if(route.basketTeam())collector.quadrantEnd=route.basketOne()?-1:1;
+        if(route.floorOnly())collector.quadrantEnd=-1;
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
         follower.setPose(route.initial); follower.update();
         mechanisms=new CycleMechanisms(hardwareMap);
@@ -119,6 +121,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         int pipeline=shooting?VisionRules.SHOT_PIPELINE:VisionRules.POLLEN_PIPELINE;
         if(pipeline!=visionPipeline){camera.pipelineSwitch(pipeline);visionPipeline=pipeline;}
         raisedCellSince=-1;
+        loweredCellSince=-1;
         if(route.rushStyle()&&index>route.bonusIndex)mechanisms.stop();
         double preparedSpeed=stage.action()==CycleRoute.Action.BONUS_FIRE?1320:index==1?CycleMechanisms.SPEED:2200;
         if(route.rushStyle()&&index<=route.bonusIndex){
@@ -187,8 +190,12 @@ public abstract class ThirtySecondAuto extends OpMode {
             }
             boolean collected=collector.update(follower,mechanisms,camera.getLatestResult(),VisionRules.POLLEN_PIPELINE,route.blue,stage.count(),now);
             vision=collector.status+"; attempts "+collector.attempts;
+            if(route.floorOnly()&&now-stageStart>stage.limit()&&!collector.hasAttemptedPickup()){
+                beginPark();report();return;
+            }
             // Let a just-fired batch settle or dump before deciding the quadrant is empty.
-            boolean waitForSpill=route.basketTeam()&&collector.attempts==0&&now-stageStart<basketSearchSeconds;
+            boolean waitForSpill=route.basketTeam()&&collector.attempts==0&&now-stageStart<basketSearchSeconds
+                ||route.floorOnly()&&!collector.hasAttemptedPickup();
             if((collected&&!waitForSpill)||now-stageStart>stage.limit())next();
             report();return;
         }
@@ -254,6 +261,17 @@ public abstract class ThirtySecondAuto extends OpMode {
             else if(stage.action()==CycleRoute.Action.COLLECT){mechanisms.collect(true);if(now-settled>.18)next();}
             else if(stage.action()==CycleRoute.Action.WAIT_TIP){
                 mechanisms.close();vision="Waiting for released balls to reach the floor";
+                if(route.floorOnly()){
+                    boolean lowered=tags.readyLoweredCell(route.blue?42:34,p,route.blue,true);
+                    vision=tags.status;
+                    if(!lowered)loweredCellSince=-1;
+                    else {
+                        if(loweredCellSince<0)loweredCellSince=now;
+                        if(now-loweredCellSince>=.65)next();
+                    }
+                    if(now-stageStart>stage.limit())beginPark();
+                    report();return;
+                }
                 LLResult floor=camera.getLatestResult();
                 boolean groundTarget=false;
                 if(SpillCollector.fresh(floor,VisionRules.POLLEN_PIPELINE))for(LLResultTypes.DetectorResult blob:SpillCollector.pollen(floor)){
@@ -324,14 +342,17 @@ public abstract class ThirtySecondAuto extends OpMode {
         boolean fast=speed>.40&&futureSpeed>.75;
         // Finish an unsafe-in-transit shot at the actual pickup approach, never by making extra passes.
         boolean settledAtPickup=arrived&&speed<.08&&Math.abs(measured.omega)<.10;
-        boolean fresh=rollingVisionReady(now,p,near,arrived)&&shotPose!=null,complete=mechanisms.fired-shotBase>=stage.count()||mechanisms.emptyPulses-emptyBase>=1;
+        boolean openingFour=route.floorOnly()&&index==2;
+        boolean complete=mechanisms.fired-shotBase>=stage.count()
+            ||!openingFour&&mechanisms.emptyPulses-emptyBase>=1;
+        boolean fresh=rollingVisionReady(now,p,near,arrived)&&shotPose!=null;
         if(shotPose==null)vision=shotVision.status;
         boolean permit=!complete&&now>=cellSafeAt&&rollingStart>=0&&(fast||settledAtPickup)&&movingSolution!=null&&direct!=null&&fresh&&chassisFits(p,h)&&chassisFits(releasePose,h);
         mechanisms.feedPredicted(now,permit,fresh&&!complete);
         shotStatus=String.format(java.util.Locale.US,"v %.2f -> %.2f, remaining %.2f m, aim %.1f deg, RPM ticks %.0f/%.0f, valid %s, feed %s",speed,futureSpeed,current.remaining(),Math.toDegrees(Math.atan2(Math.sin(releasePose.heading()-h),Math.cos(releasePose.heading()-h))),mechanisms.speed(),movingSolution==null?0:movingSolution.ticks(),direct!=null,permit);
         if(complete&&arrived){next();return;}
         if(now-stageStart>stage.limit()){
-            if(route.basketTeam()||route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
+            if(route.floorOnly()||route.basketTeam()||route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
             else finish("Rolling stage timeout: "+stage.name());
         }
     }
@@ -342,7 +363,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         return Math.abs(x)+ex<1.790&&Math.abs(y)+ey<1.790&&x*(route.blue?-1:1)+ex<-.002;
     }
     private boolean rollingVisionReady(double now,Pose pose,boolean near,boolean arrived){
-        if(route.basketTeam()){
+        if(route.basketTeam()||route.floorOnly()){
             int first=route.blue?(near?42:38):(near?34:30);
             boolean raised=tags.readyRaisedCell(first,pose,route.blue,near);
             vision=tags.status;
