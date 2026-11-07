@@ -6,10 +6,10 @@ import com.qualcomm.hardware.limelightvision.*;
 import java.util.*;
 
 /** Ground-plane projection from neural-detector angles, never simulator ball positions.
- * Calibration: fixed camera 0.305m high, +10deg pitch, zero yaw/roll/offset.
+ * Legacy detector helper; unregistered on the AprilTag-only robot.
  * Pickup attempts are estimates; only flywheel load confirms subsequent feed events. */
 public final class SpillCollector {
-    public static final double CAMERA_PITCH=10, CAMERA_HEIGHT=.305, BALL_RADIUS=.03556;
+    public static final double CAMERA_PITCH=LimelightMount.PITCH_DEGREES, CAMERA_HEIGHT=LimelightMount.HEIGHT_METERS, BALL_RADIUS=.03556;
     private final List<double[]> attempted=new ArrayList<>();
     private final Deque<double[]> queued=new ArrayDeque<>();
     private double plannedAt;
@@ -57,6 +57,7 @@ public final class SpillCollector {
         double forward=scale*(Math.cos(pitch)-t*Math.sin(pitch)),right=scale*Math.tan(Math.toRadians(tx));
         if(forward<.1||forward>2)return null;
         double h=pose.heading();
+        forward+=LimelightMount.FORWARD_METERS;right+=LimelightMount.RIGHT_METERS;
         return new double[]{pose.x()*.0254+forward*Math.cos(h)+right*Math.sin(h),
             pose.y()*.0254+forward*Math.sin(h)-right*Math.cos(h)};
     }

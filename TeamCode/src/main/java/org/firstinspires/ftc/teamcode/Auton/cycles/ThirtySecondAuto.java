@@ -17,7 +17,7 @@ public abstract class ThirtySecondAuto extends OpMode {
     private final FlowerPickup flowerPickup=new FlowerPickup();
     private final GardenSweep garden=new GardenSweep();
     private final LimelightShotPose shotVision=new LimelightShotPose();
-    private int visionPipeline=VisionRules.POLLEN_PIPELINE;
+    private int visionPipeline=VisionRules.SHOT_PIPELINE;
     private MovingShotSolver.Solution movingSolution;
     private double lastSolve=-1;
     private int movingFeeds;
@@ -42,7 +42,7 @@ public abstract class ThirtySecondAuto extends OpMode {
     private CycleMechanisms mechanisms;
     private GoBildaPinpointDriver pinpoint;
     private Limelight3A camera;
-    private WebcamTags tags;
+    private LimelightTags tags;
     private CycleRoute route;
     private CycleRoute.Stage stage;
     private final ElapsedTime timer=new ElapsedTime();
@@ -63,11 +63,11 @@ public abstract class ThirtySecondAuto extends OpMode {
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
         follower.setPose(route.initial); follower.update();
         mechanisms=new CycleMechanisms(hardwareMap);
-        camera=hardwareMap.get(Limelight3A.class,"limelight");camera.pipelineSwitch(VisionRules.POLLEN_PIPELINE);camera.setPollRateHz(100);camera.start();
-        tags=new WebcamTags(hardwareMap);
+        camera=hardwareMap.get(Limelight3A.class,"limelight");camera.pipelineSwitch(VisionRules.SHOT_PIPELINE);camera.setPollRateHz(100);camera.start();
+        tags=new LimelightTags(camera);
         telemetry.addData("Place robot (m)",String.format("%.3f, %.3f",route.initial.x()*.0254,route.initial.y()*.0254));
         telemetry.addData("Pedro heading (deg)",Math.toDegrees(route.initial.heading()));
-        telemetry.addLine("Verify hardware calibration: 4 pollen preloads, camera pitch +10 degrees, shot elevation 86 degrees.");
+        telemetry.addLine("Verify hardware calibration: 4 pollen preloads, camera height 10 in, forward offset 7 in, pitch +43 degrees, shot elevation 86 degrees.");
         telemetry.update();
     }
     @Override public void start(){timer.reset();index=0;stage=null;cellSafeAt=0;partnerTipConfirmed=false;usedBasketFallback=false;basketCycleDry=false;done=false;parking=false;result="Running";next();}
@@ -116,9 +116,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         // Bonus inventory is optional. Keep a measured-pose return budget for a partial pickup.
         if(route.rushStyle()&&index>=route.bonusIndex&&timer.seconds()+route.parkReserve(follower.pose())+.55>=29.5){beginPark();return;}
         stage=route.stages.get(index++);stageStart=timer.seconds();settled=-1;
-        boolean shooting=stage.action()==CycleRoute.Action.ROLL_NEAR||stage.action()==CycleRoute.Action.ROLL_FAR
-            ||stage.action()==CycleRoute.Action.FIRE||stage.action()==CycleRoute.Action.BONUS_FIRE;
-        int pipeline=shooting?VisionRules.SHOT_PIPELINE:VisionRules.POLLEN_PIPELINE;
+        int pipeline=VisionRules.SHOT_PIPELINE; // This robot has AprilTag vision only.
         if(pipeline!=visionPipeline){camera.pipelineSwitch(pipeline);visionPipeline=pipeline;}
         raisedCellSince=-1;
         loweredCellSince=-1;
@@ -402,7 +400,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         int first=route.blue?(initialCell?42:38):(initialCell?34:30);
         boolean ready=tags.ready(first);vision=tags.status;return ready;
     }
-    private void finish(String why){finishedAt=timer.seconds();done=true;result=why;follower.stop();follower.drivetrain.stop();mechanisms.stop();camera.stop();if(tags!=null)tags.close();}
+    private void finish(String why){finishedAt=timer.seconds();done=true;result=why;follower.stop();follower.drivetrain.stop();mechanisms.stop();camera.stop();}
     private void report(){
         telemetry.addData("Auto stage",stage==null?"Init":stage.name());telemetry.addData("Auto result",result);
         telemetry.addData("Auto elapsed",done?finishedAt:timer.seconds());telemetry.addData("Confirmed feed events",mechanisms.fired);
@@ -415,5 +413,5 @@ public abstract class ThirtySecondAuto extends OpMode {
         if(adaptive()){telemetry.addData("Moving feed events",movingFeeds);telemetry.addData("Live path replans",pathReplans+garden.replans);}
         telemetry.update();
     }
-    @Override public void stop(){if(follower!=null){follower.stop();follower.drivetrain.stop();}if(mechanisms!=null)mechanisms.stop();if(camera!=null)camera.stop();if(tags!=null)tags.close();}
+    @Override public void stop(){if(follower!=null){follower.stop();follower.drivetrain.stop();}if(mechanisms!=null)mechanisms.stop();if(camera!=null)camera.stop();}
 }

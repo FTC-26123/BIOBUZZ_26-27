@@ -230,7 +230,7 @@ public final class CycleRoute {
     private void partner(double startX){
         add("Clear starting wall in assigned lane",startX,-1.43,90,Action.MOVE,0,2);
         if(partnerOpener()){
-            // Keep the near board in the webcam view at the steep launch angle.
+            // Keep the near board in the camera view at the steep launch angle.
             add("Open near hive for partner",-.36,-1.43,90,Action.ROLL_NEAR,3,6);
             add("Return to inner handoff spot",-.36,-1.48,90,Action.MOVE,0,3);
         }else{
