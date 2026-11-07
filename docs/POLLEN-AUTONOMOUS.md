@@ -27,7 +27,7 @@ Use the team's tuned org.firstinspires.ftc.teamcode.pedro.Constants follower and
 | Intake motor | intake | REVERSE, negative inward power |
 | Windmill motor | windmill | FORWARD, positive power during permitted shooting pulses |
 | Transfer CRServo | transferServo | Team Intake.TRANSFER_SERVO_POWER, currently -1 inward |
-| Limelight | limelight | Neural detector pipeline 7 |
+| Limelight | limelight | AprilTag shooting pipeline 1, neural pollen pipeline 7 |
 | Logitech USB webcam | Webcam 1 | FTC VisionPortal and AprilTagProcessor |
 
 Collection runs the roller and transfer CRServo while holding the windmill. A permitted shot adds windmill feed. Cancellation, completed pulses, parking, and Stop clear feed outputs. Flywheel load events acknowledge estimated ball releases.
@@ -37,6 +37,12 @@ Park Only initializes the drivetrain and Pinpoint. The six scoring programs also
 ## Vision and calibration
 
 Configure the Limelight neural detector with the exact label yellow_pollen on pipeline 7. The robot uses projected detector rays and odometry to find pollen. Ground projection assumes 0.305 m camera height, +10 degrees pitch, and zero yaw, roll, or horizontal offset. Match the physical mount or calibrate these values in SpillCollector.
+
+Configure Limelight AprilTag pipeline 1 for the field's printed tags, with 3D target pose enabled and the actual 3.25-inch tag size. Autonomous switches to pipeline 1 during shooting and returns to pipeline 7 for collection. The webcam remains a separate basket interlock.
+
+Shooting power uses the expected basket's fresh Limelight target pose in camera space. Limelight camera axes are right, down, and forward. The code removes camera pitch, accounts for the individual tag's board offset, and compensates for capture age using Pinpoint velocity, acceleration and yaw rate. It supplies the resulting measured shooting position to the 86-degree moving-shot solver. Pinpoint continues to drive the path. These axes follow [Limelight's coordinate system documentation](https://docs.limelightvision.io/docs/docs-limelight/pipeline-apriltag/apriltag-coordinate-systems).
+
+Missing, stale, wrong-pipeline, wrong-basket, lowered-basket, or inconsistent measurements block feeding. An estimate more than 0.45 m from Pinpoint is rejected. Telemetry reports the measured basket range, measurement status, and 86-degree shooting angle. LimelightShotPose uses the same physical mount constants as SpillCollector.
 
 The Logitech webcam independently verifies basket tags. Basket 1 uses red tags 34–37 or blue 42–45. Basket 2 uses red 30–33 or blue 38–41. Team routines use the tag pose and Pinpoint distance to check that the assigned basket is raised for 0.65 seconds before feeding. That height check assumes the webcam mount in WebcamTags, currently 0.305 m high and pitched +10 degrees. Calibrate the camera intrinsics and physical mount before field use.
 
@@ -48,6 +54,6 @@ Each Team role pursues pollen within its own alliance-normalized quadrant. Picku
 
 The FTC Android app build checks the seven registered OpModes and their SDK/Pedro interfaces. Standalone feeder, flywheel, and vision contract checks run through tools/auton/check-models.ps1.
 
-The route logic comes from the tested simulator basket lineup. Simulator role tests used an injected teammate batch to exercise basket availability. Simulated shot counts and tips describe that field model. The real robot's CRServo feed and calibrated drivetrain still require physical autonomous trials.
+The route logic comes from the tested simulator basket lineup. Simulator role tests used an injected teammate batch to exercise basket availability. Simulated shot counts and tips describe that field model. Forty-four additional fixture checks cover Limelight projection, both alliances and baskets, capture-age compensation, invalid observations, and measured range changing the calculated shooting speed. The updated Limelight shooting flow and the real robot's CRServo feed still require physical autonomous trials.
 
-The older autonomous menu entries are disabled. Their source remains available for reference.
+The retired autonomous wrappers and their unused legacy HiveAim controller have been removed. The seven requested OpModes are the complete selectable autonomous lineup.

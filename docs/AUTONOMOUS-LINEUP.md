@@ -21,6 +21,6 @@ Coordinates are field-centered. 0Â° faces +X and 90Â° faces +Y. Place the ph
 
 The two Team routines use separate spots in the loading zone. Basket 1 Team leaves its scoring quadrant when it heads there to park. Agree on basket roles and parking slots with the other driver before selecting a Team routine. Basket 2 Team parks without shooting if the other robot never opens its basket.
 
-These are complete FTC autonomous OpModes. Press Init and then Start once. Each scoring routine handles preloads, collection, repeat feeding, and its timed return to park. The Team routines repeat recovery and shooting when their basket is available. A fresh webcam height check blocks feeding into a lowered basket. An unavailable target or time pressure leads to parking.
+These are complete FTC autonomous OpModes. Press Init and then Start once. Each scoring routine handles preloads, collection, repeat feeding, and its timed return to park. The Team routines repeat recovery and shooting when their basket is available. Fresh Limelight measurements set shooting speed for the fixed 86-degree launcher, and the webcam verifies basket availability. Configure Limelight tag pipeline 1 for shooting and neural pipeline 7 for yellow_pollen collection. An unavailable target or time pressure leads to parking.
 
 See [hardware configuration and calibration](POLLEN-AUTONOMOUS.md). Physical robot and paired-robot field trials remain required.
