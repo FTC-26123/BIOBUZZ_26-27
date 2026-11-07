@@ -66,10 +66,9 @@ public class TeleOp_BaseCode extends OpMode {
         // Driver 2 Intake Control
         handleManualIntakeControl(gamepad2);
 
-        // Driver 2 Shooter Flywheel & Gate Control
+        // Driver 2 Shooter Flywheel Control
         handleManualShootingControl(gamepad2);
         handleShooterSpeedControl(gamepad2);
-        handleManualGateControl(gamepad2);
         shooter.update();
 
         // ---------------- Telemetry Status Output ----------------
@@ -77,7 +76,6 @@ public class TeleOp_BaseCode extends OpMode {
 
         telemetry.addLine("---------------- Statuses ---------------");
         telemetry.addData("Shooter Status G2 RT", shooter.getShooterStatus());
-        telemetry.addData("Gate Status G2 X/Y", shooter.getGateStatus());
         telemetry.addData("Intake Status G2 LT/Back/LB", intake.getIntakeStatus());
         telemetry.addData("Target Launch Power G2 Dpad Up", shooter.getTargetLaunchPower());
         telemetry.addData("Current Motor Speed", shooter.getCurrentSpeed());
@@ -100,14 +98,6 @@ public class TeleOp_BaseCode extends OpMode {
     private void handleShooterSpeedControl(Gamepad gamepad2) {
         if (gamepad2.dpadUpWasPressed()) {
             shooter.switchSpeed();
-        }
-    }
-
-    private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
-            shooter.closeGate();
         }
     }
 

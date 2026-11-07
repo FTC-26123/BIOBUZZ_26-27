@@ -56,17 +56,15 @@ public class TeleOp_BaseCodeOneControllerSpeedAdjust extends OpMode {
         // Gamepad 1 Intake Control
         handleManualIntakeControl(gamepad1);
 
-        // Gamepad 1 Shooter Flywheel, Gate, & Target Speed Adjustment (+50 / -50 ticks/s)
+        // Gamepad 1 Shooter Flywheel & Target Speed Adjustment (+50 / -50 ticks/s)
         handleManualShootingControl(gamepad1);
         handleShooterSpeedControl(gamepad1);
-        handleManualGateControl(gamepad1);
         shooter.update();
 
         // ---------------- Telemetry Status Output ----------------
         telemetry.addData("Drive Speed Multiplier (G1 Dpad Right)", driveTrain.getSpeedMultiplier());
         telemetry.addLine("---------------- Statuses ---------------");
         telemetry.addData("Shooter Status (G1 RT/RB)", shooter.getShooterStatus());
-        telemetry.addData("Gate Status (G1 X/Y)", shooter.getGateStatus());
         telemetry.addData("Intake Status (G1 LT/Back/LB)", intake.getIntakeStatus());
         telemetry.addData("Target Launch Speed (+50 G1 DpadUp / -50 G1 DpadDown)", "%.0f ticks/s", shooter.getTargetLaunchPower());
         telemetry.addData("Current Motor Speed", "%.0f ticks/s", shooter.getCurrentSpeed());
@@ -97,14 +95,6 @@ public class TeleOp_BaseCodeOneControllerSpeedAdjust extends OpMode {
         // Decrease target speed by 50 ticks/sec on Dpad Down
         if (gamepad1.dpadDownWasPressed()) {
             shooter.decreaseTargetSpeed(50);
-        }
-    }
-
-    private void handleManualGateControl(Gamepad gamepad1) {
-        if (gamepad1.x) {
-            shooter.openGate();
-        } else if (gamepad1.y) {
-            shooter.closeGate();
         }
     }
 

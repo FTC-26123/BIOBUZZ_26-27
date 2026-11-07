@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.teleop;
 
 import android.util.Log;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -23,6 +24,7 @@ import java.util.List;
  * and live-loads calculated kP and kD parameters directly into AprilTagAlignment.
  */
 @TeleOp
+@Disabled
 public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
 
     // ---------------------- Subsystem Hardware Objects ----------------------
@@ -92,10 +94,9 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
         // Driver 2 Intake Controls
         handleManualIntakeControl(gamepad2);
 
-        // Driver 2 Shooter & Gate Controls
+        // Driver 2 Shooter Controls
         handleManualShootingControl(gamepad2);
         handleShooterSpeedControl(gamepad2);
-        handleManualGateControl(gamepad2);
         shooter.update();
 
         // ---------------- Telemetry Output ----------------
@@ -103,7 +104,6 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
 
         telemetry.addLine("---------------- Statuses ---------------");
         telemetry.addData("Shooter Status G2 RT", shooter.getShooterStatus());
-        telemetry.addData("Gate Status G2 X/Y", shooter.getGateStatus());
         telemetry.addData("Intake Status G2 LT/Back/LB", intake.getIntakeStatus());
         telemetry.addData("Target Launch Power G2 Dpad Up", shooter.getTargetLaunchPower());
         telemetry.addData("Current Motor Speed", shooter.getCurrentSpeed());
@@ -165,14 +165,6 @@ public class TeleOp_AprilTagAlignmentSetupAutomatic extends OpMode {
     private void handleShooterSpeedControl(Gamepad gamepad2) {
         if (gamepad2.dpadUpWasPressed()) {
             shooter.switchSpeed();
-        }
-    }
-
-    private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
-            shooter.closeGate();
         }
     }
 

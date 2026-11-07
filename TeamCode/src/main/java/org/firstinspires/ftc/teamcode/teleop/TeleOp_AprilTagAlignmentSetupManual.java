@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.teleop;
 
 import android.util.Log;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -19,6 +20,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Shooter;
  * Allows drivers to adjust gains with Dpad Up/Down, switch active parameter with Dpad Left, and change step size with B button.
  */
 @TeleOp
+@Disabled
 public class TeleOp_AprilTagAlignmentSetupManual extends OpMode {
 
     // ---------------------- Subsystem Hardware Objects ----------------------
@@ -73,10 +75,9 @@ public class TeleOp_AprilTagAlignmentSetupManual extends OpMode {
         // Intake controls (Gamepad 2)
         handleManualIntakeControl(gamepad2);
 
-        // Shooter and Gate controls (Gamepad 2)
+        // Shooter controls (Gamepad 2)
         handleManualShootingControl(gamepad2);
         handleShooterSpeedControl(gamepad2);
-        handleManualGateControl(gamepad2);
         shooter.update();
 
         // ---------------- Telemetry Output ----------------
@@ -85,7 +86,6 @@ public class TeleOp_AprilTagAlignmentSetupManual extends OpMode {
         telemetry.addData("Target Launch Power(G2DpadUpRightDown)", shooter.getTargetLaunchPower());
         telemetry.addData("Current Motor Speed", shooter.getCurrentSpeed());
         telemetry.addData("Shooter Status(G2RightTrigger/Bumper)", shooter.getShooterStatus());
-        telemetry.addData("Gate Status(G2X/Y)", shooter.getGateStatus());
         telemetry.addData("Intake Status(G2LeftTrigger/Bumper/Back)", intake.getIntakeStatus());
 
         telemetry.addLine("----------------April Tags ---------------");
@@ -129,14 +129,6 @@ public class TeleOp_AprilTagAlignmentSetupManual extends OpMode {
     private void handleShooterSpeedControl(Gamepad gamepad2) {
         if (gamepad2.dpadUpWasPressed()) {
             shooter.switchSpeed();
-        }
-    }
-
-    private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
-            shooter.closeGate();
         }
     }
 

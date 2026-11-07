@@ -4,14 +4,13 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
-import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 
 /**
- * Launcher flywheel + servo gate subsystem.
+ * Launcher flywheel subsystem.
  *
  * Features:
  *  - Software PIDF velocity control (derivative on filtered measurement, no kick on target change)
@@ -27,16 +26,11 @@ public class Shooter {
 
     // ---------------------- Hardware & Subsystem Dependencies ----------------------
     private DcMotorEx shooter;
-    private Servo gate;
     private Intake intake;
     private VoltageSensor voltageSensor;
 
-    // ---------------------- Gate Servo Positions ----------------------
-    private static final double GATE_OPEN = 0.27;
-    private static final double GATE_CLOSED = 0.5;
-
     // ---------------------- Speed Presets & Limits (ticks/sec) ----------------------
-    private static final double[] LAUNCHING_POWERS = {2000, 1500, 1000};
+    private static final double[] LAUNCHING_POWERS = {1500, 1250, 1000};
     private static final double MAX_TARGET_VELOCITY = 2400; // set to your motor's real limit
     private int launchingIndex = 0;
     private double customTargetPower = 2000;
@@ -75,7 +69,6 @@ public class Shooter {
 
     // ---------------------- Status ----------------------
     private String shooterStatus = "Off";
-    private String gateStatus = "Closed";
     private final ElapsedTime pauseTimer = new ElapsedTime();
 
     // =====================================================================
@@ -83,7 +76,7 @@ public class Shooter {
     // =====================================================================
 
     /**
-     * Initializes flywheel motor, gate servo, and voltage sensor from the hardware map.
+     * Initializes flywheel motor and voltage sensor from the hardware map.
      */
     public void init(HardwareMap hwMap, Intake intake) {
         this.intake = intake;
@@ -92,12 +85,6 @@ public class Shooter {
         shooter.setDirection(DcMotorSimple.Direction.FORWARD);
         shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         shooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-
-        try {
-            gate = hwMap.get(Servo.class, "gate");
-        } catch (IllegalArgumentException e) {
-            gate = null; // gate not configured/installed
-        }
 
         voltageSensor = null;
         for (VoltageSensor sensor : hwMap.voltageSensor) {
@@ -128,7 +115,7 @@ public class Shooter {
     }
 
     /**
-     * Begins shutdown: gate closes and windmill stops immediately; the flywheel
+     * Begins shutdown: intake stops immediately; the flywheel
      * is cut to 0 power (brake mode) and status becomes "Off" once it has slowed down.
      */
     public void stop() {
@@ -156,27 +143,13 @@ public class Shooter {
     }
 
     /**
-     * Cycles preset target velocity (2000 -> 1500 -> 1000 ticks/sec).
+     * Cycles preset target velocity (1500 -> 1250 -> 1000 ticks/sec).
      */
     public void switchSpeed() {
         launchingIndex = (launchingIndex + 1) % LAUNCHING_POWERS.length;
         customTargetPower = LAUNCHING_POWERS[launchingIndex];
         useCustomPower = false;
         resetPID();
-    }
-
-    public void openGate() {
-        gateStatus = "Open";
-        if (gate != null) {
-            gate.setPosition(GATE_OPEN);
-        }
-    }
-
-    public void closeGate() {
-        gateStatus = "Closed";
-        if (gate != null) {
-            gate.setPosition(GATE_CLOSED);
-        }
     }
 
     // =====================================================================
@@ -193,10 +166,6 @@ public class Shooter {
 
     public String getShooterStatus() {
         return shooterStatus;
-    }
-
-    public String getGateStatus() {
-        return gateStatus;
     }
 
     public int getLaunchingIndex() {
@@ -240,7 +209,6 @@ public class Shooter {
      */
     public void addTelemetry(Telemetry telemetry) {
         telemetry.addData("Shooter status", shooterStatus);
-        telemetry.addData("Gate", gateStatus);
         telemetry.addData("Target (t/s)", "%.0f", getTargetLaunchPower());
         telemetry.addData("Velocity (t/s)", "%.0f", getCurrentSpeed());
         telemetry.addData("Power", "%.3f", lastPower);
@@ -331,12 +299,11 @@ public class Shooter {
         double voltageScale = REFERENCE_VOLTAGE / getBatteryVoltage();
         double ff = kF * target * voltageScale;
 
-        double power = ff + (kP * error) + (kI * integralSum) + (kD * derivative);
-        power = Math.max(0.0, Math.min(1.0, power));
+        double calculatedPower = ff + (kP * error) + (kI * integralSum) + (kD * derivative);
+        lastPower = Math.max(0.0, Math.min(1.0, calculatedPower));
 
-        lastPower = power;
         if (shooter != null) {
-            shooter.setPower(power);
+            shooter.setPower(lastPower);
         }
     }
 
@@ -349,41 +316,41 @@ public class Shooter {
         double target = getTargetLaunchPower();
         double speed = getCurrentSpeed();
 
-        if ("Shooting".equals(shooterStatus)) {
-            if (speed < target - PAUSE_BELOW_TARGET) {
-                stopFeeding();
-                shooterStatus = "Starting";
-                pauseTimer.reset();
-            } else {
-                startFeeding(); // keep asserting while shooting
-            }
-        } else if ("Starting".equals(shooterStatus)) {
-            if (pauseTimer.seconds() >= MIN_PAUSE_SEC && speed >= target - RESUME_BELOW_TARGET) {
-                shooterStatus = "Shooting";
-                startFeeding();
-            }
+        switch (shooterStatus) {
+            case "Shooting":
+                if (speed < target - PAUSE_BELOW_TARGET) {
+                    stopFeeding();
+                    shooterStatus = "Starting";
+                    pauseTimer.reset();
+                } else {
+                    startFeeding();
+                }
+                break;
+            case "Starting":
+                if (pauseTimer.seconds() >= MIN_PAUSE_SEC && speed >= target - RESUME_BELOW_TARGET) {
+                    shooterStatus = "Shooting";
+                    startFeeding();
+                }
+                break;
         }
     }
 
     /**
-     * Once the flywheel is at speed: runs the intake roller and windmill and opens the gate.
+     * Once the flywheel is at speed: runs the intake roller and windmill.
      */
     private void startFeeding() {
         if (intake != null) {
             intake.start();
             intake.startWindmill();
         }
-        openGate();
     }
 
     /**
-     * Stops the windmill and closes the gate. The roller is left as it is; the driver
-     * turns it off with the intake controls.
+     * Stops the windmill when feeding pauses or shooter stops.
      */
     private void stopFeeding() {
         if (intake != null) {
             intake.stopWindmill();
         }
-        closeGate();
     }
 }

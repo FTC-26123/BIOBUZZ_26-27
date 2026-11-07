@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.teleop.tests;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -17,6 +18,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Shooter;
  * Displays real-time pose (X, Y, Heading), distance target settings, and error status on Driver Station telemetry.
  */
 @TeleOp
+@Disabled
 public class TeleOp_OdometryTesting extends OpMode {
 
     // ---------------------- Subsystems & Hardware ----------------------
@@ -90,28 +92,6 @@ public class TeleOp_OdometryTesting extends OpMode {
     }
 
     // ---------------------- Helper Input Handlers ----------------------
-
-    private void handleManualShootingControl(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.5) {
-            shooter.start();
-        } else if (gamepad2.right_bumper) {
-            shooter.stop();
-        }
-    }
-
-    private void handleShooterPresets(Gamepad gamepad2) {
-        if (gamepad2.dpad_up) {
-            shooter.switchSpeed();
-        }
-    }
-
-    private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
-            shooter.closeGate();
-        }
-    }
 
     private void handleManualIntakeControl(Gamepad gamepad2) {
         if (gamepad2.left_trigger > 0.5) {

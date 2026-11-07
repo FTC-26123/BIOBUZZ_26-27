@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.teleop.tests;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -14,6 +15,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Shooter;
  * Supports drivetrain driving, manual intake controls, shooter speed switching, and gate servo operations.
  */
 @TeleOp
+@Disabled
 public class TeleOp_TestIntakeShooterDrivetrain extends OpMode {
 
     // ---------------------- Subsystem Objects ----------------------
@@ -52,7 +54,6 @@ public class TeleOp_TestIntakeShooterDrivetrain extends OpMode {
         // Driver 2: Manual Intake & Shooter Controls
         handleManualIntakeControl(gamepad2);
         handleManualShootingControl(gamepad2);
-        handleManualGateControl(gamepad2);
 
         // Shooter subsystem loop update
         shooter.update();
@@ -68,7 +69,6 @@ public class TeleOp_TestIntakeShooterDrivetrain extends OpMode {
 
         telemetry.addLine("================ SHOOTER STATUS ================");
         telemetry.addData("Shooter Status [G2 RT/RB]", shooter.getShooterStatus());
-        telemetry.addData("Gate Status [G2 X/Y]", shooter.getGateStatus());
         telemetry.addData("Target Launch Velocity [G2 DpadUp]", "%.0f ticks/s", shooter.getTargetLaunchPower());
         telemetry.addData("Current Motor Velocity", "%.0f ticks/s", shooter.getCurrentSpeed());
 
@@ -94,17 +94,6 @@ public class TeleOp_TestIntakeShooterDrivetrain extends OpMode {
     private void handleShooterSpeedControl(Gamepad gamepad2) {
         if (gamepad2.dpadUpWasPressed()) {
             shooter.switchSpeed();
-        }
-    }
-
-    /**
-     * Opens launcher gate on Gamepad 2 X and closes gate on Gamepad 2 Y.
-     */
-    private void handleManualGateControl(Gamepad gamepad2) {
-        if (gamepad2.x) {
-            shooter.openGate();
-        } else if (gamepad2.y) {
-            shooter.closeGate();
         }
     }
 

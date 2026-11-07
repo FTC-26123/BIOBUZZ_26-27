@@ -65,17 +65,15 @@ public class TeleOp_BaseCodeOneController extends OpMode {
         // Gamepad 1 Intake Control
         handleManualIntakeControl(gamepad1);
 
-        // Gamepad 1 Shooter Flywheel & Gate Control
+        // Gamepad 1 Shooter Flywheel Control
         handleManualShootingControl(gamepad1);
         handleShooterSpeedControl();
-        handleManualGateControl(gamepad1);
         shooter.update();
 
         // ---------------- Telemetry Status Output ----------------
         telemetry.addData("Robot Speed Multiplier G1 Dpad Right", driveTrain.getSpeedMultiplier());
 
         telemetry.addData("Shooter Status G1 RT/RB", shooter.getShooterStatus());
-        telemetry.addData("Gate Status G1 X/Y", shooter.getGateStatus());
         telemetry.addData("Intake Status G1 LT/Back/LB", intake.getIntakeStatus());
         telemetry.addData("Target Launch Power G1 Dpad Up", shooter.getTargetLaunchPower());
         telemetry.addData("Current Motor Speed", shooter.getCurrentSpeed());
@@ -98,14 +96,6 @@ public class TeleOp_BaseCodeOneController extends OpMode {
     private void handleShooterSpeedControl() {
         if (gamepad1.dpadUpWasPressed()) {
             shooter.switchSpeed();
-        }
-    }
-
-    private void handleManualGateControl(Gamepad gamepad1) {
-        if (gamepad1.x) {
-            shooter.openGate();
-        } else if (gamepad1.y) {
-            shooter.closeGate();
         }
     }
 

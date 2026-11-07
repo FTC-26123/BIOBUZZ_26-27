@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.teleop.tests;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -10,6 +11,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
  * Pull Gamepad 1 Right Trigger to turn ALL motors OFF immediately.
  */
 @TeleOp
+@Disabled
 public class TeleOp_TestDrivetrainMotors extends OpMode {
 
     private DcMotor frontLeftMotor;
