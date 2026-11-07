@@ -6,10 +6,10 @@ import com.qualcomm.hardware.limelightvision.*;
 import java.util.*;
 
 /** Ground-plane projection from neural-detector angles, never simulator ball positions.
- * Calibration: fixed camera 0.305m high, +10deg pitch, zero yaw/roll/offset.
+ * Legacy detector helper; unregistered on the AprilTag-only robot.
  * Pickup attempts are estimates; only flywheel load confirms subsequent feed events. */
 public final class SpillCollector {
-    public static final double CAMERA_PITCH=10, CAMERA_HEIGHT=.305, BALL_RADIUS=.03556;
+    public static final double CAMERA_PITCH=LimelightMount.PITCH_DEGREES, CAMERA_HEIGHT=LimelightMount.HEIGHT_METERS, BALL_RADIUS=.03556;
     private final List<double[]> attempted=new ArrayList<>();
     private final Deque<double[]> queued=new ArrayDeque<>();
     private double plannedAt;
@@ -57,6 +57,7 @@ public final class SpillCollector {
         double forward=scale*(Math.cos(pitch)-t*Math.sin(pitch)),right=scale*Math.tan(Math.toRadians(tx));
         if(forward<.1||forward>2)return null;
         double h=pose.heading();
+        forward+=LimelightMount.FORWARD_METERS;right+=LimelightMount.RIGHT_METERS;
         return new double[]{pose.x()*.0254+forward*Math.cos(h)+right*Math.sin(h),
             pose.y()*.0254+forward*Math.sin(h)-right*Math.cos(h)};
     }
@@ -114,7 +115,9 @@ public final class SpillCollector {
             detour.addAll(FrameClearance.path(from,target,blue));
             routedGoal=target;
         }
-        while(detour.size()>1&&Math.hypot(follower.pose().x()-detour.peekFirst().x(),follower.pose().y()-detour.peekFirst().y())<.65)detour.removeFirst();
+        while(detour.size()>1&&Math.hypot(follower.pose().x()-detour.peekFirst().x(),follower.pose().y()-detour.peekFirst().y())<.65
+            &&Math.abs(Math.atan2(Math.sin(follower.pose().heading()-detour.peekFirst().heading()),Math.cos(follower.pose().heading()-detour.peekFirst().heading())))<Math.toRadians(2)
+            &&Math.hypot(follower.velocity().vx,follower.velocity().vy)<3)detour.removeFirst();
         follower.hold(detour.isEmpty()?target:detour.peekFirst());
     }
     public boolean update(Follower follower,CycleMechanisms mechanisms,LLResult frame,int pipeline,boolean blue,int wanted,double now){
@@ -126,7 +129,7 @@ public final class SpillCollector {
             driveTo(follower,goal,blue);mechanisms.collect(!returning);
             double d=Math.hypot(p.x()-goal.x(),p.y()-goal.y());
             double e=Math.abs(Math.atan2(Math.sin(p.heading()-goal.heading()),Math.cos(p.heading()-goal.heading())));
-            if(d<.55&&e<.04){
+            if(d<.55&&e<.04&&(!avoidFrame||detour.size()<=1)){
                 if(arrived<0)arrived=now;
                 if(now-arrived>.22){
                     if(!returning){attempts++;if(attempts>=wanted){mechanisms.collect(false);return true;}

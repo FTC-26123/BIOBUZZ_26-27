@@ -9,16 +9,22 @@ import org.firstinspires.ftc.robotcore.external.navigation.Position;
 
 /** Tag-relative shooting position. Path tracking continues to use Pinpoint. */
 public final class LimelightShotPose {
-    // Same physical Limelight mount used by SpillCollector, in meters and degrees.
-    public static final double HEIGHT = SpillCollector.CAMERA_HEIGHT;
-    public static final double PITCH_DEGREES = SpillCollector.CAMERA_PITCH;
+    public static final double HEIGHT = LimelightMount.HEIGHT_METERS;
+    public static final double PITCH_DEGREES = LimelightMount.PITCH_DEGREES;
     private static final double[] TAG_OFFSETS = {-6.5, -2.75, 2.75, 6.5};
     public String status = "Waiting for Limelight shooting tags";
     public double rangeMeters = Double.NaN;
 
     public Pose measured(LLResult frame, Pose odometry, Velocity velocity, boolean blue, boolean near,
                          double accelerationX, double accelerationY) {
+        return observed(frame,odometry,velocity,blue,near,accelerationX,accelerationY,true);
+    }
+    Pose observed(LLResult frame, Pose odometry, Velocity velocity, boolean blue, boolean near,
+                  double accelerationX, double accelerationY,boolean raised) {
         rangeMeters = Double.NaN;
+        if(!LimelightMount.calibrated()){
+            status="Set Limelight origin-to-lens forward offset before shooting";return null;
+        }
         if (!SpillCollector.fresh(frame, VisionRules.SHOT_PIPELINE)
                 || !frame.isValid() || frame.getFiducialResults() == null) {
             status = "No fresh Limelight shooting frame";
@@ -36,7 +42,7 @@ public final class LimelightShotPose {
             if (camera == null) continue;
             camera = camera.toUnit(DistanceUnit.METER);
             Pose estimate = fromCamera(tag.getFiducialId(), camera.x, camera.y, camera.z,
-                    age, odometry, velocity, blue, near, accelerationX, accelerationY);
+                    age, odometry, velocity, blue, near, accelerationX, accelerationY,raised);
             if (estimate == null) continue;
             x += estimate.x();
             y += estimate.y();
@@ -58,8 +64,13 @@ public final class LimelightShotPose {
     static Pose fromCamera(int id, double right, double down, double forward, double age,
                            Pose odometry, Velocity velocity, boolean blue, boolean near,
                            double accelerationX, double accelerationY) {
+        return fromCamera(id,right,down,forward,age,odometry,velocity,blue,near,accelerationX,accelerationY,true);
+    }
+    static Pose fromCamera(int id,double right,double down,double forward,double age,
+                           Pose odometry,Velocity velocity,boolean blue,boolean near,
+                           double accelerationX,double accelerationY,boolean raised){
         int first = blue ? (near ? 42 : 38) : (near ? 34 : 30);
-        if (!VisionRules.expectedTag(id, first)
+        if (!LimelightMount.calibrated() || !VisionRules.expectedTag(id, first)
                 || !Double.isFinite(right + down + forward + age + odometry.x()
                     + odometry.y() + odometry.heading() + velocity.vx + velocity.vy + velocity.omega
                     + accelerationX + accelerationY)
@@ -68,15 +79,15 @@ public final class LimelightShotPose {
         double groundForward = forward * Math.cos(pitch) + down * Math.sin(pitch);
         double tagHeight = HEIGHT + forward * Math.sin(pitch) - down * Math.cos(pitch);
         if (groundForward <= .1 || Math.hypot(groundForward, right) > 4
-                || tagHeight < 1.16 || tagHeight > 1.36) return null;
+                || tagHeight < (raised?1.22:.86) || tagHeight > (raised?1.34:1.00)) return null;
         double sign = blue ? -1 : 1, end = near ? -1 : 1;
         double tagX = sign * (-.32385 - end * TAG_OFFSETS[id - first] * .0254);
-        double tagY = sign * end * .327341117;
+        double tagY = sign * end * (raised?.327341117:.289414654);
         double captureHeading = odometry.heading() - velocity.omega * age;
         double c = Math.cos(captureHeading), s = Math.sin(captureHeading);
-        double robotX = tagX - groundForward * c - right * s
+        double robotX = tagX - (groundForward+LimelightMount.FORWARD_METERS) * c - (right+LimelightMount.RIGHT_METERS) * s
                 + velocity.vx * .0254 * age - .5 * accelerationX * age * age;
-        double robotY = tagY - groundForward * s + right * c
+        double robotY = tagY - (groundForward+LimelightMount.FORWARD_METERS) * s + (right+LimelightMount.RIGHT_METERS) * c
                 + velocity.vy * .0254 * age - .5 * accelerationY * age * age;
         if (Math.hypot(robotX - odometry.x() * .0254, robotY - odometry.y() * .0254) > .45) return null;
         return new Pose(robotX / .0254, robotY / .0254, odometry.heading());
