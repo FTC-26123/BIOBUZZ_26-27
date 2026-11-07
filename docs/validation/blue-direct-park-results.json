@@ -1,0 +1,28 @@
+{
+  "name": "BlueBasket2Wait15Shoot4Park",
+  "elapsed": 27.7527686,
+  "simulationTime": 28.630000000004767,
+  "parked": true,
+  "shots": 4,
+  "hits": 4,
+  "held": 0,
+  "garden": 0,
+  "flowers": 0,
+  "nectar": 0,
+  "end": [
+    1.5462066231419056,
+    -1.2938516194244984,
+    -6.133633087503241e-05
+  ],
+  "stages": [
+    "initializing",
+    "DRIVE",
+    "WAIT",
+    "SHOOT",
+    "PARK",
+    "DONE"
+  ],
+  "firstFeed": 15.0106795,
+  "firstShot": 15.1826856,
+  "partnerTips": 1
+}

@@ -15,7 +15,7 @@ public final class DelayedBasketTwoChecks {
                 double h=from.heading()+turn*u,half=.2286*(Math.abs(Math.cos(h))+Math.abs(Math.sin(h)));
                 check(Math.abs(x)+half<=1.792859+1e-6&&Math.abs(y)+half<=1.792859+1e-6,"wall footprint");
                 check(FrameClearance.clear(x,y),"metal frame keepout");
-                check(Math.abs(x+1.55*sign)>half+.2286||Math.abs(y-1.19*sign)>half+.2286,"reserved teammate footprint");
+                check(Math.abs(x+1.55*sign)>half+.2286||Math.abs(y-(blue?.64*sign:1.19*sign))>half+.2286,"reserved teammate footprint");
                 for(double[] pot:new double[][]{{-.5942,1.7283},{1.7283,.5942},{.5942,-1.7283},{-1.7283,-.5942}}){
                     double dx=pot[0]-x,dy=pot[1]-y,c=Math.cos(h),s=Math.sin(h);
                     double a=Math.max(0,Math.abs(dx*c+dy*s)-.2286),b=Math.max(0,Math.abs(-dx*s+dy*c)-.2286);
@@ -31,8 +31,10 @@ public final class DelayedBasketTwoChecks {
         check(DelayedBasketTwoRoute.readyToFeed(15,.25),"feed opens at fifteen seconds with settled aim");
         check(!DelayedBasketTwoRoute.readyToFeed(Double.NaN,1),"invalid time never feeds");
         DelayedBasketTwoRoute red=new DelayedBasketTwoRoute(false),blue=new DelayedBasketTwoRoute(true);
-        for(Pose[] pair:new Pose[][]{{red.initial,blue.initial},{red.shot,blue.shot},{red.park,blue.park}})
+        for(Pose[] pair:new Pose[][]{{red.initial,blue.initial},{red.shot,blue.shot}})
             check(Math.hypot(pair[0].x()+pair[1].x(),pair[0].y()+pair[1].y())<1e-8,"180 degree coordinate mirror");
+        check(Math.abs(blue.park.x()+70.75-131.44)<1e-9&&Math.abs(blue.park.y()+70.75-19.94)<1e-9,"requested Blue park coordinates");
+        check(blue.parkingPath(blue.shot).size()==1,"Blue drives straight from shooting to park");
         for(DelayedBasketTwoRoute route:new DelayedBasketTwoRoute[]{red,blue}){
             double sign=route.blue?-1:1;
             Pose near=new CycleRoute(route.blue?CycleRoute.Start.BLUE_WEST:CycleRoute.Start.RED_EAST,
