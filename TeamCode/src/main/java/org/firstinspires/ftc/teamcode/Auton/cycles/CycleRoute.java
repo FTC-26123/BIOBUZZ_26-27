@@ -191,9 +191,13 @@ public final class CycleRoute {
         if(lineup==Lineup.FOUR_PARK){
             // Pedro visualizer uses bottom-left inches on a 141.5-inch field.
             double x=(57.05-70.75)*.0254,y=(28.48-70.75)*.0254;
-            double heading=Math.toDegrees(Math.atan2(-.392176-y,-.32385-x));
+            double aim=Math.atan2(-.392176-y,-.32385-x);
+            // User's revised mark: one inch backwards along the aim line, away from the hive.
+            x-=.0254*Math.cos(aim);y-=.0254*Math.sin(aim);
+            double heading=Math.toDegrees(aim);
             // Add directly: the legacy add(FIRE) helper replaces the requested position.
-            stages.add(new Stage("Shoot four with team Shooter default",pose(x,y,heading),Action.FIRE,4,10));
+            // The unchanged Shooter PIDF/readiness can take >10 s to feed all four at its default.
+            stages.add(new Stage("Shoot four with team Shooter default",pose(x,y,heading),Action.FIRE,4,14));
             bonusIndex=stages.size();return;
         }
         add("Shoot four preloads into Basket 1",-.36,-1.43,90,Action.ROLL_NEAR,4,12);

@@ -8,9 +8,9 @@ Select **Red Shoot 4 + Garden and Park** or **Blue Shoot 4 + Garden and Park**. 
 
 Start with four pollen at the same mark as Shoot 4 and Park. Red starts at field-centered (-0.360, -1.564259) meters, Pedro heading 90 degrees; Blue mirrors by 180 degrees, (+0.360, +1.564259), heading 270 degrees. Initialize Pinpoint at the selected starting mark. No flower mechanism or camera is used.
 
-1. Clear the wall and shoot four preloads at the existing fixed mark: Red visualizer (57.05, 28.48), Blue (84.45, 113.02). The existing Shooter class retains its default **1500 encoder ticks/second** and its PIDF/feeder readiness logic.
-2. Stop the shooter. Approach our own garden with the intake facing the wall. Run the existing Intake subsystem and keep its windmill stopped, preventing the collected pollen from being shot.
-3. Sweep toward our garden corner with a moving hold target at 0.35 m/s, then dwell 0.35 seconds for capture. Pickup is timed; there is no inventory sensor. Expect up to four pollen if the garden remains available.
+1. Clear the wall and shoot four preloads at the revised mark: Red visualizer (57.0146, 27.4806), Blue (84.4854, 114.0194), exactly one inch farther from the hive along the aim line. The existing Shooter class retains its default **1500 encoder ticks/second** and its PIDF/feeder readiness logic.
+2. Stop the shooter. Approach our own garden with the intake angled 15 degrees toward the corner (Red 255 degrees / Blue 75 degrees). Run the existing Intake subsystem and keep its windmill stopped, preventing the collected pollen from being shot.
+3. Sweep toward our garden corner with a moving hold target at 0.25 m/s, require the endpoint within 0.20 inch and 1 degree, then dwell 0.50 seconds for capture. Pickup is timed; there is no inventory sensor. Expect up to four pollen if the garden remains available.
 4. Stop all mechanisms. Retreat inboard before driving along the outside of the metal frame, clearing the fixed flower pot rather than hugging the wall.
 5. Park in our near slot, leaving the farther teammate slot clear. Keep the collected pollen for TeleOp; there is no second firing stage.
 
@@ -28,15 +28,38 @@ The reproducible study uses unmodified simulator `Physics`, `Settings` and `Cont
 
 | Bounded drive profile | Parked | Final inventory | Result |
 | --- | --- | --- | --- |
-| 1.50 m/s, 2.50 m/s² | 11.185 s | Four own-garden pollen | Four opening shots, three entries, one tip |
-| 1.30 m/s, 1.60 m/s² | 12.510 s | Four own-garden pollen | Four opening shots, three entries, one tip |
-| 0.80 m/s, 0.60 m/s² | 17.765 s | Four own-garden pollen | Four opening shots, three entries, one tip |
+| 1.50 m/s, 2.50 m/s² | 12.330 s | Four own-garden pollen | Four opening shots, four entries, one tip |
+| 1.30 m/s, 1.60 m/s² | 13.685 s | Four own-garden pollen | Four opening shots, four entries, one tip |
+| 0.80 m/s, 0.60 m/s² | 19.090 s | Four own-garden pollen | Four opening shots, four entries, one tip |
 
-All six cases acquired **zero opposite-garden balls, zero flower pollen and zero nectar**, respecting four-ball capacity. The opening's fourth ball misses during the tip in this model; the working opening code has not been changed to compensate.
+All six cases acquired **zero opposite-garden balls, zero flower pollen and zero nectar**, respecting four-ball capacity. These ideal-motion planning cases produce four entries. The actual controller/motor runs below produce three entries from four shots; do not assume planning-model shot accuracy on hardware.
 
 These are **planning-model results, not an end-to-end run of the FTC OpMode, tuned Pedro follower or physical motors**. Translation follows bounded acceleration/deceleration trajectories; the fixture gates its feeder with simulator release counts and an estimated 0.4-second spin-up. Real code uses the existing flywheel-load/intake-encoder release estimator. Validate pickup at the garden edge, actual feeding and tracking on the robot. The tested drive profiles do not retune Pedro constants.
 
 Incomplete opening shots, stage timeout or the parking reserve cause an early return to park. The 29.7-second cutoff stops all motors; localization or frame-clearance faults stop immediately. Telemetry reports estimated releases and a timed pickup, not an invented sensed inventory or tip count.
+
+## Actual autonomous and Pedro follower verification
+
+The previous planning study missed a controller-level failure. In an actual OpMode run, the team's unchanged Shooter released only three preloads before the 10-second firing timeout. The routine parked with one preload still held and never entered the garden stage. The firing allowance is now 14 seconds, while the parking reserve and 29.7-second hard stop remain active. Partial release counts remain visible after a timeout.
+
+The old garden sweep also relied on about 3 mm of modeled intake-edge reach while accepting a 0.65-inch endpoint error. The revised corner-facing approach ends farther inboard at Red (-1.50, -1.48) m, heading 255 degrees, mirrored for Blue. It provides more pickup margin without driving further into the wall.
+
+The repeatable live test runs the production Java OpModes, team Shooter/Intake, unchanged tuned Pedro follower, SDK motor/Pinpoint stand-ins and simulator drivetrain/ball plant. It does not inject poses or balls. The isolated simulator hardware adapter supplies the missing transfer CRServo and maps its inward state to the simulator gate; the simulator checkout is untouched. Results and sampled trajectories are saved in [the validation folder](validation/garden-follower-results.json).
+
+| Actual-code routine | Autonomous elapsed | Shots / entries | Garden pollen held at park |
+| --- | --- | --- | --- |
+| BlueBasket1Shoot4Park | 16.389 s | 4 / 3 | 0 |
+| BlueShoot4GardenPark | 20.531 s | 4 / 3 | 4 |
+| RedBasket1Shoot4Park | 15.782 s | 4 / 3 | 0 |
+| RedShoot4GardenPark | 20.210 s | 4 / 3 | 4 |
+
+All four completed parking, stopped their motors and acquired no flower pollen or nectar. Garden routines collected only their four own-garden pollen. These remain simulator results: physical feeding, slip and intake dimensions require a robot trial.
+
+### Pedro visualizer geometry
+
+[Red project](pedro/RedGardenPark.pp.json) and [Blue project](pedro/BlueGardenPark.pp.json) contain the exact 12 route segments, headings, an 18-inch footprint, frame, fixed flower pots and reserved teammate space. Both pass the upstream Pedro Visualizer's own `calculatePathTime` and `findCollisions` engine at 0.20-inch / 1-degree sampling with **zero collision intervals**. A deliberately invalid path into the frame is rejected as a negative control. This checks geometry; it does not replace the actual follower trial.
+
+The browser's detached file input could not import the projects reliably, so verification ran the same upstream geometry engine directly from [Pedro-Pathing/Visualizer commit 97104e0](https://github.com/Pedro-Pathing/Visualizer/tree/97104e027af00d49b8bd61e29bcb74a9d7e62b90). The engine check does not access browser storage or modify the visualizer source. Open the exported projects in the visualizer for interactive playback.
 
 ## Reproduce
 
@@ -45,6 +68,11 @@ With the simulator alongside this robot checkout, including its built SDK stand-
 ```powershell
 .\tools\auton\run-garden-park-sim.ps1 -SimulatorRoot ..\sim-publish
 python tools/auton/render-garden-park-map.py
+python tools/auton/export-pedro-projects.py
+.\tools\auton\run-live-autons.ps1 -SimulatorRoot ..\sim-publish
+node tools/auton/check-pedro-visualizer.mjs build/pedro-visualizer-reference
 ```
 
-The study compiles the current production route, current Intake and simulator plant, checks the main route plus fallback paths, runs six reset-field cases and exports map coordinates. There are **400,348 route assertions** covering mirrored geometry, unchanged opening, frame/wall clearance, fixed flower-pot clearance and the reserved teammate footprint; the physics cases each also sample 6,000 rotated footprints. The map uses official FIRST BIOBUZZ STEP v26-27.2 data bundled in the simulator; see its [field provenance](https://github.com/d-mankotia/BIOBUZZ-sim/blob/main/FIELD-SOURCES.md).
+The study compiles the current production route, current Intake and simulator plant, checks the main route plus fallback paths, runs six reset-field cases and exports map coordinates. There are **462,564 route assertions** covering mirrored geometry, shared shooting marks, frame/wall clearance, fixed flower-pot clearance and the reserved teammate footprint; the physics cases each also sample 6,000 rotated footprints. The map uses official FIRST BIOBUZZ STEP v26-27.2 data bundled in the simulator; see its [field provenance](https://github.com/d-mankotia/BIOBUZZ-sim/blob/main/FIELD-SOURCES.md).
+
+The upstream geometry check requires Node 24+ with native TypeScript support and a checkout of the pinned Visualizer source at the supplied path. No package install or browser-state access is used. The live runner writes its isolated SDK adapter and traces under `build/` and stops its own simulator after the four trials.

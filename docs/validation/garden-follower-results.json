@@ -1,0 +1,104 @@
+[
+  {
+    "name": "BlueBasket1Shoot4Park",
+    "elapsed": 16.389415,
+    "simulationTime": 17.169999999998904,
+    "parked": true,
+    "shots": 4,
+    "hits": 3,
+    "held": 0,
+    "garden": 0,
+    "flowers": 0,
+    "nectar": 0,
+    "end": [
+      1.5542972770439014,
+      -0.6401924081015218,
+      -3.141592653589793
+    ],
+    "stages": [
+      "initializing",
+      "CLEAR",
+      "APPROACH",
+      "SHOOT",
+      "PARK",
+      "DONE"
+    ]
+  },
+  {
+    "name": "BlueShoot4GardenPark",
+    "elapsed": 20.5314795,
+    "simulationTime": 21.380000000001058,
+    "parked": true,
+    "shots": 4,
+    "hits": 3,
+    "held": 4,
+    "garden": 4,
+    "flowers": 0,
+    "nectar": 0,
+    "end": [
+      1.5491346429728996,
+      -0.6425489883217903,
+      -2.976579215429205e-06
+    ],
+    "stages": [
+      "initializing",
+      "DRIVE",
+      "SHOOT",
+      "SWEEP",
+      "CAPTURE",
+      "PARK",
+      "DONE"
+    ]
+  },
+  {
+    "name": "RedBasket1Shoot4Park",
+    "elapsed": 15.7824588,
+    "simulationTime": 16.619999999998623,
+    "parked": true,
+    "shots": 4,
+    "hits": 3,
+    "held": 0,
+    "garden": 0,
+    "flowers": 0,
+    "nectar": 0,
+    "end": [
+      -1.565964026009845,
+      0.6413435553782941,
+      -2.654174988176624e-05
+    ],
+    "stages": [
+      "initializing",
+      "CLEAR",
+      "APPROACH",
+      "SHOOT",
+      "PARK",
+      "DONE"
+    ]
+  },
+  {
+    "name": "RedShoot4GardenPark",
+    "elapsed": 20.2099474,
+    "simulationTime": 20.960000000000843,
+    "parked": true,
+    "shots": 4,
+    "hits": 3,
+    "held": 4,
+    "garden": 4,
+    "flowers": 0,
+    "nectar": 0,
+    "end": [
+      -1.5626563805826779,
+      0.6441395919751678,
+      3.1415358228016803
+    ],
+    "stages": [
+      "initializing",
+      "DRIVE",
+      "SHOOT",
+      "SWEEP",
+      "CAPTURE",
+      "PARK",
+      "DONE"
+    ]
+  }
+]

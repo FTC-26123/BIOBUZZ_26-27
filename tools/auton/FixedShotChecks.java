@@ -7,8 +7,12 @@ public final class FixedShotChecks {
         for(boolean blue:new boolean[]{false,true}){
             CycleRoute r=new CycleRoute(blue?CycleRoute.Start.BLUE_WEST:CycleRoute.Start.RED_EAST,CycleRoute.Strategy.NO_FLOWERS,CycleRoute.Lineup.FOUR_PARK);
             Pose shot=r.stages.get(1).pose();
-            check(Math.abs(shot.x()+70.75-(blue?84.45:57.05))<1e-8,"exact requested visualizer X");
-            check(Math.abs(shot.y()+70.75-(blue?113.02:28.48))<1e-8,"exact requested visualizer Y");
+            double sign=blue?-1:1,oldX=(57.05-70.75)*sign,oldY=(28.48-70.75)*sign;
+            double dx=shot.x()-oldX,dy=shot.y()-oldY;
+            check(Math.abs(Math.hypot(dx,dy)-1)<1e-8,"exactly one inch back from original shooting mark");
+            check(Math.abs(dx+Math.cos(shot.heading()))<1e-8&&Math.abs(dy+Math.sin(shot.heading()))<1e-8,
+                "backwards along the aim line, away from hive");
+            check(r.stages.get(1).limit()>=14,"default Shooter gets time to release all four before garden transition");
             check(r.stages.get(1).action()==CycleRoute.Action.FIRE,"stationary fixed shot");
             check(r.stages.get(1).count()==4,"four requested preloads");
             check(r.parkingPath(shot).size()>0,"park after shooting");
