@@ -1,4 +1,7 @@
-package org.firstinspires.ftc.teamcode.Auton.cycles;
+package org.firstinspires.ftc.teamcode.Auton;
+
+import org.firstinspires.ftc.teamcode.Auton.cycles.CycleRoute;
+import org.firstinspires.ftc.teamcode.Auton.cycles.ThirtySecondAuto;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 
