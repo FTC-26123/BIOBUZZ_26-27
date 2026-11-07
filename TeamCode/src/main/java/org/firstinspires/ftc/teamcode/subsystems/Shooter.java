@@ -30,10 +30,10 @@ public class Shooter {
     private VoltageSensor voltageSensor;
 
     // ---------------------- Speed Presets & Limits (ticks/sec) ----------------------
-    private static final double[] LAUNCHING_POWERS = {1500, 1250, 1000};
+    private static final double[] LAUNCHING_POWERS = {1500, 1600, 1700, 1900};
     private static final double MAX_TARGET_VELOCITY = 2400; // set to your motor's real limit
     private int launchingIndex = 0;
-    private double customTargetPower = 2000;
+    private double customTargetPower = LAUNCHING_POWERS[0];
     private boolean useCustomPower = false;
 
     // ---------------------- Feeding / Readiness Thresholds ----------------------
@@ -143,7 +143,7 @@ public class Shooter {
     }
 
     /**
-     * Cycles preset target velocity (1500 -> 1250 -> 1000 ticks/sec).
+     * Cycles preset target velocity (1500 -> 1600 -> 1700 -> 1900 ticks/sec).
      */
     public void switchSpeed() {
         launchingIndex = (launchingIndex + 1) % LAUNCHING_POWERS.length;
