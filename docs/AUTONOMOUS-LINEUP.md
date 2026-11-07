@@ -1,12 +1,15 @@
 # Flowerless autonomous setup
 
-There are six selectable autonomous programs under **26123 Flowerless**. The working Shoot 4 and Park programs remain unchanged.
+There are eight selectable autonomous programs under **26123 Flowerless**. Existing routine choices remain available.
 
 | Red | Blue | Full sequence |
 | --- | --- | --- |
 | Red Basket 1 Shoot 4 and Park | Blue Basket 1 Shoot 4 and Park | Drive to the fixed shooting mark, use the team Shooter default for four preloads, then park. |
 | Red Park Only | Blue Park Only | Leave the separate Park Only wall mark and drive around the frame to park. |
 | Red Shoot 4 + Garden and Park | Blue Shoot 4 + Garden and Park | Same four-preload opening, collect only our garden, then park carrying the pollen for TeleOp. |
+| Red Basket 2 Wait 15 Shoot 4 and Park | Blue Basket 2 Wait 15 Shoot 4 and Park | Start at the opposite wall, aim/spin up during the first 15 seconds with feeders off, then shoot four into raised Basket 2 and park. Teammate required. |
+
+The delayed Basket 2 routines have [different starting marks, a setup map and teammate requirements](BASKET-TWO-WAIT15.md). Do not place them at the Basket 1 starts.
 
 The two new garden routes have their own [route map, simulation results and setup requirements](GARDEN-PARK.md). The four original routes are shown below.
 
@@ -19,12 +22,13 @@ The field image uses the official FIRST BIOBUZZ STEP CAD v26-27.2 bundled with t
 | Shoot 4 and Park | (-0.360, -1.564259) | 90 degrees | (+0.360, +1.564259) | 270 degrees |
 | Shoot 4 + Garden and Park | (-0.360, -1.564259) | 90 degrees | (+0.360, +1.564259) | 270 degrees |
 | Park Only | (-0.900, -1.564259) | 90 degrees | (+0.900, +1.564259) | 270 degrees |
+| Basket 2 Wait 15 | (-0.245, +1.564259) | 270 degrees | (+0.245, -1.564259) | 90 degrees |
 
 Coordinates refer to the robot's pose origin at the field center convention. Positive X points right and positive Y points up in the map. All starting arrows point into the field. Place the robot at the exact selected mark before Start. Initialize sets Pinpoint to that mark.
 
 ## Parking with a teammate
 
-All three autonomous choices for an alliance use **our near slot**, leaving the farther slot available for a teammate. Positions below use Pedro visualizer inches. Blue mirrors Red by a 180-degree rotation about field center.
+All four autonomous choices for an alliance use **our near slot**, leaving the farther slot available for a teammate. Positions below use Pedro visualizer inches. Blue mirrors Red by a 180-degree rotation about field center.
 
 | Alliance | Our robot parks (X, Y) | Reserved teammate center (X, Y) | Heading |
 | --- | --- | --- | --- |
