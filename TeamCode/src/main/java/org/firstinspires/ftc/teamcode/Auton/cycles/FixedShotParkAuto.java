@@ -41,7 +41,8 @@ public abstract class FixedShotParkAuto extends OpMode {
         follower.setPose(route.initial);follower.update();
         telemetry.addData("Place robot (m)","%.3f, %.3f",route.initial.x()*.0254,route.initial.y()*.0254);
         telemetry.addData("Heading (deg)",Math.toDegrees(route.initial.heading()));
-        telemetry.addData("Shot visualizer (in)",route.blue?"84.45, 113.02":"57.05, 28.48");
+        telemetry.addData("Shot visualizer (in)","%.4f, %.4f",route.stages.get(1).pose().x()+70.75,
+            route.stages.get(1).pose().y()+70.75);
         telemetry.addData("Shooter default (ticks/s)",shooter.getTargetLaunchPower());
         telemetry.addLine("Load four pollen. No Limelight or webcam required.");telemetry.update();
     }

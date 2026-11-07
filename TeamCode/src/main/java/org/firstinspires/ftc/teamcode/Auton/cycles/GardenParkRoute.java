@@ -6,7 +6,8 @@ import java.util.List;
 
 /** Camera-free own-garden reload for TeleOp. No opposite garden or second-basket shots. */
 public final class GardenParkRoute {
-    public static final double SWEEP_METERS_PER_SECOND=.35,CAPTURE_DWELL_SECONDS=.35;
+    public static final double SWEEP_METERS_PER_SECOND=.25,CAPTURE_DWELL_SECONDS=.50;
+    public static final double PICKUP_POSITION_TOLERANCE_INCHES=.20,PICKUP_HEADING_TOLERANCE_DEGREES=1;
     public final boolean blue;
     public final Pose initial,park;
     public final List<CycleRoute.Stage> stages=new ArrayList<>();
@@ -16,8 +17,10 @@ public final class GardenParkRoute {
         CycleRoute opening=new CycleRoute(blue?CycleRoute.Start.BLUE_WEST:CycleRoute.Start.RED_EAST,
             CycleRoute.Strategy.NO_FLOWERS,CycleRoute.Lineup.FOUR_PARK);
         initial=opening.initial;stages.addAll(opening.stages);
-        stages.add(new CycleRoute.Stage("Our garden approach",pose(-1.15,-1.48,270),CycleRoute.Action.MOVE,0,8));
-        stages.add(new CycleRoute.Stage("Our garden floor sweep",pose(-1.564,-1.48,270),CycleRoute.Action.SWEEP,0,8));
+        // Angle the front intake 15 degrees toward the corner. The old parallel sweep caught
+        // the last ball only at the outer edge of the intake and needed millimeter-perfect tracking.
+        stages.add(new CycleRoute.Stage("Our garden approach",pose(-1.15,-1.48,255),CycleRoute.Action.MOVE,0,8));
+        stages.add(new CycleRoute.Stage("Our garden floor sweep",pose(-1.50,-1.48,255),CycleRoute.Action.SWEEP,0,8));
         park=pose(-1.55,CycleRoute.OUR_PARK_Y_METERS,270);
     }
     private Pose pose(double x,double y,double degrees){

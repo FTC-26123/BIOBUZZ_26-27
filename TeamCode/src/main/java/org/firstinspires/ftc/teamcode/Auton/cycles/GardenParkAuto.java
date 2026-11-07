@@ -64,10 +64,11 @@ public abstract class GardenParkAuto extends OpMode {
         }
     }
     private void nextWaypoint(){target=waypoints.next();Pose from=follower.pose();follower.follow(Paths.line(from,target).linear(from,target));}
-    private boolean at(Pose goal){
+    private boolean at(Pose goal){return at(goal,.65,2);}
+    private boolean at(Pose goal,double positionTolerance,double headingTolerance){
         Pose p=follower.pose();double angle=p.heading()-goal.heading();
-        return Math.hypot(p.x()-goal.x(),p.y()-goal.y())<.65
-            &&Math.abs(Math.atan2(Math.sin(angle),Math.cos(angle)))<Math.toRadians(2)
+        return Math.hypot(p.x()-goal.x(),p.y()-goal.y())<positionTolerance
+            &&Math.abs(Math.atan2(Math.sin(angle),Math.cos(angle)))<Math.toRadians(headingTolerance)
             &&Math.hypot(follower.velocity().vx,follower.velocity().vy)<3;
     }
     private void beginShooting(){
@@ -96,7 +97,8 @@ public abstract class GardenParkAuto extends OpMode {
                 double u=sweepSeconds<=0?1:Math.min(1,(now-phaseStarted)/sweepSeconds);
                 follower.hold(new Pose(sweepFrom.x()+(target.x()-sweepFrom.x())*u,
                     sweepFrom.y()+(target.y()-sweepFrom.y())*u,target.heading()));
-                if(u>=1&&at(target)){state=State.CAPTURE;phaseStarted=now;}
+                if(u>=1&&at(target,GardenParkRoute.PICKUP_POSITION_TOLERANCE_INCHES,
+                    GardenParkRoute.PICKUP_HEADING_TOLERANCE_DEGREES)){state=State.CAPTURE;phaseStarted=now;}
                 break;
             case CAPTURE:
                 if(now-phaseStarted>=GardenParkRoute.CAPTURE_DWELL_SECONDS){stageIndex++;enterStage();}
@@ -107,6 +109,7 @@ public abstract class GardenParkAuto extends OpMode {
                     intakeEncoder.getVelocity(),"Shooting".equals(shooter.getShooterStatus()));
                 if(counter.shots>=4){
                     releases+=counter.shots;
+                    counter=null;
                     stageIndex++;enterStage();
                 }else if(now-phaseStarted>=stage().limit())park("Incomplete batch; parking");
                 else shooter.update();
@@ -128,7 +131,7 @@ public abstract class GardenParkAuto extends OpMode {
     private void report(){
         telemetry.addData("Auto stage",state);telemetry.addData("Route",stageIndex<route.stages.size()?stage().name():"Park");
         telemetry.addData("Auto result",result);telemetry.addData("Elapsed (s)",timer.seconds());
-        telemetry.addData("Estimated releases",releases+(state==State.SHOOT&&counter!=null?counter.shots:0));
+        telemetry.addData("Estimated releases",releases+(counter==null?0:counter.shots));
         telemetry.addLine("Garden pickup is timed; up to four pollen expected for TeleOp.");
         shooter.addTelemetry(telemetry);telemetry.update();
     }

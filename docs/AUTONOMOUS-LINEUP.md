@@ -43,11 +43,11 @@ These coordinates use the Pedro visualizer's bottom-left origin, in inches, on i
 
 | Alliance | Visualizer X, Y (in) | Robot X, Y (in) | Heading |
 | --- | --- | --- | --- |
-| Red | (57.05, 28.48) | (-13.70, -42.27) | About 87.97 degrees |
-| Blue | (84.45, 113.02) | (+13.70, +42.27) | About 267.97 degrees |
+| Red | (57.0146, 27.4806) | (-13.7354, -43.2694) | About 87.97 degrees |
+| Blue | (84.4854, 114.0194) | (+13.7354, +43.2694) | About 267.97 degrees |
 
-Blue is a 180-degree rotation about field center. Starting marks above are unchanged. Shoot 4 and Park clears the wall, drives to its fixed mark facing Basket 1, stops, calls the existing team Shooter class, and then parks outside the metal frame. Shooter uses its default 1500 ticks/second preset and existing PIDF, voltage compensation and feeder readiness. This value is encoder ticks/second, not a new RPM calculation.
+Both shooting families now stop exactly one inch backwards along the aim line from the previous marks, away from the hive. Blue is a 180-degree rotation about field center. Starting marks above are unchanged. Shoot 4 and Park clears the wall, drives to its fixed mark facing Basket 1, stops, calls the existing team Shooter class, and then parks outside the metal frame. Shooter uses its default 1500 ticks/second preset and existing PIDF, voltage compensation and feeder readiness. This value is encoder ticks/second, not a new RPM calculation.
 
-There are no camera requirements for any selectable auton. Recovery remains unregistered. Release events are estimated from recovered flywheel load dips and intake encoder travel. In the original Shoot 4 and Park, four estimated releases end shooting; a 10-second shooting timeout or the return-path reserve leads to parking even if fewer releases were observed. Physical robot trials must validate feeding and shot accuracy at the supplied mark. The new garden program uses the same opening, then reserves time to park with the collected pollen for TeleOp.
+There are no camera requirements for any selectable auton. Recovery remains unregistered. Release events are estimated from recovered flywheel load dips and intake encoder travel. In the original Shoot 4 and Park, four estimated releases end shooting; a 14-second shooting timeout or the return-path reserve leads to parking even if fewer releases were observed. Physical robot trials must validate feeding and shot accuracy at the supplied mark. The new garden program uses the same opening, then reserves time to park with the collected pollen for TeleOp.
 
 See [hardware and feeder setup](POLLEN-AUTONOMOUS.md).
