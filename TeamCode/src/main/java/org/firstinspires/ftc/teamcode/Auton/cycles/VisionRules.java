@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode.Auton.cycles;
 /** Shared sensor contract, independent of camera SDKs for regression checks. */
 public final class VisionRules {
     public static final int POLLEN_PIPELINE = 7;
+    public static final int SHOT_PIPELINE = 1;
     public static final String POLLEN_LABEL = "yellow_pollen";
     public static final double MAX_AGE_MS = 180;
     private VisionRules() { }
