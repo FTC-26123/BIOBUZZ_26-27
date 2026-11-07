@@ -27,6 +27,7 @@ import static com.pedropathing.ivy.commands.Commands.lazy;
 import static com.pedropathing.ivy.groups.Groups.sequential;
 import static com.pedropathing.ivy.pedro.PedroCommands.follow;
 
+@com.qualcomm.robotcore.eventloop.opmode.Disabled
 @Autonomous(name = "AutoPathYellow", group = "Autonomous")
 public class red_forward extends LinearOpMode {
 

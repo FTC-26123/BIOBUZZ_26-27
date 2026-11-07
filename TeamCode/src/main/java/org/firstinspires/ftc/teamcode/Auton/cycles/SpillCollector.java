@@ -21,6 +21,8 @@ public final class SpillCollector {
     public boolean clustered;
     public boolean avoidFlowers;
     public boolean avoidFrame;
+    // Alliance-normalized Y direction for a team assignment; zero allows both ends.
+    public int quadrantEnd;
     private Pose routedGoal;
     private final Deque<Pose> detour=new ArrayDeque<>();
     /** Exclude known pot contact zones; detector class alone cannot identify a ball's source. */
@@ -30,6 +32,7 @@ public final class SpillCollector {
         return true;
     }
     public String status="Scanning";
+    public boolean hasAttemptedPickup(){return !attempted.isEmpty();}
     public void reset(Pose pose){scan=pose;goal=null;routedGoal=null;detour.clear();queued.clear();attempted.clear();attempts=0;arrived=-1;emptySince=-1;returning=false;}
     public static boolean fresh(LLResult frame,int pipeline){
         if(frame==null||frame.getPipelineIndex()!=pipeline)return false;
@@ -77,8 +80,8 @@ public final class SpillCollector {
     private Pose approach(double[] xy,Pose scan,double sign){
         double h=scan.heading(),x=xy[0]*sign,y=xy[1]*sign,gx,gy;
         if(x< -1.30){h=Math.toRadians(180+(sign<0?180:0));gx=Math.max(-1.53919,Math.min(-.245,x+.235));gy=Math.max(-1.564259,Math.min(1.564259,y));}
-        else if(y< -1.30){h=Math.toRadians(270+(sign<0?180:0));gx=Math.max(-1.50,Math.min(-.245,x));gy=Math.max(-1.53919,y+.235);}
-        else if(y>1.30){h=Math.toRadians(90+(sign<0?180:0));gx=Math.max(-1.50,Math.min(-.245,x));gy=Math.min(1.53919,y-.235);}
+        else if(y< -1.30){h=Math.toRadians(270+(sign<0?180:0));gx=Math.max(-1.50,Math.min(-.245,x));gy=quadrantEnd<0?-1.53:Math.max(-1.53919,y+.235);}
+        else if(y>1.30){h=Math.toRadians(90+(sign<0?180:0));gx=Math.max(-1.50,Math.min(-.245,x));gy=quadrantEnd>0?1.53:Math.min(1.53919,y-.235);}
         else if(avoidFrame&&y<-.60){h=Math.toRadians(90+(sign<0?180:0));gx=Math.max(-1.50,Math.min(-.245,x));gy=Math.min(-1.05,y-.26);}
         else if(avoidFrame&&y>.60){h=Math.toRadians(270+(sign<0?180:0));gx=Math.max(-1.50,Math.min(-.245,x));gy=Math.max(1.05,y+.26);}
         else {gx=Math.max(-.95,Math.min(-.245,(xy[0]-.235*Math.cos(h))*sign));if(x>-.42)gx=-.245;
@@ -89,9 +92,28 @@ public final class SpillCollector {
         if(avoidFrame)return FrameClearance.clear(from.x()*.0254,from.y()*.0254)&&FrameClearance.clear(to.x()*.0254,to.y()*.0254);
         return safeApproach(from.x()*.0254,from.y()*.0254,to.x()*.0254,to.y()*.0254);
     }
+    private boolean allowed(double[] xy,double sign){
+        double x=xy[0]*sign,y=xy[1]*sign;
+        return x>=-1.79&&x<=-.05&&Math.abs(y)>=.30&&Math.abs(y)<=1.79
+            &&(quadrantEnd==0||y*quadrantEnd>=.30);
+    }
     private void driveTo(Follower follower,Pose target,boolean blue){
         if(!avoidFrame){follower.hold(target);return;}
-        if(routedGoal!=target){detour.clear();detour.addAll(FrameClearance.path(follower.pose(),target,blue));routedGoal=target;}
+        if(routedGoal!=target){
+            detour.clear();
+            Pose from=follower.pose();
+            int wallSign=quadrantEnd*(blue?-1:1);
+            if(!returning&&target.y()*.0254*wallSign>1.36&&Math.sin(target.heading())*wallSign>.9){
+                // Line up inside the wall spill before driving into it nose-first.
+                // Sweep to the wall because wall occlusion can shorten the projected range.
+                // A diagonal approach can knock the row across the centerline.
+                Pose staging=new Pose(target.x(),wallSign*1.23/.0254,target.heading());
+                detour.addAll(FrameClearance.path(from,staging,blue));
+                from=staging;
+            }
+            detour.addAll(FrameClearance.path(from,target,blue));
+            routedGoal=target;
+        }
         while(detour.size()>1&&Math.hypot(follower.pose().x()-detour.peekFirst().x(),follower.pose().y()-detour.peekFirst().y())<.65)detour.removeFirst();
         follower.hold(detour.isEmpty()?target:detour.peekFirst());
     }
@@ -127,16 +149,15 @@ public final class SpillCollector {
         double sign=blue?-1:1,best=Double.POSITIVE_INFINITY;
         double[] selected=null;
         List<double[]> observed=new ArrayList<>();
-        if(clustered)for(com.qualcomm.hardware.limelightvision.LLResultTypes.DetectorResult ball:pollen(frame)){
+        if(clustered)for(LLResultTypes.DetectorResult ball:pollen(frame)){
             double[] xy=project(ball.getTargetXDegrees(),ball.getTargetYDegrees(),p,BALL_RADIUS);
-            if(xy!=null)observed.add(xy);
+            if(xy!=null&&allowed(xy,sign))observed.add(xy);
         }
         for(LLResultTypes.DetectorResult ball:pollen(frame)){
             double[] xy=project(ball.getTargetXDegrees(),ball.getTargetYDegrees(),p,BALL_RADIUS);
             if(xy==null)continue;
-            double x=xy[0]*sign,y=xy[1]*sign;
             // Confine pursuit to the alliance spill corridor; stay away from frame feet and center line.
-            if(x>-.05||x<-1.79||Math.abs(y)<.30||Math.abs(y)>1.79)continue;
+            if(!allowed(xy,sign))continue;
             Pose candidate=approach(xy,scan,sign);if(avoidFlowers&&!clearOfPots(candidate.x()*.0254,candidate.y()*.0254))continue;double gx=candidate.x()*.0254*sign,gy=candidate.y()*.0254*sign;
             // Only the narrow inner corridor may pass the legs; approach outer balls from the end.
             if(!avoidFrame&&gx<-.28&&Math.abs(gy)<.80)continue;
@@ -154,7 +175,6 @@ public final class SpillCollector {
             if(clustered&&wanted>1){
                 for(double[] other:observed){
                     if(Math.hypot(other[0]-selected[0],other[1]-selected[1])<.065||Math.abs(other[1]-selected[1])>.15)continue;
-                    if(other[0]*sign>-.05||other[0]*sign< -1.79||Math.abs(other[1])<.30||Math.abs(other[1])>1.79)continue;
                     Pose next=approach(other,scan,sign);
                     if(avoidFlowers&&!clearOfPots(next.x()*.0254,next.y()*.0254))continue;
                     if(!avoidFrame&&next.x()*sign*.0254<-.28&&Math.abs(next.y()*.0254)<.80)continue;

@@ -31,6 +31,10 @@ public abstract class ThirtySecondAuto extends OpMode {
     private double cellSafeAt;
     private double raisedCellSince=-1;
     private boolean partnerTipConfirmed;
+    private boolean usedBasketFallback;
+    private boolean basketCycleDry;
+    private double basketSearchSeconds;
+    private double basketSettleSeconds;
     private Follower follower;
     private CycleMechanisms mechanisms;
     private GoBildaPinpointDriver pinpoint;
@@ -49,8 +53,9 @@ public abstract class ThirtySecondAuto extends OpMode {
     @Override public void init(){
         route=new CycleRoute(startingPoint(),strategy(),lineup()); follower=org.firstinspires.ftc.teamcode.pedro.Constants.create(hardwareMap);
         collector.clustered=route.rushStyle();
-        collector.avoidFlowers=route.strategy==CycleRoute.Strategy.NO_FLOWERS||route.lineup==CycleRoute.Lineup.PARTNER;
+        collector.avoidFlowers=route.strategy==CycleRoute.Strategy.NO_FLOWERS||route.lineup==CycleRoute.Lineup.PARTNER||route.basketTeam();
         collector.avoidFrame=route.avoidFrame();
+        if(route.basketTeam())collector.quadrantEnd=route.basketOne()?-1:1;
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
         follower.setPose(route.initial); follower.update();
         mechanisms=new CycleMechanisms(hardwareMap);
@@ -61,7 +66,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         telemetry.addLine("Verify hardware calibration: 4 pollen preloads, camera pitch +10 degrees, shot elevation 86 degrees.");
         telemetry.update();
     }
-    @Override public void start(){timer.reset();index=0;stage=null;cellSafeAt=0;partnerTipConfirmed=false;done=false;parking=false;result="Running";next();}
+    @Override public void start(){timer.reset();index=0;stage=null;cellSafeAt=0;partnerTipConfirmed=false;usedBasketFallback=false;basketCycleDry=false;done=false;parking=false;result="Running";next();}
     private void beginPark(){
         mechanisms.stop();parking=true;result="Parking";
         parkSteps=route.parkingPath(follower.pose()).iterator();nextPark();
@@ -79,6 +84,26 @@ public abstract class ThirtySecondAuto extends OpMode {
             (stage.name().equals("Shoot preloads en route to near flower")||stage.name().equals("Shoot preloads toward garden")||stage.name().equals("Shoot while returning to near flower")))cellSafeAt=timer.seconds()+3.15;
         mechanisms.close();
         if(parking){nextPark();return;}
+        if(route.basketTeam()){
+            if(index==route.basketFallbackIndex){
+                // One pass can collect several adjacent balls. Try feeding the recovered batch
+                // before spending time on the fallback, unless the previous pass fed nothing.
+                if(collector.hasAttemptedPickup()&&(!basketCycleDry||usedBasketFallback))index=route.basketReloadIndex;
+                else if(usedBasketFallback){beginPark();return;}
+                else usedBasketFallback=true;
+            }
+            if(index>=route.stages.size()){
+                basketCycleDry=mechanisms.fired==shotBase;
+                index=route.basketRecoveryIndex;
+            }
+            if(index==route.basketRecoveryIndex){
+                // The opening Basket 1 and later full batches may still be in flight.
+                // Leave time for the flight, the damped hinge and the roll-out.
+                boolean opening=stage==route.stages.get(1);
+                basketSettleSeconds=opening&&route.basketOne()?4.8:0;
+                basketSearchSeconds=basketCycleDry||opening&&!route.basketOne()?2.0:5.7;
+            }
+        }
         if(index>=route.stages.size()){
             if(route.partnerOpener())finish("Holding inner lane for TeleOp");
             else beginPark();
@@ -149,9 +174,16 @@ public abstract class ThirtySecondAuto extends OpMode {
             vision=garden.status;report();return;
         }
         if(stage.action()==CycleRoute.Action.VISION_COLLECT||stage.action()==CycleRoute.Action.VISION_NECTAR){
+            if(route.basketTeam()&&now-stageStart<basketSettleSeconds){
+                follower.hold(stage.pose());
+                vision="Waiting for the opening spill to settle";
+                report();return;
+            }
             boolean collected=collector.update(follower,mechanisms,camera.getLatestResult(),VisionRules.POLLEN_PIPELINE,route.blue,stage.count(),now);
             vision=collector.status+"; attempts "+collector.attempts;
-            if(collected||now-stageStart>stage.limit())next();
+            // Let a just-fired batch settle or dump before deciding the quadrant is empty.
+            boolean waitForSpill=route.basketTeam()&&collector.attempts==0&&now-stageStart<basketSearchSeconds;
+            if((collected&&!waitForSpill)||now-stageStart>stage.limit())next();
             report();return;
         }
         double distance=Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y());
@@ -211,7 +243,7 @@ public abstract class ThirtySecondAuto extends OpMode {
                 mechanisms.close();vision="Waiting for released balls to reach the floor";
                 LLResult floor=camera.getLatestResult();
                 boolean groundTarget=false;
-                if(SpillCollector.fresh(floor,VisionRules.POLLEN_PIPELINE))for(com.qualcomm.hardware.limelightvision.LLResultTypes.DetectorResult blob:SpillCollector.pollen(floor)){
+                if(SpillCollector.fresh(floor,VisionRules.POLLEN_PIPELINE))for(LLResultTypes.DetectorResult blob:SpillCollector.pollen(floor)){
                     double[] xy=SpillCollector.project(blob.getTargetXDegrees(),blob.getTargetYDegrees(),p,SpillCollector.BALL_RADIUS);
                     if(xy!=null&&xy[0]*(route.blue?-1:1)<-.05){groundTarget=true;break;}
                 }
@@ -225,7 +257,7 @@ public abstract class ThirtySecondAuto extends OpMode {
             }
         }
         if(!done&&now-stageStart>stage.limit()){
-            if(stage.action()==CycleRoute.Action.WAIT_TIP||bonusPickup)beginPark();
+            if(stage.action()==CycleRoute.Action.WAIT_TIP||bonusPickup||route.basketTeam()&&!parking)beginPark();
             else finish("Stage timeout: "+stage.name());
         }
         report();
@@ -282,7 +314,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         shotStatus=String.format(java.util.Locale.US,"v %.2f -> %.2f, remaining %.2f m, aim %.1f deg, RPM ticks %.0f/%.0f, valid %s, feed %s",speed,futureSpeed,current.remaining(),Math.toDegrees(Math.atan2(Math.sin(releasePose.heading()-h),Math.cos(releasePose.heading()-h))),mechanisms.speed(),movingSolution==null?0:movingSolution.ticks(),direct!=null,permit);
         if(complete&&arrived){next();return;}
         if(now-stageStart>stage.limit()){
-            if(route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
+            if(route.basketTeam()||route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
             else finish("Rolling stage timeout: "+stage.name());
         }
     }
@@ -293,6 +325,14 @@ public abstract class ThirtySecondAuto extends OpMode {
         return Math.abs(x)+ex<1.790&&Math.abs(y)+ey<1.790&&x*(route.blue?-1:1)+ex<-.002;
     }
     private boolean rollingVisionReady(double now,Pose pose,boolean near,boolean arrived){
+        if(route.basketTeam()){
+            int first=route.blue?(near?42:38):(near?34:30);
+            boolean raised=tags.readyRaisedCell(first,pose,route.blue,near);
+            vision=tags.status;
+            if(!raised){raisedCellSince=-1;return false;}
+            if(raisedCellSince<0)raisedCellSince=now;
+            return now-raisedCellSince>=.65;
+        }
         if(route.lineup!=CycleRoute.Lineup.PARTNER||near)return visionReady();
         if(!arrived){
             vision="Approaching partner shot position";

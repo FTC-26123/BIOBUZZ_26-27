@@ -29,7 +29,7 @@ public final class CycleRoute {
             return alliancePose(blue, -1.55, .90, 90);
         }
     }
-    public enum Lineup { LEGACY, SOLO, PARTNER }
+    public enum Lineup { LEGACY, SOLO, PARTNER, BASKET_ONE_TEAM, BASKET_TWO_TEAM }
     public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, ROLL_NEAR, ROLL_FAR, PARK }
     public enum Strategy { FLOWERS, TIPPED_POLLEN, ADAPTIVE_ALL, RUSH_TIPS, NO_FLOWERS }
     public static final class Stage {
@@ -57,6 +57,9 @@ public final class CycleRoute {
     public final Pose initial;
     public final Pose park;
     public int bonusIndex;
+    public int basketRecoveryIndex;
+    public int basketFallbackIndex;
+    public int basketReloadIndex;
     public final List<Stage> stages = new ArrayList<>();
     public CycleRoute(Start start) {
         this(start,Strategy.FLOWERS);
@@ -75,7 +78,14 @@ public final class CycleRoute {
             if(rushStyle())startX=-.36;
             else if(innerStart)startX=-.32385;
         }
-        initial=lineup==Lineup.LEGACY?pose(startX,-1.564259,90):start.wallPose();
+        initial=lineup==Lineup.BASKET_TWO_TEAM?pose(-.90,1.564259,-90)
+            :lineup==Lineup.LEGACY?pose(startX,-1.564259,90):start.wallPose();
+        if(basketTeam()){
+            // Split the loading zone along its length so both robots can park.
+            park=pose(-1.55,basketOne()?.66:1.17,90);
+            basketTeamRoute();
+            return;
+        }
         park=partnerOpener()?pose(-.36,-1.48,90)
             :rushStyle()?start.loadingZone():pose(-1.42,strategy==Strategy.ADAPTIVE_ALL?.56:.9144,180);
         if(lineup==Lineup.PARTNER){partner(startX);return;}
@@ -136,7 +146,7 @@ public final class CycleRoute {
     private void transit(String name,boolean near,int count){
         double x=-1.13, y=near?-.85:.85; // 86-degree reachable outer intake approach.
         double h=Math.toDegrees(Math.atan2((near?-.392176:.392176)-y,-.32385-x));
-        double limit=lineup==Lineup.PARTNER?9.5:7.5;
+        double limit=basketTeam()?30:lineup==Lineup.PARTNER?9.5:7.5;
         stages.add(new Stage(name,pose(x,y,h),near?Action.ROLL_NEAR:Action.ROLL_FAR,count,limit,false));
     }
     private void rush(double startX){
@@ -162,12 +172,39 @@ public final class CycleRoute {
         add("Collect teleop preload",-1.50,-1.564259,180,Action.SWEEP,0,2.0);
     }
     public boolean rushStyle(){return strategy==Strategy.RUSH_TIPS||strategy==Strategy.NO_FLOWERS;}
+    public boolean basketTeam(){
+        return lineup==Lineup.BASKET_ONE_TEAM||lineup==Lineup.BASKET_TWO_TEAM;
+    }
+    public boolean basketOne(){return lineup==Lineup.BASKET_ONE_TEAM;}
     public boolean partnerOpener(){
         return lineup==Lineup.PARTNER&&innerStart;
     }
 
     public boolean avoidFrame(){
         return lineup!=Lineup.LEGACY||strategy==Strategy.NO_FLOWERS;
+    }
+
+    private void basketTeamRoute(){
+        boolean near=basketOne();
+        int end=near?-1:1;
+        Action fire=near?Action.ROLL_NEAR:Action.ROLL_FAR;
+        String basket=near?"Basket 1":"Basket 2";
+        add("Clear starting wall",near?-.36:-.90,1.43*end,-90*end,Action.MOVE,0,3);
+        add("Open "+basket,near?-.36:-1.13,near?-1.43:.85,near?90:-29,fire,near?3:4,near?14:30);
+        basketRecoveryIndex=stages.size();
+        // View the full wall-end spill lane after the dumped pollen rolls away from the frame.
+        add("Look for "+basket+" spill",-1.12,1.42*end,22*end,Action.MOVE,0,3);
+        add("Recover local loose pollen with Limelight",-1.12,1.42*end,22*end,Action.VISION_COLLECT,4,8.5);
+        basketFallbackIndex=stages.size();
+        if(near){
+            add("View local garden pollen",-1.10,-1.35,210,Action.MOVE,0,3);
+            add("Collect local garden fallback",-1.50,-1.564259,180,Action.SWEEP,4,3);
+        }else{
+            add("Collect local pot fallback",-.5942,1.415,90,Action.FLOWER_COLLECT,4,4);
+        }
+        basketReloadIndex=stages.size();
+        transit("Score recovered pollen in "+basket,near,4);
+        bonusIndex=stages.size();
     }
 
     private void partner(double startX){
@@ -222,6 +259,7 @@ public final class CycleRoute {
         double inches=0;Pose from=current;
         for(Pose to:parkingPath(current)){inches+=Math.hypot(to.x()-from.x(),to.y()-from.y());from=to;}
         // Include braking the fast pass, turning, and settling inside the loading zone.
+        if(basketTeam())return 1.90+inches*.0254/1.20;
         return rushStyle()?1.15+inches*.0254/1.20:strategy==Strategy.ADAPTIVE_ALL?1.45+inches*.0254/1.20:1.05+inches*.0254/.85;
     }
     private Pose pose(double x,double y,double heading) {

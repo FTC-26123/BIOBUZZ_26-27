@@ -33,13 +33,18 @@ public abstract class ParkOnlyAuto extends OpMode {
     }
 
     @Override public void init() {
-        CycleRoute.Start start = startingPoint();
         follower = org.firstinspires.ftc.teamcode.pedro.Constants.create(hardwareMap);
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        prepareStart();
+    }
+
+    protected final void prepareStart() {
+        CycleRoute.Start start = startingPoint();
         Pose wall = start.wallPose();
         follower.setPose(wall);
         follower.update();
         remaining = waypoints(start).iterator();
+        done = false;
         telemetry.addData("Place robot (m)", "%.3f, %.3f", wall.x() * .0254, wall.y() * .0254);
         telemetry.addData("Pedro heading (deg)", Math.toDegrees(wall.heading()));
         telemetry.addData("Auto result", "Ready to park");
