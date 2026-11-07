@@ -16,7 +16,7 @@ public class Intake {
     private CRServo transferServo;
 
     // ---------------------- Default Motor & Servo Power Constants ----------------------
-    public static final double INTAKE_POWER = 1;
+    public static final double INTAKE_POWER = 0.80;
     public static final double INTAKE_IN = -INTAKE_POWER;
     public static final double INTAKE_OUT = INTAKE_POWER;
     public static final double WINDMILL_POWER = 1.0;
