@@ -182,6 +182,14 @@ public final class CycleRoute {
 
     private void floorRoute(){
         add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
+        if(lineup==Lineup.FOUR_PARK){
+            // Pedro visualizer uses bottom-left inches on a 141.5-inch field.
+            double x=(57.05-70.75)*.0254,y=(28.48-70.75)*.0254;
+            double heading=Math.toDegrees(Math.atan2(-.392176-y,-.32385-x));
+            // Add directly: the legacy add(FIRE) helper replaces the requested position.
+            stages.add(new Stage("Shoot four with team Shooter default",pose(x,y,heading),Action.FIRE,4,10));
+            bonusIndex=stages.size();return;
+        }
         add("Shoot four preloads into Basket 1",-.36,-1.43,90,Action.ROLL_NEAR,4,12);
         if(lineup==Lineup.FOUR_RECOVER_TEAM){
             add("Move forward toward the spill",-.36,-1.18,90,Action.MOVE,0,3);

@@ -9,7 +9,7 @@ The Driver Station offers four programs under **26123 Flowerless**.
 
 The four selectable programs are flowerless. Recovery programs are unregistered because the only camera detects AprilTags, not pollen. Previous flower and recovery source remains available but is absent from the autonomous menu.
 
-A confirmed four-shot opening is required before the shooting program parks. Feeding requires Basket 1 raised observations for 0.65 seconds, a fresh expected-basket Limelight pose, and a valid 86-degree trajectory. Missing vision yields to the parking reserve. The scoring deadline is 29.7 seconds.
+The fixed shooting routines call the current team's `Shooter` and `Intake` classes without changing either subsystem. Shooter's default preset is 1500 encoder ticks/second. Its existing PIDF, battery compensation and speed hysteresis control the flywheel and feeding. Autonomous starts it only after arriving at the shooting pose; movement and parking keep the mechanisms stopped. Four estimated releases or a 10-second timeout begin parking, with a 29.7-second hard deadline.
 
 See the [official CAD setup map and starting coordinates](AUTONOMOUS-LINEUP.md). Park Only uses a different wall mark from the shooting routines and the former Basket 2 start.
 
@@ -26,25 +26,20 @@ Use the team's tuned org.firstinspires.ftc.teamcode.pedro.Constants follower and
 | Intake motor | intake | REVERSE, negative inward power |
 | Windmill motor | windmill | FORWARD, positive power during permitted shooting pulses |
 | Transfer CRServo | transferServo | Team Intake.TRANSFER_SERVO_POWER, currently -1 inward |
-| Limelight | limelight | AprilTag pipeline 1 throughout autonomous |
 
 Collection runs the roller and transfer CRServo while holding the windmill. A permitted shot adds windmill feed. Cancellation, completed pulses, parking, and Stop clear feed outputs. Flywheel load events acknowledge estimated ball releases.
 
-Park Only initializes the drivetrain and Pinpoint. The two shooting programs also initialize the mechanisms and Limelight. Neither Park Only program requires a camera.
+Park Only initializes the drivetrain and Pinpoint. The two shooting programs also initialize the mechanisms. None of the four programs initializes a Limelight or webcam.
 
-## Vision and calibration
+## Fixed-position shooting
 
-There is no webcam. Configure Limelight AprilTag pipeline 1 for the field's printed tags, with 3D target pose enabled and the actual 3.25-inch tag size. The active autonomous programs never request neural pipeline 7.
+Red shoots from visualizer (57.05, 28.48) inches. Blue shoots from (84.45, 113.02), using a 180-degree alliance rotation. The robot's field-centered positions are (-13.70, -42.27) and (+13.70, +42.27) inches. The fixed heading points at Basket 1. See the lineup guide for starts and setup map.
 
-`LimelightMount` records the approximate measured lens height of 10 inches (0.254 m), forward offset of 7 inches (0.1778 m) from the Pinpoint pose origin, zero lateral offset, and upward pitch of 43 degrees. Confirm these physical measurements before tuning shots. The camera pitch is separate from the ball's 86-degree launch elevation.
+The 86-degree launch angle is a physical configuration. Autonomous does not use a ballistic solver, tag range, or camera mount to choose shooting speed. It uses Shooter's existing 1500 ticks/second default. Tune the subsystem on the robot as usual.
 
-Shooting uses the expected basket's fresh target pose in camera space. The code removes camera pitch, subtracts the rotated camera-to-origin translation, accounts for each tag's board offset, and compensates for capture age using Pinpoint velocity, acceleration, and yaw rate. Pinpoint continues to drive the paths. These axes follow [Limelight's coordinate documentation](https://docs.limelightvision.io/docs/docs-limelight/pipeline-apriltag/apriltag-coordinate-systems).
+`PreloadShotCounter` estimates release events using intake encoder transport, a previously recovered flywheel, a speed dip and minimum spacing. It cannot guarantee physical inventory without a ball sensor. No detected load does not count as a ball. Sustained low speed cannot repeatedly count the same dip. Stop, parking, lost shooting position, localization faults and timeouts stop Shooter and all Intake outputs.
 
-Limelight also verifies the basket's height before feeding. Basket 1 uses red tags 34–37 or blue 42–45. Missing, stale, wrong-pipeline, wrong-basket, lowered, or inconsistent observations block feeding. Estimates more than 0.45 m from Pinpoint are rejected. Configure and use **26123 Limelight AprilTag Check** for a camera-only diagnostic that commands no motors.
-
-The shooting solver uses the measured 86-degree elevation. Muzzle height, projectile drag and slip, flywheel response, feeder travel, motor encoder scale, and load thresholds need physical measurements. Transfer startup delay is currently estimated at 35 ms. Recalibrate transport timing for the current windmill and CRServo hardware. The single-ball pulse controller uses intake encoder travel and flywheel load feedback.
-
-Each Team role pursues pollen within its own alliance-normalized quadrant. Pickup approaches and parking route around the whole metal frame with the existing swept-body allowance. Establish field dimensions and tracking margin on the physical robot.
+Legacy unregistered autonomous helpers remain in the repository; the four menu entries use `FixedShotParkAuto` or `ParkOnlyAuto`, with no camera initialization.
 
 ## Verification scope
 
@@ -52,6 +47,6 @@ Wall pickup returns retreat to a 1.42 m inset while retaining the pickup heading
 
 The FTC Android app build checks the four registered autonomous OpModes and their SDK/Pedro interfaces. Standalone feeder, flywheel, and vision contract checks run through tools/auton/check-models.ps1.
 
-The 53 synthetic Limelight mount checks cover 43-degree pitch, 10-inch height, 7-inch forward translation, both alliances and baskets, capture latency, acceleration, raised/lowered observations, invalid frames, and range changing shooting power. The swept-chassis path checks and Android build also pass. These are software and geometry checks; physical autonomous trials remain required.
+The 21 fixed-shot checks cover the requested Red coordinates, exact Blue rotation, stationary shooting stage, parking, and release counting under feeding, no-load and stalled-transport scenarios. Updated swept-chassis checks pass. The Android build compiles against the latest main-branch Shooter and Intake implementation.
 
-Only Red/Blue Basket 1 Shoot 4 and Park and Red/Blue Park Only are registered. Driver TeleOp and Pedro constants are unchanged.
+Only Red/Blue Basket 1 Shoot 4 and Park and Red/Blue Park Only are registered. Driver TeleOp, Shooter, Intake and Pedro constants are unchanged relative to the latest main branch. Physical field trials are required.
