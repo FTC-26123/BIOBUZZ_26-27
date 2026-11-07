@@ -4,10 +4,11 @@ Run run-garden-park-sim.ps1 first; it exports the actual Java route data.
 import csv
 import json
 import math
+import sys
 from pathlib import Path
 
 routes = {}
-for name, phase, x, y, heading in csv.reader(Path('build/garden-park-routes.tsv').read_text().splitlines(), delimiter='\t'):
+for name, phase, x, y, heading in csv.reader(Path(sys.argv[1] if len(sys.argv)>1 else 'build/garden-park-routes.tsv').read_text().splitlines(), delimiter='\t'):
     routes.setdefault(name, []).append((phase, float(x) + 70.75, float(y) + 70.75, float(heading)))
 output = Path('docs/pedro')
 output.mkdir(exist_ok=True)

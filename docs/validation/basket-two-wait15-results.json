@@ -1,0 +1,108 @@
+[
+  {
+    "name": "BlueBasket1Shoot4Park",
+    "elapsed": 15.6575812,
+    "simulationTime": 16.49999999999856,
+    "parked": true,
+    "shots": 4,
+    "hits": 3,
+    "held": 0,
+    "garden": 0,
+    "flowers": 0,
+    "nectar": 0,
+    "end": [
+      1.5478089651698623,
+      -0.6411813233106302,
+      -3.1415450414322805
+    ],
+    "stages": [
+      "initializing",
+      "CLEAR",
+      "APPROACH",
+      "SHOOT",
+      "PARK",
+      "DONE"
+    ]
+  },
+  {
+    "name": "BlueBasket2Wait15Shoot4Park",
+    "elapsed": 26.3644348,
+    "simulationTime": 27.080000000003974,
+    "parked": true,
+    "shots": 4,
+    "hits": 4,
+    "held": 0,
+    "garden": 0,
+    "flowers": 0,
+    "nectar": 0,
+    "end": [
+      1.549126466611946,
+      -0.6403300168928532,
+      -0.00033979091372057373
+    ],
+    "stages": [
+      "initializing",
+      "DRIVE",
+      "WAIT",
+      "SHOOT",
+      "PARK",
+      "DONE"
+    ],
+    "firstFeed": 15.0124962,
+    "firstShot": 15.1230197,
+    "partnerTips": 1
+  },
+  {
+    "name": "RedBasket1Shoot4Park",
+    "elapsed": 15.7096796,
+    "simulationTime": 16.579999999998602,
+    "parked": true,
+    "shots": 4,
+    "hits": 3,
+    "held": 0,
+    "garden": 0,
+    "flowers": 0,
+    "nectar": 0,
+    "end": [
+      -1.5472656110334078,
+      0.641003519284325,
+      -1.8542817227339256e-06
+    ],
+    "stages": [
+      "initializing",
+      "CLEAR",
+      "APPROACH",
+      "SHOOT",
+      "PARK",
+      "DONE"
+    ]
+  },
+  {
+    "name": "RedBasket2Wait15Shoot4Park",
+    "elapsed": 26.3171013,
+    "simulationTime": 27.100000000003984,
+    "parked": true,
+    "shots": 4,
+    "hits": 4,
+    "held": 0,
+    "garden": 0,
+    "flowers": 0,
+    "nectar": 0,
+    "end": [
+      -1.5498533467817353,
+      0.6402833101181717,
+      -3.141453584901739
+    ],
+    "stages": [
+      "initializing",
+      "DRIVE",
+      "WAIT",
+      "SHOOT",
+      "PARK",
+      "DONE"
+    ],
+    "firstFeed": 15.0055293,
+    "firstShot": 15.0782035,
+    "partnerTips": 1
+  }
+]

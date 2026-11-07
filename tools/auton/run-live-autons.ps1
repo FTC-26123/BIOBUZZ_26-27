@@ -1,4 +1,5 @@
-param([string]$SimulatorRoot='../sim-publish',[int]$Port=8777)
+param([string]$SimulatorRoot='../sim-publish',[int]$Port=8777,[switch]$PartnerFixture,
+    [string[]]$Autons=@('RedShoot4GardenPark','BlueShoot4GardenPark','RedBasket1Shoot4Park','BlueBasket1Shoot4Park'))
 $ErrorActionPreference='Stop'
 $repo=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Push-Location $repo
@@ -12,7 +13,7 @@ try {
     $source=Join-Path $repo 'TeamCode/src/main/java'
     $team='org/firstinspires/ftc/teamcode'
     $files=@(Get-ChildItem (Join-Path $source "$team/Auton") -Filter '*.java' -File)
-    foreach($name in @('CycleRoute','FrameClearance','GardenParkRoute','GardenParkAuto','FixedShotParkAuto','ParkOnlyAuto','FeederModel','PreloadShotCounter')) {
+    foreach($name in @('CycleRoute','FrameClearance','GardenParkRoute','GardenParkAuto','FixedShotParkAuto','ParkOnlyAuto','FeederModel','PreloadShotCounter','DelayedBasketTwoRoute','DelayedBasketTwoAuto')) {
         $files+=Get-Item (Join-Path $source "$team/Auton/cycles/$name.java")
     }
     foreach($name in @('Intake','Shooter')){$files+=Get-Item (Join-Path $source "$team/subsystems/$name.java")}
@@ -38,13 +39,18 @@ try {
     New-Item -ItemType Directory -Force (Split-Path -Parent $adapter) | Out-Null
     Set-Content -LiteralPath $adapter -Value $bot
     $compileFiles+=$adapter
+    $application='virtual_robot.controller.VirtualRobotApplication'
+    if($PartnerFixture){
+        $compileFiles+=(Resolve-Path 'tools/auton/fixtures/DelayedBasketTwoFixture.java').Path
+        $application='virtual_robot.controller.DelayedBasketTwoFixture'
+    }
     $argsFile=Join-Path $run 'sources.args'
     $compileFiles | ForEach-Object {'"'+$_.Replace('\','/')+'"'} | Set-Content $argsFile
     & "$sim/runtime/bin/javac.exe" --module-path "$sim/vendor/javafx" --add-modules 'javafx.controls,javafx.fxml,javafx.swing,jdk.httpserver' -cp "$active;$sim/lib/*" -d $classes "@$argsFile"
     if($LASTEXITCODE){throw 'Robot/simulator compilation failed'}
     $cp="$classes;$active;$sim/Controller/src;$sim/TeamCode/src;$sim/lib/*"
     $taskProcess=Start-Process -FilePath "$sim/runtime/bin/java.exe" -WorkingDirectory $run -WindowStyle Hidden -PassThru `
-        -ArgumentList @("-Dbiobuzz.port=$Port",'--module-path',('"'+$sim+'/vendor/javafx"'),'--add-modules','javafx.controls,javafx.fxml,javafx.swing,jdk.httpserver','-cp',('"'+$cp+'"'),'virtual_robot.controller.VirtualRobotApplication','--studio','--no-browser','--hidden') `
+        -ArgumentList @("-Dbiobuzz.port=$Port",'--module-path',('"'+$sim+'/vendor/javafx"'),'--add-modules','javafx.controls,javafx.fxml,javafx.swing,jdk.httpserver','-cp',('"'+$cp+'"'),$application,'--studio','--no-browser','--hidden') `
         -RedirectStandardOutput "$run/server.log" -RedirectStandardError "$run/server-error.log"
     $ready=$false
     for($attempt=0;$attempt -lt 60;$attempt++){
@@ -55,7 +61,7 @@ try {
     }
     if(!$ready){throw 'Simulator did not become ready'}
     $env:AUTON_TEST_PORT="$Port"
-    foreach($name in @('RedShoot4GardenPark','BlueShoot4GardenPark','RedBasket1Shoot4Park','BlueBasket1Shoot4Park')) {
+    foreach($name in $Autons) {
         node tools/auton/live-auton-check.cjs $name $run
         if($LASTEXITCODE){throw "Actual autonomous check failed: $name"}
     }

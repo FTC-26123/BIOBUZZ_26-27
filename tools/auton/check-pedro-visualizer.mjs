@@ -9,11 +9,11 @@ registerHooks({resolve(specifier,context,next){
 const reference=resolve(process.argv[2]||'build/pedro-visualizer-reference');
 const {findCollisions}=await import(pathToFileURL(reference+'/src/model/collision.ts'));
 const {calculatePathTime}=await import(pathToFileURL(reference+'/src/utils/timeCalculator.ts'));
-for(const color of ['Red','Blue']){
- const doc=JSON.parse(readFileSync('docs/pedro/'+color+'GardenPark.pp.json','utf8'));
+for(const name of process.argv.length>3?process.argv.slice(3):['RedGardenPark','BlueGardenPark']){
+ const doc=JSON.parse(readFileSync('docs/pedro/'+name+'.pp.json','utf8'));
  const prediction=calculatePathTime(doc.startPoint,doc.lines,doc.robot,doc.sequence);
  const collisions=findCollisions(doc,prediction.timeline,{step:.20,angleStep:1});
- console.log(color,'official Pedro visualizer engine:',doc.lines.length,'segments,',collisions.length,'collision intervals');
+ console.log(name,'official Pedro visualizer engine:',doc.lines.length,'segments,',collisions.length,'collision intervals');
  if(collisions.length){console.log(JSON.stringify(collisions));process.exitCode=1;}
  const bad=structuredClone(doc);bad.lines=[{kind:'atomic',id:'negative-control',color:'#ff0000',endPoint:{x:70.75,y:70.75},controlPoints:[],heading:{type:'constant',degrees:0}}];bad.sequence=[{kind:'path',lineId:'negative-control'}];
  const negative=findCollisions(bad,calculatePathTime(bad.startPoint,bad.lines,bad.robot,bad.sequence).timeline,{step:.2,angleStep:1});

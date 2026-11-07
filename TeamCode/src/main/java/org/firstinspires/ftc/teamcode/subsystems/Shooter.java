@@ -220,6 +220,22 @@ public class Shooter {
     // Main update loop - call every loop iteration
     // =====================================================================
 
+    /** Continue the existing velocity PIDF without feeding. Call start() before using this.
+     * Used by delayed autonomous: spin up while all three Intake outputs stay stopped.
+     * Normal update() and all existing TeleOp behavior are unchanged. */
+    public void updateSpinupOnly() {
+        if (intake != null) intake.stop();
+        if ("Starting".equals(shooterStatus) || "Shooting".equals(shooterStatus)) {
+            if (getTargetLaunchPower() <= 0) stop();
+            else {
+                updatePIDF();
+                shooterStatus = "Starting";
+            }
+        } else {
+            update(); // Off/Stopping only; neither state permits feeding.
+        }
+    }
+
     public void update() {
         switch (shooterStatus) {
             case "Off":
