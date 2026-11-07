@@ -182,6 +182,14 @@ public final class CycleRoute {
 
     private void floorRoute(){
         add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
+        if(lineup==Lineup.FOUR_PARK){
+            // Pedro visualizer uses bottom-left inches on a 141.5-inch field.
+            double x=(57.05-70.75)*.0254,y=(28.48-70.75)*.0254;
+            double heading=Math.toDegrees(Math.atan2(-.392176-y,-.32385-x));
+            // Add directly: the legacy add(FIRE) helper replaces the requested position.
+            stages.add(new Stage("Shoot four with team Shooter default",pose(x,y,heading),Action.FIRE,4,10));
+            bonusIndex=stages.size();return;
+        }
         add("Shoot four preloads into Basket 1",-.36,-1.43,90,Action.ROLL_NEAR,4,12);
         if(lineup==Lineup.FOUR_RECOVER_TEAM){
             add("Move forward toward the spill",-.36,-1.18,90,Action.MOVE,0,3);
@@ -230,7 +238,7 @@ public final class CycleRoute {
     private void partner(double startX){
         add("Clear starting wall in assigned lane",startX,-1.43,90,Action.MOVE,0,2);
         if(partnerOpener()){
-            // Keep the near board in the webcam view at the steep launch angle.
+            // Keep the near board in the camera view at the steep launch angle.
             add("Open near hive for partner",-.36,-1.43,90,Action.ROLL_NEAR,3,6);
             add("Return to inner handoff spot",-.36,-1.48,90,Action.MOVE,0,3);
         }else{

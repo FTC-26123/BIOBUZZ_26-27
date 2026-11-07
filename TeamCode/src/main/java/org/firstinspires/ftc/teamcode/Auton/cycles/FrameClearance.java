@@ -21,6 +21,33 @@ public final class FrameClearance {
     }
     /** Visibility graph around the alliance-side outer corners; never uses the center gap. */
     public static List<Pose> path(Pose from,Pose to,boolean blue){
+        double turn=Math.atan2(Math.sin(to.heading()-from.heading()),Math.cos(to.heading()-from.heading()));
+        if(Math.abs(turn)<1e-6)return bypass(from,to,blue);
+        // Retreat without turning before changing heading next to a field wall.
+        // Likewise finish the turn inboard before the final wall pickup approach.
+        double limit=1.42;
+        Pose innerFrom=new Pose(Math.max(-limit,Math.min(limit,from.x()*.0254))/.0254,
+            Math.max(-limit,Math.min(limit,from.y()*.0254))/.0254,from.heading());
+        Pose innerTo=new Pose(Math.max(-limit,Math.min(limit,to.x()*.0254))/.0254,
+            Math.max(-limit,Math.min(limit,to.y()*.0254))/.0254,to.heading());
+        boolean retreat=Math.hypot(innerFrom.x()-from.x(),innerFrom.y()-from.y())>1e-6;
+        boolean approach=Math.hypot(innerTo.x()-to.x(),innerTo.y()-to.y())>1e-6;
+        List<Pose> result=new ArrayList<>();
+        if(retreat){
+            if(!segment(from.x()*.0254,from.y()*.0254,innerFrom.x()*.0254,innerFrom.y()*.0254))
+                throw new IllegalArgumentException("Wall retreat enters metal-frame keepout");
+            result.add(innerFrom);
+            result.add(new Pose(innerFrom.x(),innerFrom.y(),to.heading()));
+        }
+        result.addAll(bypass(retreat?innerFrom:from,approach?innerTo:to,blue));
+        if(approach){
+            if(!segment(innerTo.x()*.0254,innerTo.y()*.0254,to.x()*.0254,to.y()*.0254))
+                throw new IllegalArgumentException("Wall approach enters metal-frame keepout");
+            result.add(to);
+        }
+        return result;
+    }
+    private static List<Pose> bypass(Pose from,Pose to,boolean blue){
         double sign=blue?-1:1;
         double[][] points={{from.x()*.0254,from.y()*.0254},{to.x()*.0254,to.y()*.0254},{-1.13*sign,-1.05*sign},{-1.13*sign,1.05*sign}};
         if(!clear(points[0][0],points[0][1])||!clear(points[1][0],points[1][1]))throw new IllegalArgumentException("Target enters metal-frame keepout");
