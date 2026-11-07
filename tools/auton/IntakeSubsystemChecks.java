@@ -1,0 +1,43 @@
+import com.qualcomm.robotcore.hardware.*;
+import com.qualcomm.robotcore.hardware.configuration.MotorType;
+import java.lang.reflect.Proxy;
+import org.firstinspires.ftc.teamcode.Auton.cycles.CycleMechanisms;
+import org.firstinspires.ftc.teamcode.subsystems.Intake;
+
+/** Exercise the legacy autonomous helper against the existing Intake and SDK motor stand-ins. */
+public final class IntakeSubsystemChecks {
+    private static int checks;
+    private static void check(boolean ok,String why){checks++;if(!ok)throw new AssertionError(why);}
+    public static void main(String[] args){
+        HardwareMap hw=new HardwareMap();hw.setActive(true);
+        DcMotorExImpl roller=new DcMotorExImpl(MotorType.Gobilda6000,new DcMotorControllerImpl(),0);
+        DcMotorExImpl windmill=new DcMotorExImpl(MotorType.Gobilda192,new DcMotorControllerImpl(),0);
+        CRServoImpl transfer=new CRServoImpl(360);
+        // A recovered flywheel allows the test to exercise the feed permission transition.
+        DcMotorEx flywheel=(DcMotorEx)Proxy.newProxyInstance(DcMotorEx.class.getClassLoader(),new Class<?>[]{DcMotorEx.class},
+            (proxy,method,values)->{
+                if(method.getName().equals("getVelocity"))return CycleMechanisms.SPEED;
+                if(method.getName().equals("hashCode"))return System.identityHashCode(proxy);
+                if(method.getName().equals("equals"))return proxy==values[0];
+                if(method.getName().equals("toString"))return "Recovered flywheel fixture";
+                return null;
+            });
+        hw.put("intake",roller);hw.put("windmill",windmill);hw.put("transferServo",transfer);hw.put("shooter",flywheel);
+        CycleMechanisms auto=new CycleMechanisms(hw);
+        check(roller.getDirection()==DcMotorSimple.Direction.REVERSE,"subsystem roller direction");
+        check(windmill.getDirection()==DcMotorSimple.Direction.FORWARD,"subsystem windmill direction");
+        check(roller.getMode()==DcMotor.RunMode.RUN_WITHOUT_ENCODER,"subsystem roller mode");
+        check(windmill.getMode()==DcMotor.RunMode.RUN_WITHOUT_ENCODER,"subsystem windmill mode");
+        auto.collect(true);
+        check(roller.getPower()==Intake.INTAKE_IN,"uses current subsystem intake power");
+        check(transfer.getPower()==Intake.TRANSFER_SERVO_POWER,"uses subsystem inward transfer");
+        check(windmill.getPower()==0,"collection keeps feeder off");
+        auto.feed(0,true);auto.feed(.13,true);
+        check(windmill.getPower()==Intake.WINDMILL_IN,"permitted feeding starts subsystem windmill");
+        auto.close();
+        check(roller.getPower()==0&&windmill.getPower()==0&&transfer.getPower()==0,"closing stops every intake actuator");
+        auto.collect(true);auto.stop();
+        check(roller.getPower()==0&&windmill.getPower()==0&&transfer.getPower()==0,"stop cancels collection");
+        System.out.println("PASS "+checks+" existing Intake initialization, collection, feeder and shutdown checks");
+    }
+}

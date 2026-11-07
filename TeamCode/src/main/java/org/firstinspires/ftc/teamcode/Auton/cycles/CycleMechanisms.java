@@ -5,10 +5,9 @@ import com.qualcomm.robotcore.hardware.*;
 /** Nonblocking flywheel recovery and single-shot windmill pulses. No simulator state access. */
 public final class CycleMechanisms {
     private final DcMotorEx flywheel;
-    private final DcMotorEx intake;
-    private final DcMotor windmill;
+    private final DcMotorEx intake; // Encoder read only; the existing Intake subsystem owns all actuator commands.
+    private final org.firstinspires.ftc.teamcode.subsystems.Intake intakeSubsystem=new org.firstinspires.ftc.teamcode.subsystems.Intake();
     private final FeederModel feeder=new FeederModel();
-    private final CRServo transferServo;
     private double readySince=-1, opened=-1, lastShot=-10;
     private boolean armed;
     private boolean awaitingLoad;
@@ -23,15 +22,9 @@ public final class CycleMechanisms {
     public static final double SPEED=2100;
     public CycleMechanisms(HardwareMap hw) {
         flywheel=hw.get(DcMotorEx.class,"shooter"); intake=hw.get(DcMotorEx.class,"intake");
-        windmill=hw.get(DcMotor.class,"windmill"); transferServo=hw.get(CRServo.class,"transferServo");
-        intake.setDirection(DcMotorSimple.Direction.REVERSE);
+        intakeSubsystem.init(hw);
         flywheel.setDirection(DcMotorSimple.Direction.FORWARD);
         flywheel.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        intake.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        windmill.setDirection(DcMotorSimple.Direction.FORWARD);
-        windmill.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        windmill.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         stop();
     }
     public double intakeSpeed(){return intake.getVelocity();}
@@ -54,9 +47,8 @@ public final class CycleMechanisms {
     public void aim(double ticks){if(Math.abs(targetSpeed-ticks)>3){if(Math.abs(targetSpeed-ticks)>20)readySince=-1;targetSpeed=ticks;}}
     public void spin(){if(opened<0)requestVelocity(targetSpeed);}
     public void collect(boolean on){
-        intake.setPower(on?-FeederModel.POWER:0);
-        transferServo.setPower(on?org.firstinspires.ftc.teamcode.subsystems.Intake.TRANSFER_SERVO_POWER:0);
-        windmill.setPower(0);
+        if(on)intakeSubsystem.start();else intakeSubsystem.stop();
+        intakeSubsystem.stopWindmill();
     }
     public void close(){collect(false);opened=-1;armed=awaitingLoad=false;readySince=-1;feeder.cancel();}
     private void continuePulse(double now,boolean permit){
@@ -86,7 +78,7 @@ public final class CycleMechanisms {
         if(Math.abs(velocity-targetSpeed)<25){if(readySince<0)readySince=now;}
         else readySince=-1;
         if(readySince>=0&&now-readySince>.12&&now-lastShot>.4&&now>=retryAt){
-            opened=now;feeder.begin(now,lastShot);armed=true;armedSpeed=targetSpeed;collect(true);windmill.setPower(org.firstinspires.ftc.teamcode.subsystems.Intake.WINDMILL_IN);
+            opened=now;feeder.begin(now,lastShot);armed=true;armedSpeed=targetSpeed;collect(true);intakeSubsystem.startWindmill();
         }
     }
     /** Predictive feeding: trajectory validity replaces the fixed speed/settle window.
@@ -107,7 +99,7 @@ public final class CycleMechanisms {
         requestVelocity(feedCommand(now));
         if(!permit){collect(prepare);return;}
         // Start transport during recovery/spacing, rather than waiting and then paying transit again.
-        if(now-lastShot>.07&&now>=retryAt){opened=now;feeder.begin(now,lastShot);armed=true;armedSpeed=velocity;collect(true);windmill.setPower(org.firstinspires.ftc.teamcode.subsystems.Intake.WINDMILL_IN);}
+        if(now-lastShot>.07&&now>=retryAt){opened=now;feeder.begin(now,lastShot);armed=true;armedSpeed=velocity;collect(true);intakeSubsystem.startWindmill();}
     }
     public void stop(){requestVelocity(0);close();}
 }
