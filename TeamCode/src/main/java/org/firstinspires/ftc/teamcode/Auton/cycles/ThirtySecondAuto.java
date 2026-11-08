@@ -26,6 +26,7 @@ public abstract class ThirtySecondAuto extends OpMode {
     private double velocityTime=-1,lastVx,lastVy,accelX,accelY;
     private boolean adaptive(){return route.strategy==CycleRoute.Strategy.ADAPTIVE_ALL||route.rushStyle();}
     private double rollingStart=-1;
+    private boolean rollingLate;
     private double plannedReleaseHeading;
     private double plannedTurnRate;
     private TransitPath transitPath;
@@ -135,7 +136,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         }
         mechanisms.target(preparedSpeed);
         shotBase=mechanisms.fired;lastProgress=stageStart;lastX=follower.pose().x();lastY=follower.pose().y();
-        rollingStart=-1;haveRollingAim=false;plannedTurnRate=Double.NaN;emptyBase=mechanisms.emptyPulses;
+        rollingStart=-1;rollingLate=false;haveRollingAim=false;plannedTurnRate=Double.NaN;emptyBase=mechanisms.emptyPulses;
         // Four preloads remain ballistically reachable at this modeled slow diagonal pace.
         boolean gardenOpening=route.gardenMoving()&&stage.action()==CycleRoute.Action.ROLL_NEAR;
         transitPath=new TransitPath(follower.pose(),stage.pose(),route.blue,route.avoidFrame(),
@@ -190,10 +191,14 @@ public abstract class ThirtySecondAuto extends OpMode {
         if(!parking&&!bonusPickup)mechanisms.spin();
         if(stage.action()==CycleRoute.Action.ROLL_NEAR||stage.action()==CycleRoute.Action.ROLL_FAR){rolling(now,p);report();return;}
         if(stage.action()==CycleRoute.Action.GARDEN_STRAFE){
-            follower.hold(gardenStrafe.target(p,stage.pose(),now));mechanisms.collect(true);
-            vision="Timed sideways garden intake; inventory is not sensed";
-            if(gardenStrafe.complete(now))next();
-            else if(now-stageStart>stage.limit())beginPark();
+            // Never park for a missed pickup window: keep correcting onto the lane, widen the capture
+            // window once late, and only the park-reserve check above can end the stage early.
+            boolean late=now-stageStart>stage.limit();
+            Pose designedFrom=index>=2?route.stages.get(index-2).pose():null;
+            follower.hold(gardenStrafe.target(p,designedFrom,stage.pose(),now,late));mechanisms.collect(true);
+            vision=gardenStrafe.skipped()?"Garden pass skipped: no frame-safe lane from here"
+                :late?"Late garden pass: widened capture window":"Timed sideways garden intake; inventory is not sensed";
+            if(gardenStrafe.complete(now)||now-stageStart>stage.limit()+GardenStrafe.GIVE_UP_GRACE_SECONDS)next();
             report();return;
         }
         if(stage.action()==CycleRoute.Action.SWEEP){
@@ -335,7 +340,10 @@ public abstract class ThirtySecondAuto extends OpMode {
         Pose launchFrom=shotPose==null?p:shotPose;
         Pose releasePose=new Pose(launchFrom.x()+dx/.0254,launchFrom.y()+dy/.0254,p.heading()+measured.omega*delay);
         com.pedropathing.math.Velocity releaseVelocity=new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,measured.omega);
-        boolean atDestination=rollingStart>=0&&phase>=transitPath.duration()&&Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y())*.0254<.06;
+        // Garden-moving shots are never abandoned for parking. Once past the stage limit the arrival
+        // window widens so a robot that cannot settle on the exact mark still finishes the batch.
+        if(route.gardenMoving()&&!rollingLate&&now-stageStart>stage.limit())rollingLate=true;
+        boolean atDestination=rollingStart>=0&&phase>=transitPath.duration()&&Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y())*.0254<(rollingLate?.15:.06);
         // A stationary fallback aims for zero yaw, rather than chasing each measured yaw
         // correction and feeding it back into the next heading target. The actual gate below
         // still validates measured translation/yaw at release before opening the feeder.
@@ -391,8 +399,8 @@ public abstract class ThirtySecondAuto extends OpMode {
         mechanisms.feedPredicted(now,permit,fresh&&!complete);
         shotStatus=String.format(java.util.Locale.US,"v %.2f -> %.2f, remaining %.2f m, aim %.1f deg, RPM ticks %.0f/%.0f, valid %s, feed %s",speed,futureSpeed,current.remaining(),Math.toDegrees(Math.atan2(Math.sin(releasePose.heading()-h),Math.cos(releasePose.heading()-h))),mechanisms.speed(),movingSolution==null?0:movingSolution.ticks(),direct!=null,permit);
         if(complete&&arrived){next();return;}
-        if(now-stageStart>stage.limit()){
-            if(route.gardenMoving()||route.floorOnly()||route.basketTeam()||route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
+        if(now-stageStart>stage.limit()&&!route.gardenMoving()){
+            if(route.floorOnly()||route.basketTeam()||route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
             else finish("Rolling stage timeout: "+stage.name());
         }
     }

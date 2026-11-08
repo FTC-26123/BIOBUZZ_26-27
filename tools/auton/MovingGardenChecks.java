@@ -89,6 +89,19 @@ public final class MovingGardenChecks {
             strafe.target(end,end,2);check(!strafe.complete(2.4),"capture dwell required");
             strafe.target(start,end,2.4);check(!strafe.complete(3),"lost endpoint cancels capture dwell");
             strafe.target(end,end,3);check(strafe.complete(3.51),"continuous capture dwell completes");
+            // Recovery: a robot that cannot settle still completes, and an unsafe start never throws.
+            Pose off=new Pose(end.x()+2,end.y(),end.heading());
+            GardenStrafe late=new GardenStrafe();late.target(start,start,end,0,false);
+            late.target(off,start,end,2,false);check(!late.complete(3),"strict window rejects a pose 2 in off");
+            late.target(off,start,end,3,true);check(late.complete(3.51),"late window accepts a pose 2 in off");
+            Pose unsafe=null;
+            for(double x=-70;x<=70&&unsafe==null;x+=5)for(double y=-70;y<=70;y+=5)
+                if(!FrameClearance.segment(x*.0254,y*.0254,end.x()*.0254,end.y()*.0254)){unsafe=new Pose(x,y,end.heading());break;}
+            check(unsafe!=null,"found a start whose direct lane crosses the frame");
+            GardenStrafe recover=new GardenStrafe();Pose lane=recover.target(unsafe,start,end,0,false);
+            check(!recover.skipped()&&Math.abs(lane.x()-start.x())<1e-9,"unsafe start recovers from the designed origin");
+            GardenStrafe skip=new GardenStrafe();skip.target(unsafe,null,end,0,false);
+            check(skip.skipped()&&skip.complete(0),"no safe lane skips the pass instead of throwing");
             check(Double.isFinite(r.parkReserve(end))&&r.parkReserve(end)>0,"parking reserve exists");
             Pose parkedFrom=r.stages.get(5).pose();
             for(Pose waypoint:r.parkingPath(parkedFrom)){
