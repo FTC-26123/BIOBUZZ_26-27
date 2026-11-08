@@ -7,6 +7,7 @@ import java.util.*;
 public final class PathClearanceChecks {
     private static int checks;
     private static void check(boolean ok,String message){checks++;if(!ok)throw new AssertionError(message);}
+    private static CycleRoute r0(CycleRoute.Start s){return new CycleRoute(s,CycleRoute.Strategy.NO_FLOWERS,CycleRoute.Lineup.FOUR_PARK);}
     private static boolean fits(Pose p){
         double half=.2286*(Math.abs(Math.cos(p.heading()))+Math.abs(Math.sin(p.heading())));
         return Math.abs(p.x()*.0254)+half<=1.8 && Math.abs(p.y()*.0254)+half<=1.8;
@@ -23,6 +24,7 @@ public final class PathClearanceChecks {
             from=to;
         }
     }
+    private static List<Pose> sampled(List<AutoPaths.Leg> legs){List<Pose> out=new ArrayList<>();for(AutoPaths.Leg l:legs){List<Pose> s=l.sample(200);out.addAll(s.subList(1,s.size()));}return out;}
     public static void main(String[] args){
         for(CycleRoute.Start start:Arrays.asList(CycleRoute.Start.RED_EAST,CycleRoute.Start.BLUE_WEST)){
             for(CycleRoute.Lineup mode:Arrays.asList(CycleRoute.Lineup.FOUR_PARK,CycleRoute.Lineup.FOUR_RECOVER_TEAM)){
@@ -45,8 +47,9 @@ public final class PathClearanceChecks {
                             verify(scan,FrameClearance.path(scan,pickup,r.blue));
                         }
             }
-            CycleRoute.Start park=start==CycleRoute.Start.RED_EAST?CycleRoute.Start.RED_WEST:CycleRoute.Start.BLUE_EAST;
-            verify(park.wallPose(),ParkOnlyAuto.waypoints(park));
+            CycleRoute.Start park=start; // Park Only starts on the same wall mark as the shooting autons
+            verify(park.wallPose(),sampled(ParkOnlyAuto.legs(park,park.wallPose())));
+            verify(r0(park).shot(),sampled(r0(park).parkingLegs(r0(park).shot())));
         }
         System.out.println("PASS "+checks+" swept chassis, wall retreat, mirrored route and parking checks");
     }

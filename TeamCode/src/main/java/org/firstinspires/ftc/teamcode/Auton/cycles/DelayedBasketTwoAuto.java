@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.Auton.cycles;
 
-import com.pedropathing.api.Paths;
 import com.pedropathing.follower.Follower;
 import com.pedropathing.math.Pose;
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
@@ -23,7 +22,7 @@ public abstract class DelayedBasketTwoAuto extends OpMode {
     private DcMotorEx intakeEncoder;
     private DelayedBasketTwoRoute route;
     private PreloadShotCounter counter;
-    private Iterator<Pose> waypoints;
+    private Iterator<AutoPaths.Leg> waypoints;
     private Pose target;
     private State state=State.DONE;
     private double stableSince=-1,firstFeedAt=-1;
@@ -46,10 +45,10 @@ public abstract class DelayedBasketTwoAuto extends OpMode {
     @Override public void start(){
         timer.reset();counter=new PreloadShotCounter();stableSince=firstFeedAt=-1;
         state=State.DRIVE;result="Aiming for Basket 2";parkingReason="None";
-        shooter.start();waypoints=route.approachPath().iterator();nextWaypoint();
+        shooter.start();waypoints=route.approachLegs(follower.pose()).iterator();nextWaypoint();
     }
     private void nextWaypoint(){
-        target=waypoints.next();Pose from=follower.pose();follower.follow(Paths.line(from,target).linear(from,target));
+        AutoPaths.Leg leg=waypoints.next().from(follower.pose());target=leg.end;follower.follow(leg.path());
     }
     private boolean at(Pose p,Pose goal,double inches,double degrees,double speed){
         double turn=Math.atan2(Math.sin(p.heading()-goal.heading()),Math.cos(p.heading()-goal.heading()));
@@ -62,7 +61,7 @@ public abstract class DelayedBasketTwoAuto extends OpMode {
     }
     private void park(String why){
         shooter.stop();intake.stop();state=State.PARK;result=parkingReason=why;
-        waypoints=route.parkingPath(follower.pose()).iterator();nextWaypoint();
+        waypoints=route.parkingLegs(follower.pose()).iterator();nextWaypoint();
     }
     @Override public void loop(){
         if(state==State.DONE)return;

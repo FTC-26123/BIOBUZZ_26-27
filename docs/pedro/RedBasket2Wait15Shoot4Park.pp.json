@@ -11,14 +11,19 @@
       "id": "RedBasket2Wait15Shoot4Park-0",
       "name": "Aim for Basket 2; feed after 15 seconds",
       "endPoint": {
-        "x": 61.104330708999996,
-        "y": 127.049212598
+        "x": 57.01461405,
+        "y": 114.019373721
       },
-      "controlPoints": [],
+      "controlPoints": [
+        {
+          "x": 61.1,
+          "y": 121.0
+        }
+      ],
       "heading": {
         "type": "linear",
         "startDeg": 270.0,
-        "endDeg": 270.0
+        "endDeg": 272.027888941
       },
       "color": "#e15759",
       "waitBeforeMs": 0,
@@ -27,60 +32,6 @@
     {
       "kind": "atomic",
       "id": "RedBasket2Wait15Shoot4Park-1",
-      "name": "Aim for Basket 2; feed after 15 seconds",
-      "endPoint": {
-        "x": 61.104330708999996,
-        "y": 126.655511811
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 270.0,
-        "endDeg": 270.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket2Wait15Shoot4Park-2",
-      "name": "Aim for Basket 2; feed after 15 seconds",
-      "endPoint": {
-        "x": 61.104330708999996,
-        "y": 126.655511811
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 270.0,
-        "endDeg": 272.027888941
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket2Wait15Shoot4Park-3",
-      "name": "Aim for Basket 2; feed after 15 seconds",
-      "endPoint": {
-        "x": 57.01461405,
-        "y": 114.019373721
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 272.027888941,
-        "endDeg": 272.027888941
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket2Wait15Shoot4Park-4",
       "name": "Park",
       "endPoint": {
         "x": 13.619999999999997,
@@ -105,18 +56,6 @@
     {
       "kind": "path",
       "lineId": "RedBasket2Wait15Shoot4Park-1"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket2Wait15Shoot4Park-2"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket2Wait15Shoot4Park-3"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket2Wait15Shoot4Park-4"
     }
   ],
   "shapes": [
@@ -438,19 +377,19 @@
       "vertices": [
         {
           "x": 0.7263779527559109,
-          "y": 108.60039370078741
+          "y": 86.94685039370079
         },
         {
           "x": 18.726377952755897,
-          "y": 108.60039370078741
+          "y": 86.94685039370079
         },
         {
           "x": 18.726377952755897,
-          "y": 126.60039370078741
+          "y": 104.9468503937008
         },
         {
           "x": 0.7263779527559109,
-          "y": 126.60039370078741
+          "y": 104.9468503937008
         }
       ],
       "color": "#8959a8",

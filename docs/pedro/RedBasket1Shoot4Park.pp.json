@@ -1,7 +1,7 @@
 {
   "version": "2.0.0",
   "startPoint": {
-    "x": 56.576772,
+    "x": 56.576771654,
     "y": 9.165,
     "headingDeg": 90.0
   },
@@ -9,16 +9,16 @@
     {
       "kind": "atomic",
       "id": "RedBasket1Shoot4Park-0",
-      "name": "Clear starting wall",
+      "name": "Drive to the shot mark",
       "endPoint": {
-        "x": 56.576772,
-        "y": 14.450786999999998
+        "x": 57.01461405,
+        "y": 27.480626279
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 90.0,
-        "endDeg": 90.0
+        "endDeg": 87.972111059
       },
       "color": "#e15759",
       "waitBeforeMs": 0,
@@ -27,123 +27,24 @@
     {
       "kind": "atomic",
       "id": "RedBasket1Shoot4Park-1",
-      "name": "Retreat from wall",
+      "name": "Park",
       "endPoint": {
-        "x": 56.576772,
-        "y": 14.844487999999998
+        "x": 13.624015747999998,
+        "y": 95.946850394
       },
-      "controlPoints": [],
+      "controlPoints": [
+        {
+          "x": 44.81,
+          "y": 21.979999999999997
+        },
+        {
+          "x": 12.14,
+          "y": 20.86
+        }
+      ],
       "heading": {
         "type": "linear",
-        "startDeg": 90.0,
-        "endDeg": 90.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket1Shoot4Park-2",
-      "name": "Turn to shot heading",
-      "endPoint": {
-        "x": 56.576772,
-        "y": 14.844487999999998
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
-        "endDeg": 87.972111
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket1Shoot4Park-3",
-      "name": "Shoot four preloads",
-      "endPoint": {
-        "x": 57.014614,
-        "y": 27.480626
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 87.972111,
-        "endDeg": 87.972111
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 14000
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket1Shoot4Park-4",
-      "name": "Park: turn in place",
-      "endPoint": {
-        "x": 57.014614,
-        "y": 27.480626
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 87.972111,
-        "endDeg": 90.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket1Shoot4Park-5",
-      "name": "Park: around frame corner",
-      "endPoint": {
-        "x": 26.261811,
-        "y": 29.411417
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
-        "endDeg": 90.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket1Shoot4Park-6",
-      "name": "Park: inboard of wall",
-      "endPoint": {
-        "x": 14.844487999999998,
-        "y": 95.94685
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
-        "endDeg": 90.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket1Shoot4Park-7",
-      "name": "Park in loading zone",
-      "endPoint": {
-        "x": 13.624016,
-        "y": 95.94685
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
+        "startDeg": 87.972111059,
         "endDeg": 90.0
       },
       "color": "#e15759",
@@ -159,30 +60,6 @@
     {
       "kind": "path",
       "lineId": "RedBasket1Shoot4Park-1"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket1Shoot4Park-2"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket1Shoot4Park-3"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket1Shoot4Park-4"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket1Shoot4Park-5"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket1Shoot4Park-6"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket1Shoot4Park-7"
     }
   ],
   "shapes": [

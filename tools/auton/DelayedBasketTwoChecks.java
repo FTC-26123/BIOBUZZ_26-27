@@ -41,7 +41,7 @@ public final class DelayedBasketTwoChecks {
         for(DelayedBasketTwoRoute route:new DelayedBasketTwoRoute[]{red,blue}){
             double sign=route.blue?-1:1;
             Pose near=new CycleRoute(route.blue?CycleRoute.Start.BLUE_WEST:CycleRoute.Start.RED_EAST,
-                CycleRoute.Strategy.NO_FLOWERS,CycleRoute.Lineup.FOUR_PARK).stages.get(1).pose();
+                CycleRoute.Strategy.NO_FLOWERS,CycleRoute.Lineup.FOUR_PARK).shot();
             double nearRange=Math.hypot(near.x()*.0254+.32385*sign,near.y()*.0254+.392176*sign);
             double farRange=Math.hypot(route.shot.x()*.0254+.32385*sign,route.shot.y()*.0254-.392176*sign);
             check(Math.abs(nearRange-farRange)<1e-10,"same standoff as current Basket 1 mark");

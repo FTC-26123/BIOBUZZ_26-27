@@ -9,16 +9,16 @@
     {
       "kind": "atomic",
       "id": "RedGardenPark-0",
-      "name": "Clear starting wall",
+      "name": "Drive to the shot mark",
       "endPoint": {
-        "x": 56.576771654,
-        "y": 14.450787402000003
+        "x": 57.01461405,
+        "y": 27.480626279
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 90.0,
-        "endDeg": 90.0
+        "endDeg": 87.972111059
       },
       "color": "#e15759",
       "waitBeforeMs": 0,
@@ -27,16 +27,35 @@
     {
       "kind": "atomic",
       "id": "RedGardenPark-1",
-      "name": "Shoot four with team Shooter default",
+      "name": "Our garden approach",
       "endPoint": {
-        "x": 56.576771654,
-        "y": 14.844488189000003
+        "x": 25.474409449,
+        "y": 12.482283465000002
       },
       "controlPoints": [],
       "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
-        "endDeg": 90.0
+        "type": "piecewise",
+        "piecewiseHeading": {
+          "segments": [
+            {
+              "startProgress": 0,
+              "endProgress": 0.6,
+              "interpolationType": "linear",
+              "parameters": {
+                "startDeg": 87.972111059,
+                "endDeg": 255.0
+              }
+            },
+            {
+              "startProgress": 0.6,
+              "endProgress": 1,
+              "interpolationType": "constant",
+              "parameters": {
+                "degrees": 255.0
+              }
+            }
+          ]
+        }
       },
       "color": "#e15759",
       "waitBeforeMs": 0,
@@ -45,78 +64,6 @@
     {
       "kind": "atomic",
       "id": "RedGardenPark-2",
-      "name": "Shoot four with team Shooter default",
-      "endPoint": {
-        "x": 56.576771654,
-        "y": 14.844488189000003
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
-        "endDeg": 87.972111059
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedGardenPark-3",
-      "name": "Shoot four with team Shooter default",
-      "endPoint": {
-        "x": 57.01461405,
-        "y": 27.480626279
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 87.972111059,
-        "endDeg": 87.972111059
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedGardenPark-4",
-      "name": "Our garden approach",
-      "endPoint": {
-        "x": 25.474409449,
-        "y": 14.844488189000003
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 87.972111059,
-        "endDeg": 255.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedGardenPark-5",
-      "name": "Our garden approach",
-      "endPoint": {
-        "x": 25.474409449,
-        "y": 12.482283465000002
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 255.0,
-        "endDeg": 255.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedGardenPark-6",
       "name": "Our garden floor sweep",
       "endPoint": {
         "x": 11.694881889999998,
@@ -134,88 +81,25 @@
     },
     {
       "kind": "atomic",
-      "id": "RedGardenPark-7",
-      "name": "Park",
+      "id": "RedGardenPark-3",
+      "name": "Park with garden pollen",
       "endPoint": {
-        "x": 14.844488189000003,
-        "y": 14.844488189000003
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 255.0,
-        "endDeg": 255.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedGardenPark-8",
-      "name": "Park",
-      "endPoint": {
-        "x": 14.844488189000003,
-        "y": 14.844488189000003
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 255.0,
-        "endDeg": 270.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedGardenPark-9",
-      "name": "Park",
-      "endPoint": {
-        "x": 26.261811023999996,
-        "y": 29.411417323000002
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 270.0,
-        "endDeg": 270.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedGardenPark-10",
-      "name": "Park",
-      "endPoint": {
-        "x": 26.261811023999996,
-        "y": 90.43503937
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 270.0,
-        "endDeg": 270.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedGardenPark-11",
-      "name": "Park",
-      "endPoint": {
-        "x": 13.624016,
+        "x": 13.624015747999998,
         "y": 95.946850394
       },
-      "controlPoints": [],
+      "controlPoints": [
+        {
+          "x": 27.119999999999997,
+          "y": 25.990000000000002
+        },
+        {
+          "x": 13.219999999999999,
+          "y": 84.4
+        }
+      ],
       "heading": {
         "type": "linear",
-        "startDeg": 270.0,
+        "startDeg": 255.0,
         "endDeg": 270.0
       },
       "color": "#e15759",
@@ -239,38 +123,6 @@
     {
       "kind": "path",
       "lineId": "RedGardenPark-3"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedGardenPark-4"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedGardenPark-5"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedGardenPark-6"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedGardenPark-7"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedGardenPark-8"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedGardenPark-9"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedGardenPark-10"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedGardenPark-11"
     }
   ],
   "shapes": [

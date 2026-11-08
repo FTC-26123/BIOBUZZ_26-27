@@ -11,21 +11,47 @@ public final class GardenParkRoute {
     public final boolean blue;
     public final Pose initial,park;
     public final List<CycleRoute.Stage> stages=new ArrayList<>();
+    /** Designed Pedro leg INTO each stage (null for the slow SWEEP, which uses a moving hold target). */
+    public final List<AutoPaths.Leg> legs=new ArrayList<>();
     private final double sign;
+    private final CycleRoute opening;
     public GardenParkRoute(boolean blue){
         this.blue=blue;sign=blue?-1:1;
-        CycleRoute opening=new CycleRoute(blue?CycleRoute.Start.BLUE_WEST:CycleRoute.Start.RED_EAST,
+        opening=new CycleRoute(blue?CycleRoute.Start.BLUE_WEST:CycleRoute.Start.RED_EAST,
             CycleRoute.Strategy.NO_FLOWERS,CycleRoute.Lineup.FOUR_PARK);
-        initial=opening.initial;stages.addAll(opening.stages);
+        initial=opening.initial;stages.addAll(opening.stages);legs.add(opening.approachLeg());
         // Angle the front intake 15 degrees toward the corner. The old parallel sweep caught
         // the last ball only at the outer edge of the intake and needed millimeter-perfect tracking.
         stages.add(new CycleRoute.Stage("Our garden approach",pose(-1.15,-1.48,255),CycleRoute.Action.MOVE,0,8));
+        // One straight leg from the shot mark; the 167-degree turn finishes by 60% so the rotating corners clear the wall.
+        legs.add(AutoPaths.Leg.line("Our garden approach",opening.shot(),stages.get(stages.size()-1).pose(),AutoPaths.GARDEN_TURN_DONE));
         stages.add(new CycleRoute.Stage("Our garden floor sweep",pose(-1.50,-1.48,255),CycleRoute.Action.SWEEP,0,8));
+        legs.add(null);
         park=pose(CycleRoute.PARK_X_METERS,CycleRoute.OUR_PARK_Y_METERS,270);
     }
     private Pose pose(double x,double y,double degrees){
         return new Pose(sign*x/.0254,sign*y/.0254,Math.toRadians(degrees+(blue?180:0)));
     }
+    /** Legs to drive into stage {@code index} from the measured pose. */
+    public List<AutoPaths.Leg> legsInto(int index,Pose from){
+        AutoPaths.Leg designed=legs.get(index);
+        return AutoPaths.plan(designed,from,blue);
+    }
+    /** Sweep end -> park in one continuous curve, inboard of the fixed flower pot. */
+    public AutoPaths.Leg parkLeg(){
+        return AutoPaths.curve("Park with garden pollen",blue,stages.get(stages.size()-1).pose(),park,AutoPaths.GARDEN_TO_PARK);
+    }
+    /** Parking from the measured pose: the designed curve after the sweep; the Basket 1 curve (same slot, facing
+     * the opening heading) if the garden was skipped at the shot mark; otherwise the inboard corridor. */
+    public List<AutoPaths.Leg> parkingLegs(Pose from){
+        Pose shot=opening.shot();
+        if(Math.hypot(from.x()-shot.x(),from.y()-shot.y())<=AutoPaths.REUSE_INCHES){
+            List<AutoPaths.Leg> early=opening.parkingLegs(from);
+            if(early.size()==1)return early;
+        }
+        return AutoPaths.plan(parkLeg(),from,parkingPath(from));
+    }
+    /** Conservative stop-and-go corridor; used only when the robot is far from the sweep end. */
     public List<Pose> parkingPath(Pose from){
         List<Pose> result=new ArrayList<>();
         // Retreat inboard: hugging the west/east wall would clip the fixed flower pot.
@@ -34,13 +60,5 @@ public final class GardenParkRoute {
         result.addAll(FrameClearance.path(entry,exit,blue));
         result.addAll(FrameClearance.path(exit,park,blue));return result;
     }
-    public double parkReserve(Pose from){
-        double seconds=.8;
-        for(Pose next:parkingPath(from)){
-            double turn=Math.atan2(Math.sin(next.heading()-from.heading()),Math.cos(next.heading()-from.heading()));
-            seconds+=Math.hypot(next.x()-from.x(),next.y()-from.y())*.0254/1.2+Math.abs(turn)/2+.5;
-            from=next;
-        }
-        return seconds;
-    }
+    public double parkReserve(Pose from){return AutoPaths.reserveSeconds(parkingLegs(from));}
 }

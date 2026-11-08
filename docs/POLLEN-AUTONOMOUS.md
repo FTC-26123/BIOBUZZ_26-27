@@ -7,7 +7,7 @@ The Driver Station offers eight programs under **26123 Flowerless**.
 | Red alliance | Blue alliance | Behavior |
 | --- | --- | --- |
 | Red Basket 1 Shoot 4 and Park | Blue Basket 1 Shoot 4 and Park | Shoot four preloads and park. |
-| Red Park Only | Blue Park Only | Leave a separate wall mark and park using the drivetrain and Pinpoint. |
+| Red Park Only | Blue Park Only | Start on the same wall mark as Shoot 4 and Park, then park using the drivetrain and Pinpoint. |
 | Red Shoot 4 + Garden and Park | Blue Shoot 4 + Garden and Park | Shoot the opening, collect our garden and park with pollen for TeleOp. |
 | Red Basket 2 Wait 15 Shoot 4 and Park | Blue Basket 2 Wait 15 Shoot 4 and Park | Opposite-wall start; wait/aim/spin up, feed four after 15 seconds, then park. Teammate must raise Basket 2. |
 
@@ -15,7 +15,7 @@ The eight selectable programs are flowerless. Recovery programs are unregistered
 
 The existing Basket 1 shooting routines call the team's `Shooter` and `Intake` classes through their normal update methods. Shooter's default preset is 1500 encoder ticks/second. Its existing PIDF, battery compensation and speed hysteresis control the flywheel and feeding. Those Basket 1 routines start it only after arriving at the shooting pose; movement and parking keep the mechanisms stopped. The delayed Basket 2 pair instead spins up with feeders off during its approach and wait. Four estimated releases or a 14-second timeout begin parking, with a 29.7-second hard deadline.
 
-See the [official CAD setup map and starting coordinates](AUTONOMOUS-LINEUP.md). Park Only uses a different wall mark from the shooting routines and the former Basket 2 start.
+See the [official CAD setup map and starting coordinates](AUTONOMOUS-LINEUP.md). Park Only starts on the same wall mark as the shooting routines; the former Basket 2 start is different.
 
 ## Robot configuration
 

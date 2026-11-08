@@ -11,11 +11,12 @@ import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
 import java.util.Iterator;
 
-/** Drive to the fixed shooting mark, use the team's Shooter, then park. No cameras. */
+/** One straight leg to the fixed shooting mark, shoot four with the team's Shooter, then one continuous
+ * curve into our parking slot. No cameras. */
 public abstract class ShootFourAndParkAuto extends OpMode {
     protected abstract CycleRoute.Start startingPoint();
     private static final double SHOOT_SECONDS=13; // Default Shooter needs at most ~13 s for four balls.
-    private enum State { CLEAR, APPROACH, SHOOT, PARK, DONE }
+    private enum State { APPROACH, SHOOT, PARK, DONE }
     private final ElapsedTime timer=new ElapsedTime();
     private final Intake intake=new Intake();
     private final Shooter shooter=new Shooter();
@@ -24,7 +25,7 @@ public abstract class ShootFourAndParkAuto extends OpMode {
     private GoBildaPinpointDriver pinpoint;
     private DcMotorEx intakeEncoder;
     private CycleRoute route;
-    private Iterator<Pose> waypoints;
+    private Iterator<AutoPaths.Leg> legs;
     private Pose target;
     private State state=State.DONE;
     private double shotStarted;
@@ -42,21 +43,17 @@ public abstract class ShootFourAndParkAuto extends OpMode {
         follower.setPose(route.initial);follower.update();
         telemetry.addData("Place robot (m)","%.3f, %.3f",route.initial.x()*.0254,route.initial.y()*.0254);
         telemetry.addData("Heading (deg)",Math.toDegrees(route.initial.heading()));
-        telemetry.addData("Shot visualizer (in)","%.4f, %.4f",route.stages.get(1).pose().x()+70.75,
-            route.stages.get(1).pose().y()+70.75);
+        telemetry.addData("Shot visualizer (in)","%.4f, %.4f",route.shot().x()+70.75,route.shot().y()+70.75);
         telemetry.addData("Shooter default (ticks/s)",shooter.getTargetLaunchPower());
         telemetry.addLine("Load four pollen. No Limelight or webcam required.");telemetry.update();
     }
     @Override public void start(){
-        timer.reset();counter=new PreloadShotCounter();state=State.CLEAR;result="Running";lateAim=false;
-        drive(route.stages.get(0).pose());
+        timer.reset();counter=new PreloadShotCounter();state=State.APPROACH;result="Running";lateAim=false;
+        drive(AutoPaths.plan(route.approachLeg(),follower.pose(),route.blue));
     }
-    private void drive(Pose destination){
-        waypoints=FrameClearance.path(follower.pose(),destination,route.blue).iterator();nextWaypoint();
-    }
-    private void nextWaypoint(){
-        target=waypoints.next();Pose from=follower.pose();
-        follower.follow(Paths.line(from,target).linear(from,target));
+    private void drive(java.util.List<AutoPaths.Leg> plan){legs=plan.iterator();nextLeg();}
+    private void nextLeg(){
+        AutoPaths.Leg leg=legs.next().from(follower.pose());target=leg.end;follower.follow(leg.path());
     }
     private boolean at(Pose p,Pose goal){return at(p,goal,1.0,2,3);}
     private boolean at(Pose p,Pose goal,double inches,double degrees,double speed){
@@ -71,12 +68,12 @@ public abstract class ShootFourAndParkAuto extends OpMode {
         return resume?at(p,shot,1.0,2,3):at(p,shot,1.0,3,4.5);
     }
     private void startShooting(double now){
-        state=State.SHOOT;correcting=false;shotStarted=now;follower.hold(route.stages.get(1).pose());
+        state=State.SHOOT;correcting=false;shotStarted=now;follower.hold(route.shot());
         shooter.start(); // Default 1500 ticks/s; Shooter owns PIDF and feeder readiness.
     }
     private void park(String reason){
         shooter.stop();intake.stop();state=State.PARK;result=reason;
-        waypoints=route.parkingPath(follower.pose()).iterator();nextWaypoint();
+        drive(route.parkingLegs(follower.pose()));
     }
     @Override public void loop(){
         if(state==State.DONE)return;
@@ -89,13 +86,13 @@ public abstract class ShootFourAndParkAuto extends OpMode {
         if(state!=State.PARK&&now>=29.5-route.parkReserve(p)){park("Time reserved for parking");report();return;}
         // Past this time, four shots (SHOOT_SECONDS) plus parking only just fit: stop being picky.
         if(!lateAim&&now>=29.5-route.parkReserve(p)-SHOOT_SECONDS)lateAim=true;
-        Pose shot=route.stages.get(1).pose();
+        Pose shot=route.shot();
         if(state==State.SHOOT){
             // Count the preceding feed interval before Shooter may pause on a speed dip.
             counter.update(now,shooter.getTargetLaunchPower(),shooter.getCurrentSpeed(),
                 intakeEncoder.getVelocity(),"Shooting".equals(shooter.getShooterStatus()));
             if(counter.shots>=4)park("Four estimated releases; parking");
-            else if(now-shotStarted>=route.stages.get(1).limit())park("Shooting timeout; parking");
+            else if(now-shotStarted>=route.stages.get(0).limit())park("Shooting timeout; parking");
             else{
                 // The hold keeps correcting the whole time. Feeding pauses only while clearly off the mark.
                 if(!correcting&&!onMark(p,shot,false)){
@@ -108,20 +105,15 @@ public abstract class ShootFourAndParkAuto extends OpMode {
                 }else shooter.update();
             }
         }else{
-            if(state==State.CLEAR&&(lateAim||now>=route.stages.get(0).limit())){
-                // Stuck clearing the wall: skip the remaining cleanup stops and head for the mark.
-                state=State.APPROACH;drive(shot);
-            }
             if(state==State.APPROACH&&lateAim&&at(p,shot,3.0,5,6)){
                 result="Shooting from close-enough fallback";startShooting(now);report();return;
             }
             double distance=Math.hypot(p.x()-target.x(),p.y()-target.y());
             if(distance<2&&!follower.holding())follower.hold(target);
-            // Corridor points only need to be passed cleanly once late or parking; the final point stays tight.
-            boolean relaxed=waypoints.hasNext()&&(state==State.PARK||lateAim);
+            // Fallback corridor points only need to be passed cleanly once late or parking; the final point stays tight.
+            boolean relaxed=legs.hasNext()&&(state==State.PARK||lateAim);
             if(relaxed?at(p,target,1.5,5,6):at(p,target)){
-                if(waypoints.hasNext())nextWaypoint();
-                else if(state==State.CLEAR){state=State.APPROACH;drive(route.stages.get(1).pose());}
+                if(legs.hasNext())nextLeg();
                 else if(state==State.APPROACH)startShooting(now);
                 else finish("Parked");
             }

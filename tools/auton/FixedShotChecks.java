@@ -6,16 +6,16 @@ public final class FixedShotChecks {
     public static void main(String[] args){
         for(boolean blue:new boolean[]{false,true}){
             CycleRoute r=new CycleRoute(blue?CycleRoute.Start.BLUE_WEST:CycleRoute.Start.RED_EAST,CycleRoute.Strategy.NO_FLOWERS,CycleRoute.Lineup.FOUR_PARK);
-            Pose shot=r.stages.get(1).pose();
+            Pose shot=r.shot();
             double sign=blue?-1:1,oldX=(57.05-70.75)*sign,oldY=(28.48-70.75)*sign;
             double dx=shot.x()-oldX,dy=shot.y()-oldY;
             check(Math.abs(Math.hypot(dx,dy)-1)<1e-8,"exactly one inch back from original shooting mark");
             check(Math.abs(dx+Math.cos(shot.heading()))<1e-8&&Math.abs(dy+Math.sin(shot.heading()))<1e-8,
                 "backwards along the aim line, away from hive");
-            check(r.stages.get(1).limit()>=14,"default Shooter gets time to release all four before garden transition");
-            check(r.stages.get(1).action()==CycleRoute.Action.FIRE,"stationary fixed shot");
-            check(r.stages.get(1).count()==4,"four requested preloads");
-            check(r.parkingPath(shot).size()>0,"park after shooting");
+            check(r.stages.get(0).limit()>=14,"default Shooter gets time to release all four before garden transition");
+            check(r.stages.get(0).action()==CycleRoute.Action.FIRE,"stationary fixed shot");
+            check(r.stages.get(0).count()==4,"four requested preloads");
+            check(r.parkingLegs(shot).size()==1,"park after shooting in one continuous leg");
         }
         PreloadShotCounter c=new PreloadShotCounter();double now=0;
         // Motor noise without actual feeding cannot acknowledge a release.

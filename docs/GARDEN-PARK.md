@@ -8,10 +8,10 @@ Select **Red Shoot 4 + Garden and Park** or **Blue Shoot 4 + Garden and Park**. 
 
 Start with four pollen at the same mark as Shoot 4 and Park. Red starts at field-centered (-0.360, -1.564259) meters, Pedro heading 90 degrees; Blue mirrors by 180 degrees, (+0.360, +1.564259), heading 270 degrees. Initialize Pinpoint at the selected starting mark. No flower mechanism or camera is used.
 
-1. Clear the wall and shoot four preloads at the revised mark: Red visualizer (57.0146, 27.4806), Blue (84.4854, 114.0194), exactly one inch farther from the hive along the aim line. The existing Shooter class retains its default **1500 encoder ticks/second** and its PIDF/feeder readiness logic.
-2. Stop the shooter. Approach our own garden with the intake angled 15 degrees toward the corner (Red 255 degrees / Blue 75 degrees). Run the existing Intake subsystem and keep its windmill stopped, preventing the collected pollen from being shot.
+1. Drive one straight leg from the wall and shoot four preloads at the revised mark: Red visualizer (57.0146, 27.4806), Blue (84.4854, 114.0194), exactly one inch farther from the hive along the aim line. The existing Shooter class retains its default **1500 encoder ticks/second** and its PIDF/feeder readiness logic.
+2. Stop the shooter. Drive one straight leg to our own garden, finishing the turn within the first 60% of the leg, with the intake angled 15 degrees toward the corner (Red 255 degrees / Blue 75 degrees). Run the existing Intake subsystem and keep its windmill stopped, preventing the collected pollen from being shot.
 3. Sweep toward our garden corner with a moving hold target at 0.25 m/s, require the endpoint within 0.20 inch and 1 degree, then dwell 0.50 seconds for capture. Pickup is timed; there is no inventory sensor. Expect up to four pollen if the garden remains available.
-4. Stop all mechanisms. Retreat inboard before driving along the outside of the metal frame, clearing the fixed flower pot rather than hugging the wall.
+4. Stop all mechanisms. Drive one continuous curve inboard of the fixed flower pot and outside the metal frame into our slot.
 5. Park in our near slot, leaving the farther teammate slot clear. Keep the collected pollen for TeleOp; there is no second firing stage.
 
 Park centers are Red visualizer **(9.73, 95.95)** / Blue **(131.77, 45.55)**. Garden-and-Park finishes facing 270 degrees Red / 90 degrees Blue, avoiding a half-turn. Two 18-inch square footprints have the same 3.65-inch gap to the reserved teammate slot. Coordinate actual teammate traffic; the route does not detect moving robots.
@@ -57,7 +57,7 @@ All four completed parking, stopped their motors and acquired no flower pollen o
 
 ### Pedro visualizer geometry
 
-[Red project](pedro/RedGardenPark.pp.json) and [Blue project](pedro/BlueGardenPark.pp.json) contain the exact 12 route segments, headings, an 18-inch footprint, frame, fixed flower pots and reserved teammate space. Both pass the upstream Pedro Visualizer's own `calculatePathTime` and `findCollisions` engine at 0.20-inch / 1-degree sampling with **zero collision intervals**. A deliberately invalid path into the frame is rejected as a negative control. This checks geometry; it does not replace the actual follower trial.
+[Red project](pedro/RedGardenPark.pp.json) and [Blue project](pedro/BlueGardenPark.pp.json) contain the exact four route legs (12 stop-and-go segments before the continuous-route redesign), headings, an 18-inch footprint, frame, fixed flower pots and reserved teammate space. Both pass the upstream Pedro Visualizer's own `calculatePathTime` and `findCollisions` engine at 0.20-inch / 1-degree sampling with **zero collision intervals**. A deliberately invalid path into the frame is rejected as a negative control. This checks geometry; it does not replace the actual follower trial.
 
 The browser's detached file input could not import the projects reliably, so verification ran the same upstream geometry engine directly from [Pedro-Pathing/Visualizer commit 97104e0](https://github.com/Pedro-Pathing/Visualizer/tree/97104e027af00d49b8bd61e29bcb74a9d7e62b90). The engine check does not access browser storage or modify the visualizer source. Open the exported projects in the visualizer for interactive playback.
 

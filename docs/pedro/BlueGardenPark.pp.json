@@ -9,16 +9,16 @@
     {
       "kind": "atomic",
       "id": "BlueGardenPark-0",
-      "name": "Clear starting wall",
+      "name": "Drive to the shot mark",
       "endPoint": {
-        "x": 84.923228346,
-        "y": 127.049212598
+        "x": 84.48538595,
+        "y": 114.019373721
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 270.0,
-        "endDeg": 270.0
+        "endDeg": 267.972111059
       },
       "color": "#4e79a7",
       "waitBeforeMs": 0,
@@ -27,16 +27,35 @@
     {
       "kind": "atomic",
       "id": "BlueGardenPark-1",
-      "name": "Shoot four with team Shooter default",
+      "name": "Our garden approach",
       "endPoint": {
-        "x": 84.923228346,
-        "y": 126.655511811
+        "x": 116.025590551,
+        "y": 129.017716535
       },
       "controlPoints": [],
       "heading": {
-        "type": "linear",
-        "startDeg": 270.0,
-        "endDeg": 270.0
+        "type": "piecewise",
+        "piecewiseHeading": {
+          "segments": [
+            {
+              "startProgress": 0,
+              "endProgress": 0.6,
+              "interpolationType": "linear",
+              "parameters": {
+                "startDeg": 267.972111059,
+                "endDeg": 75.0
+              }
+            },
+            {
+              "startProgress": 0.6,
+              "endProgress": 1,
+              "interpolationType": "constant",
+              "parameters": {
+                "degrees": 75.0
+              }
+            }
+          ]
+        }
       },
       "color": "#4e79a7",
       "waitBeforeMs": 0,
@@ -45,78 +64,6 @@
     {
       "kind": "atomic",
       "id": "BlueGardenPark-2",
-      "name": "Shoot four with team Shooter default",
-      "endPoint": {
-        "x": 84.923228346,
-        "y": 126.655511811
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 270.0,
-        "endDeg": 267.972111059
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueGardenPark-3",
-      "name": "Shoot four with team Shooter default",
-      "endPoint": {
-        "x": 84.48538595,
-        "y": 114.019373721
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 267.972111059,
-        "endDeg": 267.972111059
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueGardenPark-4",
-      "name": "Our garden approach",
-      "endPoint": {
-        "x": 116.025590551,
-        "y": 126.655511811
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 267.972111059,
-        "endDeg": 75.0
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueGardenPark-5",
-      "name": "Our garden approach",
-      "endPoint": {
-        "x": 116.025590551,
-        "y": 129.017716535
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 75.0,
-        "endDeg": 75.0
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueGardenPark-6",
       "name": "Our garden floor sweep",
       "endPoint": {
         "x": 129.80511811,
@@ -134,88 +81,25 @@
     },
     {
       "kind": "atomic",
-      "id": "BlueGardenPark-7",
-      "name": "Park",
+      "id": "BlueGardenPark-3",
+      "name": "Park with garden pollen",
       "endPoint": {
-        "x": 126.655511811,
-        "y": 126.655511811
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 75.0,
-        "endDeg": 75.0
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueGardenPark-8",
-      "name": "Park",
-      "endPoint": {
-        "x": 126.655511811,
-        "y": 126.655511811
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 75.0,
-        "endDeg": 90.0
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueGardenPark-9",
-      "name": "Park",
-      "endPoint": {
-        "x": 115.238188976,
-        "y": 112.088582677
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
-        "endDeg": 90.0
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueGardenPark-10",
-      "name": "Park",
-      "endPoint": {
-        "x": 115.238188976,
-        "y": 51.06496063
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
-        "endDeg": 90.0
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueGardenPark-11",
-      "name": "Park",
-      "endPoint": {
-        "x": 127.875984,
+        "x": 127.875984252,
         "y": 45.553149606000005
       },
-      "controlPoints": [],
+      "controlPoints": [
+        {
+          "x": 114.38,
+          "y": 115.50999999999999
+        },
+        {
+          "x": 128.28,
+          "y": 57.1
+        }
+      ],
       "heading": {
         "type": "linear",
-        "startDeg": 90.0,
+        "startDeg": 75.0,
         "endDeg": 90.0
       },
       "color": "#4e79a7",
@@ -239,38 +123,6 @@
     {
       "kind": "path",
       "lineId": "BlueGardenPark-3"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueGardenPark-4"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueGardenPark-5"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueGardenPark-6"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueGardenPark-7"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueGardenPark-8"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueGardenPark-9"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueGardenPark-10"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueGardenPark-11"
     }
   ],
   "shapes": [

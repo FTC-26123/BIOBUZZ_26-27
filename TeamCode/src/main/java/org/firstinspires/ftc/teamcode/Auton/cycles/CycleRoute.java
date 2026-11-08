@@ -209,8 +209,8 @@ public final class CycleRoute {
     }
 
     private void floorRoute(){
-        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
         if(lineup==Lineup.FOUR_PARK){
+            // No separate wall-clear stop: one straight Pedro leg from the wall start to the mark (see approachLeg).
             // Pedro visualizer uses bottom-left inches on a 141.5-inch field.
             double x=(57.05-70.75)*.0254,y=(28.48-70.75)*.0254;
             double aim=Math.atan2(-.392176-y,-.32385-x);
@@ -222,6 +222,7 @@ public final class CycleRoute {
             stages.add(new Stage("Shoot four with team Shooter default",pose(x,y,heading),Action.FIRE,4,14));
             bonusIndex=stages.size();return;
         }
+        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
         add("Shoot four preloads into Basket 1",-.36,-1.43,90,Action.ROLL_NEAR,4,12);
         if(lineup==Lineup.FOUR_RECOVER_TEAM){
             add("Move forward toward the spill",-.36,-1.18,90,Action.MOVE,0,3);
@@ -305,6 +306,14 @@ public final class CycleRoute {
         if(a==Action.FIRE||a==Action.BONUS_FIRE){ x=-1.13; y=(stages.isEmpty()||a==Action.BONUS_FIRE)?-.85:.85; }
         stages.add(new Stage(name,pose(x,y,h),a,count,limit));
     }
+    /** FOUR_PARK: the fixed shooting mark. */
+    public Pose shot(){return stages.get(0).pose();}
+    /** FOUR_PARK: wall start straight to the shooting mark, turning the last 2 degrees on the way. */
+    public AutoPaths.Leg approachLeg(){return AutoPaths.Leg.line("Drive to the shot mark",initial,shot());}
+    /** FOUR_PARK: one continuous curve from the shooting mark around the frame corner into our slot. */
+    public AutoPaths.Leg parkLeg(){return AutoPaths.curve("Park",blue,shot(),park,AutoPaths.SHOT_TO_PARK);}
+    /** FOUR_PARK parking from the measured pose: the designed curve near the mark, else the corridor. */
+    public java.util.List<AutoPaths.Leg> parkingLegs(Pose current){return AutoPaths.plan(parkLeg(),current,blue);}
     /** Collision-clear return corridor; points are generated from the current measured pose. */
     public List<Pose> parkingPath(Pose current) {
         if(avoidFrame())return FrameClearance.path(current,park,blue);
@@ -316,6 +325,7 @@ public final class CycleRoute {
         return result;
     }
     public double parkReserve(Pose current) {
+        if(lineup==Lineup.FOUR_PARK)return 1.90+AutoPaths.reserveSeconds(parkingLegs(current))-.8;
         double inches=0;Pose from=current;
         for(Pose to:parkingPath(current)){inches+=Math.hypot(to.x()-from.x(),to.y()-from.y());from=to;}
         // Include braking the fast pass, turning, and settling inside the loading zone.

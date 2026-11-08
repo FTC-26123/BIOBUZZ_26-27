@@ -11,7 +11,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
 import java.util.Iterator;
 
-/** Shoot the opening, collect our garden and carry pollen to park; existing Shoot 4 and Park is unchanged. */
+/** Shoot the opening, collect our garden and carry pollen to park. Every drive is one continuous Pedro leg (AutoPaths). */
 public abstract class GardenParkAuto extends OpMode {
     protected abstract boolean blueAlliance();
     private enum State { DRIVE, SWEEP, CAPTURE, SHOOT, PARK, DONE }
@@ -23,7 +23,7 @@ public abstract class GardenParkAuto extends OpMode {
     private DcMotorEx intakeEncoder;
     private GardenParkRoute route;
     private PreloadShotCounter counter;
-    private Iterator<Pose> waypoints;
+    private Iterator<AutoPaths.Leg> waypoints;
     private Pose target,sweepFrom;
     private State state=State.DONE;
     private int stageIndex,releases;
@@ -63,10 +63,10 @@ public abstract class GardenParkAuto extends OpMode {
             }
             intake.start();intake.stopWindmill();
         }else{
-            state=State.DRIVE;waypoints=FrameClearance.path(follower.pose(),stage().pose(),route.blue).iterator();nextWaypoint();
+            state=State.DRIVE;waypoints=route.legsInto(stageIndex,follower.pose()).iterator();nextWaypoint();
         }
     }
-    private void nextWaypoint(){target=waypoints.next();Pose from=follower.pose();follower.follow(Paths.line(from,target).linear(from,target));}
+    private void nextWaypoint(){AutoPaths.Leg leg=waypoints.next().from(follower.pose());target=leg.end;follower.follow(leg.path());}
     private boolean at(Pose goal){return at(goal,1.0,2);}
     private boolean at(Pose goal,double positionTolerance,double headingTolerance){return at(goal,positionTolerance,headingTolerance,3);}
     private boolean at(Pose goal,double positionTolerance,double headingTolerance,double speed){
@@ -87,7 +87,7 @@ public abstract class GardenParkAuto extends OpMode {
     }
     private void park(String why){
         shooter.stop();intake.stop();result=why;state=State.PARK;
-        waypoints=route.parkingPath(follower.pose()).iterator();nextWaypoint();
+        waypoints=route.parkingLegs(follower.pose()).iterator();nextWaypoint();
     }
     @Override public void loop(){
         if(state==State.DONE)return;

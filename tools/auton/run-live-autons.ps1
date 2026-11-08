@@ -16,7 +16,7 @@ try {
     $team='org/firstinspires/ftc/teamcode'
     # Only registered OpModes: legacy unregistered ones extend ThirtySecondAuto, which this harness does not compile.
     $files=@(Get-ChildItem (Join-Path $source "$team/Auton") -Filter '*.java' -File | Where-Object { (Get-Content $_.FullName -Raw) -match '@Autonomous' })
-    foreach($name in @('CycleRoute','FrameClearance','GardenParkRoute','GardenParkAuto','ShootFourAndParkAuto','ParkOnlyAuto','FeederModel','PreloadShotCounter','DelayedBasketTwoRoute','DelayedBasketTwoAuto')) {
+    foreach($name in @('AutoPaths','CycleRoute','FrameClearance','GardenParkRoute','GardenParkAuto','ShootFourAndParkAuto','ParkOnlyAuto','FeederModel','PreloadShotCounter','DelayedBasketTwoRoute','DelayedBasketTwoAuto')) {
         $files+=Get-Item (Join-Path $source "$team/Auton/cycles/$name.java")
     }
     foreach($name in @('Intake','Shooter')){$files+=Get-Item (Join-Path $source "$team/subsystems/$name.java")}

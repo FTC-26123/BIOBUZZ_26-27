@@ -43,7 +43,6 @@ public final class GardenParkRouteChecks {
                 CycleRoute.Strategy.NO_FLOWERS,CycleRoute.Lineup.FOUR_PARK);
             same(route.initial,original.initial);
             same(route.stages.get(0).pose(),original.stages.get(0).pose());
-            same(route.stages.get(1).pose(),original.stages.get(1).pose());
             String name=route.blue?"BlueGardenPark":"RedGardenPark";
             Pose previous=route.initial;int fire=0,sweeps=0;
             if(export)row(name,"Start",previous);
@@ -67,6 +66,7 @@ public final class GardenParkRouteChecks {
             }
             check(fire==1&&sweeps==1,"one four-preload batch and only our garden");
             List<Pose> park=route.parkingPath(previous);verify(previous,park,route.blue);
+            List<Pose> curve=new java.util.ArrayList<>();for(AutoPaths.Leg l:route.parkingLegs(previous))curve.addAll(l.sample(200));verify(previous,curve,route.blue);
             if(export)for(Pose next:park)row(name,"Park",next);
             check(route.parkReserve(previous)>0,"positive parking reserve");
         }
