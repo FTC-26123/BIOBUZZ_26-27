@@ -28,7 +28,7 @@ Coordinates refer to the robot's pose origin at the field center convention. Pos
 
 ## Parking with a teammate
 
-All four autonomous choices for an alliance use **our near slot**, leaving the farther slot available for a teammate. Positions below use Pedro visualizer inches. Blue mirrors Red by a 180-degree rotation about field center.
+The existing routines and Red delayed routine use **our near slot**, leaving the farther slot available for a teammate. Blue Basket 2 Wait 15 instead parks at **(131.44, 19.94)** and leaves its near slot **(131.77, 45.55)** for the teammate. Positions below use Pedro visualizer inches. Blue mirrors Red by a 180-degree rotation about field center.
 
 | Alliance | Our robot parks (X, Y) | Reserved teammate center (X, Y) | Heading |
 | --- | --- | --- | --- |

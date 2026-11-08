@@ -83,67 +83,13 @@
       "id": "BlueBasket2Wait15Shoot4Park-4",
       "name": "Park",
       "endPoint": {
-        "x": 112.482283465,
-        "y": 33.742125984
+        "x": 131.44,
+        "y": 19.939999999999998
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 92.027888941,
-        "endDeg": 92.027888941
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueBasket2Wait15Shoot4Park-5",
-      "name": "Park",
-      "endPoint": {
-        "x": 112.482283465,
-        "y": 51.06496063
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 92.027888941,
-        "endDeg": 92.027888941
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueBasket2Wait15Shoot4Park-6",
-      "name": "Park",
-      "endPoint": {
-        "x": 126.655511811,
-        "y": 45.553149606000005
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 92.027888941,
-        "endDeg": 90.0
-      },
-      "color": "#4e79a7",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "BlueBasket2Wait15Shoot4Park-7",
-      "name": "Park",
-      "endPoint": {
-        "x": 131.773622047,
-        "y": 45.553149606000005
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 90.0,
         "endDeg": 90.0
       },
       "color": "#4e79a7",
@@ -171,18 +117,6 @@
     {
       "kind": "path",
       "lineId": "BlueBasket2Wait15Shoot4Park-4"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueBasket2Wait15Shoot4Park-5"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueBasket2Wait15Shoot4Park-6"
-    },
-    {
-      "kind": "path",
-      "lineId": "BlueBasket2Wait15Shoot4Park-7"
     }
   ],
   "shapes": [
@@ -504,19 +438,19 @@
       "vertices": [
         {
           "x": 122.7736220472441,
-          "y": 14.8996062992126
+          "y": 36.55314960629921
         },
         {
           "x": 140.7736220472441,
-          "y": 14.8996062992126
+          "y": 36.55314960629921
         },
         {
           "x": 140.7736220472441,
-          "y": 32.8996062992126
+          "y": 54.553149606299215
         },
         {
           "x": 122.7736220472441,
-          "y": 32.8996062992126
+          "y": 54.553149606299215
         }
       ],
       "color": "#8959a8",

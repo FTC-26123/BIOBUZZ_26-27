@@ -55,7 +55,8 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   assert(last.hits>=3,'opening shots reach hive');
   if(delayed){assert(summary.firstFeed>=15&&summary.firstFeed<16,'feed gate opens at 15 seconds after settled aim');
    assert(summary.firstShot>=15,'actual first launch after wait');assert.equal(last.hits,4,'all four enter raised Basket 2');}
-  assert(Math.abs(last.robot[0]+1.55*sign)<.025&&Math.abs(last.robot[1]-.64*sign)<.025,'assigned parking slot');
+  const park=delayed&&name.startsWith('Blue')?[(131.44-70.75)*.0254,(19.94-70.75)*.0254]:[-1.55*sign,.64*sign];
+  assert(Math.abs(last.robot[0]-park[0])<.025&&Math.abs(last.robot[1]-park[1])<.025,'assigned parking slot');
   assert(last.motorPowers.every(power=>Math.abs(power)<1e-8)&&last.intake===0&&last.windmill===0,'stopped drive and intake');
   assert.equal(last.collected.flowers,0);assert.equal(last.collected.nectarCollected,0);
   if(garden){assert.equal(last.collected.garden,4);assert.equal(last.held,4);assert(summary.stages.includes('CAPTURE'));}

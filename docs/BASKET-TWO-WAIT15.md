@@ -35,6 +35,8 @@ Shooter has one additive method, `updateSpinupOnly()`. It uses the existing PIDF
 
 ## Verification
 
+The revised Blue direct-parking route with the requested 1-inch tolerance passed the actual-code simulator: first feed **15.0107 s**, four shots / four entries, parked **27.7528 s**, all mechanisms off. See [updated results](validation/blue-direct-park-results.json) and [trace](validation/blue-direct-park-traces.csv).
+
 The repeatable live runner executed the actual production Java autonomous, Shooter, Intake and tuned Pedro follower with simulator motors, drivetrain, ball flight, feeder travel and damped hive swing. Its test-only teammate fixture delivered three reserved partner preloads into Basket 1 around four seconds, letting the normal plant tip and settle the hive. It does not inject our robot's pose, inventory or releases. Fixture deliveries are excluded from our shot/hit counts. This tests the agreed teammate-success scenario, not the teammate's robot path or the guarantee that a real teammate will tip on time.
 
 | Routine | First feed command | Four shots / entries | Parked, autonomous clock |
@@ -46,12 +48,14 @@ Both parked with all drive/intake/windmill outputs stopped, no pollen still held
 
 Additional checks passed:
 
-- 636,065 assertions for the 15-second gate, settle requirement, mirrored starts, equal shooting distance, swept wall/frame/flower-pot/teammate clearance and fallback parking.
+- 506,622 assertions for the 15-second gate, settle requirement, mirrored starts, equal shooting distance, swept wall/frame/flower-pot/teammate clearance and fallback parking.
 - 25 Shooter checks covering all three intake outputs staying off during spin-up, continued flywheel power, normal `update()` feeding and shutdown.
-- The upstream Pedro Visualizer collision/timeline engine reports zero collision intervals on both exported eight-segment routes at 0.20-inch / 1-degree sampling. An invalid frame-crossing negative control is rejected.
+- The upstream Pedro Visualizer collision/timeline engine reports zero collision intervals on the exported eight-segment Red and five-segment Blue routes at 0.20-inch / 1-degree sampling. An invalid frame-crossing negative control is rejected.
 - FTC Android `:TeamCode:assembleDebug` succeeds.
 
 These are simulator and build results. Physical feeding, tracking, launch accuracy and teammate timing still require a field trial; no real-world success guarantee is implied.
+
+The table above records the original parking route. The revised Blue direct route and 1-inch position tolerance are verified separately in `validation/blue-direct-park-results.json`.
 
 ## Reproduce and view paths
 
