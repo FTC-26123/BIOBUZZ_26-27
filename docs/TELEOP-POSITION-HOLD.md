@@ -6,7 +6,7 @@ All four standard `TeleOp_BaseCode*` modes now hold position and heading when al
 
 Hold creates its backend with `org.firstinspires.ftc.teamcode.pedro.Constants.create(hardwareMap)`. It uses the existing `localizerConfig`, `drivetrainConfig`, and `foresightConfig` without changing their values or copying gains. Translation uses your forward/strafe controllers; heading uses your heading feedback. Pedro's existing hold-point scaling is honored. This is Pedro Foresight's built-in closed-loop hold, using your current proportional feedback and braking tuning; no separate PID gains or integral term have been invented.
 
-Continue tuning the real robot in `pedro/Constants.java`. This feature has a separate 50% maximum wheel-power limit, independent of the manual drive speed preset. Deadband, engagement delay and power limit are behavior limits in `TeleOpPositionHold`, not replacement robot tuning.
+Continue tuning the real robot in `pedro/Constants.java`. This feature has a separate 90% maximum wheel-power limit, independent of the manual drive speed preset. Deadband, engagement delay and power limit are behavior limits in `TeleOpPositionHold`, not replacement robot tuning.
 
 ## Controls and fault handling
 
