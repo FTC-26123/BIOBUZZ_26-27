@@ -14,27 +14,30 @@ foreach($name in @('Intake','Shooter')){$files+=Get-Item (Join-Path $source "$te
 $files+=Get-Item (Join-Path $source "$team/pedro/Constants.java")
 $compileFiles=@()
 foreach($file in $files){
-    $relative=[IO.Path]::GetRelativePath($source,$file.FullName)
+    $relative=$file.FullName.Substring((Resolve-Path $source).Path.Length+1) # Windows PowerShell 5.1 has no GetRelativePath
     $destination=Join-Path $run "ImportedTeamCode/$relative"
     New-Item -ItemType Directory -Force (Split-Path -Parent $destination) | Out-Null
     Copy-Item -LiteralPath $file.FullName -Destination $destination
     $compileFiles+=$destination
 }
 $bot=Get-Content (Join-Path $sim 'Controller/src/virtual_robot/robots/classes/BioBuzzBot.java') -Raw
+# Newer simulators already provide the transferServo; older ones need the isolated adapter below.
+if(!$bot.Contains('hardwareMap.put("transferServo"')){
 foreach($expected in @('private double physicalGate=.5;','camera=new Limelight3A(MODEL);','gate.getPosition()-physicalGate')){
-    if(!$bot.Contains($expected)){throw 'Simulator hardware changed; review transfer adapter'}
+        if(!$bot.Contains($expected)){throw 'Simulator hardware changed; review transfer adapter'}
+    }
+    # Supply missing team hardware; do not change Physics, drive dynamics or camera detection.
+    $bot=$bot.Replace('private double physicalGate=.5;','private double physicalGate=.5; private CRServoImpl transferServo;')
+    $bot=$bot.Replace('camera=new Limelight3A(MODEL);','transferServo=new CRServoImpl(360);hardwareMap.put("transferServo",transferServo);camera=new Limelight3A(MODEL);')
+    $bot=$bot.Replace('gate.getPosition()-physicalGate','(transferServo.getPower()<-.1?.27:.5)-physicalGate')
+    # Surface scheduled-physics exceptions instead of reporting a frozen robot as a controller fault.
+    $bot=$bot.Replace('public synchronized void updateStateAndSensors(double ms){','public synchronized void updateStateAndSensors(double ms){ try {')
+    $bot=$bot.Replace('camera.sample();webcam.sample();}','camera.sample();webcam.sample();} } catch(RuntimeException|Error fault){fault.printStackTrace();throw fault;}')
+    $adapter=Join-Path $run 'adapter/virtual_robot/robots/classes/BioBuzzBot.java'
+    New-Item -ItemType Directory -Force (Split-Path -Parent $adapter) | Out-Null
+    Set-Content -LiteralPath $adapter -Value $bot
+    $compileFiles+=$adapter
 }
-# Supply missing team hardware; do not change Physics, drive dynamics or camera detection.
-$bot=$bot.Replace('private double physicalGate=.5;','private double physicalGate=.5; private CRServoImpl transferServo;')
-$bot=$bot.Replace('camera=new Limelight3A(MODEL);','transferServo=new CRServoImpl(360);hardwareMap.put("transferServo",transferServo);camera=new Limelight3A(MODEL);')
-$bot=$bot.Replace('gate.getPosition()-physicalGate','(transferServo.getPower()<-.1?.27:.5)-physicalGate')
-# Surface scheduled-physics exceptions instead of reporting a frozen robot as a controller fault.
-$bot=$bot.Replace('public synchronized void updateStateAndSensors(double ms){','public synchronized void updateStateAndSensors(double ms){ try {')
-$bot=$bot.Replace('camera.sample();webcam.sample();}','camera.sample();webcam.sample();} } catch(RuntimeException|Error fault){fault.printStackTrace();throw fault;}')
-$adapter=Join-Path $run 'adapter/virtual_robot/robots/classes/BioBuzzBot.java'
-New-Item -ItemType Directory -Force (Split-Path -Parent $adapter) | Out-Null
-Set-Content -LiteralPath $adapter -Value $bot
-$compileFiles+=$adapter
 $compileFiles+=Join-Path $PSScriptRoot 'fixtures/MovingGardenFixture.java'
 $tagFolder=Join-Path $run 'web/assets/field'
 New-Item -ItemType Directory -Force $tagFolder | Out-Null
