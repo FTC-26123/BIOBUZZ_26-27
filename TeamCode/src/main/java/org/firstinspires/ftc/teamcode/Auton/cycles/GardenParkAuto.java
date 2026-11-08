@@ -28,11 +28,14 @@ public abstract class GardenParkAuto extends OpMode {
     private State state=State.DONE;
     private int stageIndex,releases;
     private double phaseStarted,sweepSeconds;
-    private boolean mechanismsReady;
+    private static final double SHOOT_SECONDS=13; // Default Shooter needs at most ~13 s for four balls.
+    private int fireIndex;
+    private boolean mechanismsReady,correcting,lateAim;
     private String result="Ready";
 
     @Override public void init(){
         route=new GardenParkRoute(blueAlliance());
+        fireIndex=0;while(route.stages.get(fireIndex).action()!=CycleRoute.Action.FIRE)fireIndex++;
         follower=org.firstinspires.ftc.teamcode.pedro.Constants.create(hardwareMap);
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
         intake.init(hardwareMap);shooter.init(hardwareMap,intake);mechanismsReady=true;
@@ -44,7 +47,7 @@ public abstract class GardenParkAuto extends OpMode {
         telemetry.addData("Heading (deg)",Math.toDegrees(route.initial.heading()));telemetry.update();
     }
     @Override public void start(){
-        timer.reset();stageIndex=releases=0;result="Running";enterStage();
+        timer.reset();stageIndex=releases=0;counter=null;correcting=lateAim=false;result="Running";enterStage();
     }
     private CycleRoute.Stage stage(){return route.stages.get(stageIndex);}
     private void enterStage(){
@@ -64,16 +67,22 @@ public abstract class GardenParkAuto extends OpMode {
         }
     }
     private void nextWaypoint(){target=waypoints.next();Pose from=follower.pose();follower.follow(Paths.line(from,target).linear(from,target));}
-    private boolean at(Pose goal){return at(goal,.65,2);}
-    private boolean at(Pose goal,double positionTolerance,double headingTolerance){
+    private boolean at(Pose goal){return at(goal,1.0,2);}
+    private boolean at(Pose goal,double positionTolerance,double headingTolerance){return at(goal,positionTolerance,headingTolerance,3);}
+    private boolean at(Pose goal,double positionTolerance,double headingTolerance,double speed){
         Pose p=follower.pose();double angle=p.heading()-goal.heading();
         return Math.hypot(p.x()-goal.x(),p.y()-goal.y())<positionTolerance
             &&Math.abs(Math.atan2(Math.sin(angle),Math.cos(angle)))<Math.toRadians(headingTolerance)
-            &&Math.hypot(follower.velocity().vx,follower.velocity().vy)<3;
+            &&Math.hypot(follower.velocity().vx,follower.velocity().vy)<speed;
+    }
+    /** Shot-mark windows. resume=true is the stricter re-entry window (hysteresis); late widens both. */
+    private boolean onMark(Pose shot,boolean resume){
+        if(lateAim)return resume?at(shot,3.0,5,6):at(shot,3.5,6,8);
+        return resume?at(shot,1.0,2,3):at(shot,1.0,3,4.5);
     }
     private void beginShooting(){
         if(timer.seconds()+1.8+route.parkReserve(follower.pose())>29.5){park("Insufficient shooting and parking time");return;}
-        state=State.SHOOT;phaseStarted=timer.seconds();counter=new PreloadShotCounter();
+        state=State.SHOOT;correcting=false;phaseStarted=timer.seconds();counter=new PreloadShotCounter();
         follower.hold(stage().pose());shooter.start(); // Existing default 1500 ticks/s, existing feeder logic.
     }
     private void park(String why){
@@ -89,7 +98,16 @@ public abstract class GardenParkAuto extends OpMode {
         }
         if(!FrameClearance.clear(p.x()*.0254,p.y()*.0254)){finish("Frame clearance interlock");return;}
         if(state!=State.PARK&&now>=29.5-route.parkReserve(p)){park("Time reserved for parking");report();return;}
+        boolean beforeShooting=releases==0&&counter==null;
+        if(beforeShooting&&!lateAim&&now>=29.5-route.parkReserve(p)-SHOOT_SECONDS)lateAim=true;
+        if(state==State.DRIVE&&beforeShooting&&stage().action()==CycleRoute.Action.FIRE
+            &&(lateAim||now-phaseStarted>stage().limit())&&at(stage().pose(),3.0,5,6)){
+            // Slow to settle on the shot mark: close enough, shoot from here and keep correcting.
+            result="Shooting from close-enough fallback";beginShooting();report();return;
+        }
         if(state!=State.PARK&&state!=State.SHOOT&&now-phaseStarted>stage().limit()){
+            // A stuck wall-clearing stop must not cost the opening shot: skip ahead to the shot mark.
+            if(stageIndex<fireIndex){stageIndex=fireIndex;enterStage();report();return;}
             park("Stage timeout; parking");report();return;
         }
         switch(state){
@@ -104,7 +122,6 @@ public abstract class GardenParkAuto extends OpMode {
                 if(now-phaseStarted>=GardenParkRoute.CAPTURE_DWELL_SECONDS){stageIndex++;enterStage();}
                 break;
             case SHOOT:
-                if(!at(stage().pose())){park("Shooting pose lost");break;}
                 counter.update(now,shooter.getTargetLaunchPower(),shooter.getCurrentSpeed(),
                     intakeEncoder.getVelocity(),"Shooting".equals(shooter.getShooterStatus()));
                 if(counter.shots>=4){
@@ -112,11 +129,24 @@ public abstract class GardenParkAuto extends OpMode {
                     counter=null;
                     stageIndex++;enterStage();
                 }else if(now-phaseStarted>=stage().limit())park("Incomplete batch; parking");
-                else shooter.update();
+                else{
+                    // The hold keeps correcting the whole time. Feeding pauses only while clearly off the mark.
+                    Pose shot=stage().pose();
+                    if(!correcting&&!onMark(shot,false)){
+                        correcting=true;follower.follow(Paths.line(p,shot).linear(p,shot));
+                    }
+                    if(correcting){
+                        shooter.updateSpinupOnly();
+                        if(Math.hypot(p.x()-shot.x(),p.y()-shot.y())<2&&!follower.holding())follower.hold(shot);
+                        if(onMark(shot,true)){correcting=false;follower.hold(shot);}
+                    }else shooter.update();
+                }
                 break;
             case DRIVE: case PARK:
                 if(Math.hypot(p.x()-target.x(),p.y()-target.y())<2&&!follower.holding())follower.hold(target);
-                if(at(target)){
+                // Corridor points only need to be passed cleanly once late or parking; final points stay tight.
+                boolean relaxed=waypoints.hasNext()&&(state==State.PARK||lateAim);
+                if(relaxed?at(target,1.5,5,6):at(target)){
                     if(waypoints.hasNext())nextWaypoint();
                     else if(state==State.PARK)finish("Parked");
                     else if(stage().action()==CycleRoute.Action.FIRE)beginShooting();

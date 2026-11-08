@@ -83,67 +83,13 @@
       "id": "RedBasket2Wait15Shoot4Park-4",
       "name": "Park",
       "endPoint": {
-        "x": 29.017716534999998,
-        "y": 107.757874016
+        "x": 13.619999999999997,
+        "y": 120.22999999999999
       },
       "controlPoints": [],
       "heading": {
         "type": "linear",
         "startDeg": 272.027888941,
-        "endDeg": 272.027888941
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket2Wait15Shoot4Park-5",
-      "name": "Park",
-      "endPoint": {
-        "x": 29.017716534999998,
-        "y": 90.43503937
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 272.027888941,
-        "endDeg": 272.027888941
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket2Wait15Shoot4Park-6",
-      "name": "Park",
-      "endPoint": {
-        "x": 14.844488189000003,
-        "y": 95.946850394
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 272.027888941,
-        "endDeg": 270.0
-      },
-      "color": "#e15759",
-      "waitBeforeMs": 0,
-      "waitAfterMs": 0
-    },
-    {
-      "kind": "atomic",
-      "id": "RedBasket2Wait15Shoot4Park-7",
-      "name": "Park",
-      "endPoint": {
-        "x": 9.726377952999997,
-        "y": 95.946850394
-      },
-      "controlPoints": [],
-      "heading": {
-        "type": "linear",
-        "startDeg": 270.0,
         "endDeg": 270.0
       },
       "color": "#e15759",
@@ -171,18 +117,6 @@
     {
       "kind": "path",
       "lineId": "RedBasket2Wait15Shoot4Park-4"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket2Wait15Shoot4Park-5"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket2Wait15Shoot4Park-6"
-    },
-    {
-      "kind": "path",
-      "lineId": "RedBasket2Wait15Shoot4Park-7"
     }
   ],
   "shapes": [

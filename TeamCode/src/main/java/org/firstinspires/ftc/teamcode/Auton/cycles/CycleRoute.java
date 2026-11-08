@@ -7,6 +7,8 @@ import java.util.*;
 public final class CycleRoute {
     // Two 18-inch footprints along the loading wall, with a 3.65-inch gap.
     public static final double OUR_PARK_Y_METERS=.64,TEAMMATE_PARK_Y_METERS=1.19;
+    /** Parking x: about 4 inches off the loading-zone wall so the robot never touches it. Teammate slot stays at -1.55. */
+    public static final double PARK_X_METERS=-1.451;
     public enum Start {
         RED_WEST(false, false), RED_EAST(false, true),
         BLUE_EAST(true, false), BLUE_WEST(true, true);
@@ -28,7 +30,7 @@ public final class CycleRoute {
         }
 
         Pose loadingZone() {
-            return alliancePose(blue, -1.55, OUR_PARK_Y_METERS, 90);
+            return alliancePose(blue, PARK_X_METERS, OUR_PARK_Y_METERS, 90);
         }
 
         public Pose teammateParking() {
@@ -98,7 +100,7 @@ public final class CycleRoute {
         }
         if(basketTeam()){
             // Split the loading zone along its length so both robots can park.
-            park=pose(-1.55,basketOne()?.66:1.17,90);
+            park=pose(PARK_X_METERS,basketOne()?.66:1.17,90);
             basketTeamRoute();
             return;
         }
