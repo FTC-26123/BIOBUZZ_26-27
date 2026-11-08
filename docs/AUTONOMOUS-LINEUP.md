@@ -28,14 +28,14 @@ Coordinates refer to the robot's pose origin at the field center convention. Pos
 
 ## Parking with a teammate
 
-The existing routines and Red delayed routine use **our near slot**, leaving the farther slot available for a teammate. Blue Basket 2 Wait 15 instead parks at **(131.44, 19.94)** and leaves its near slot **(131.77, 45.55)** for the teammate. Positions below use Pedro visualizer inches. Blue mirrors Red by a 180-degree rotation about field center.
+Every routine parks in the half of our parking zone nearer the wall it started from; the teammate parks in the half nearer theirs. The Basket 1, Garden and Park Only routines start on the far wall and use **our near slot**. Basket 2 Wait 15 starts on the parking-zone wall, so it parks at Blue **(127.88, 21.27)** / Red **(13.62, 120.23)** and leaves the near slot Blue **(131.77, 45.55)** / Red **(9.73, 95.95)** for the teammate. Positions below use Pedro visualizer inches. Blue mirrors Red by a 180-degree rotation about field center.
 
 | Alliance | Our robot parks (X, Y) | Reserved teammate center (X, Y) | Heading |
 | --- | --- | --- | --- |
 | Red | (9.73, 95.95) | (9.73, 117.60) | 90 degrees |
 | Blue | (131.77, 45.55) | (131.77, 23.90) | 270 degrees |
 
-The robot-code centers are Red (-1.55, +0.64) m and Blue (+1.55, -0.64) m. The reserved teammate centers are Red (-1.55, +1.19) m and Blue (+1.55, -1.19) m. Two 18-inch square robots have a 3.65-inch gap at these marks. The routes avoid the reserved footprint even when a teammate is already parked there. The dashed boxes are suggested teammate spaces, not an autonomous command for their robot. Coordinate the teammate's approach and confirm their actual footprint and the event's parking requirements.
+The robot-code parking centers are Red (-1.451, +0.64) m and Blue (+1.451, -0.64) m (about 4 inches off the wall); Blue Basket 2 Wait 15 uses its own point above. The reserved teammate centers are Red (-1.55, +1.19) m and Blue (+1.55, -1.19) m. Two 18-inch square robots have a 3.65-inch gap at these marks. The routes avoid the reserved footprint even when a teammate is already parked there. The dashed boxes are suggested teammate spaces, not an autonomous command for their robot. Coordinate the teammate's approach and confirm their actual footprint and the event's parking requirements.
 
 The original four route colors identify alternative programs; only one runs on our robot. Circles mark starting poses, stars mark shooting positions, and P squares mark our own final slots. Shoot 4 + Garden and Park uses the same parking centers, facing 270 degrees Red / 90 degrees Blue. It leaves the same 3.65-inch gap to the reserved teammate slot.
 

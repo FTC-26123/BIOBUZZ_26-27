@@ -21,7 +21,7 @@ public final class GardenParkRoute {
         // the last ball only at the outer edge of the intake and needed millimeter-perfect tracking.
         stages.add(new CycleRoute.Stage("Our garden approach",pose(-1.15,-1.48,255),CycleRoute.Action.MOVE,0,8));
         stages.add(new CycleRoute.Stage("Our garden floor sweep",pose(-1.50,-1.48,255),CycleRoute.Action.SWEEP,0,8));
-        park=pose(-1.55,CycleRoute.OUR_PARK_Y_METERS,270);
+        park=pose(CycleRoute.PARK_X_METERS,CycleRoute.OUR_PARK_Y_METERS,270);
     }
     private Pose pose(double x,double y,double degrees){
         return new Pose(sign*x/.0254,sign*y/.0254,Math.toRadians(degrees+(blue?180:0)));

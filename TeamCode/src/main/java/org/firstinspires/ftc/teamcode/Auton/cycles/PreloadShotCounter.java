@@ -6,6 +6,9 @@ public final class PreloadShotCounter {
     private double lastTime=-1,travel,lastShot=-10;
     private boolean recovered;
     public int shots;
+    /** Diagnostics for telemetry: encoder travel since the last release and whether the flywheel has recovered. */
+    public double travel(){return travel;}
+    public boolean recovered(){return recovered;}
     public void update(double now,double target,double speed,double intakeSpeed,boolean feeding){
         if(!Double.isFinite(now+target+speed+intakeSpeed)||target<=0){lastTime=-1;recovered=false;return;}
         if(lastTime>=0&&now>lastTime&&feeding)travel+=Math.abs(intakeSpeed)*Math.min(.1,now-lastTime);

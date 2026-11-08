@@ -76,14 +76,19 @@ public abstract class DelayedBasketTwoAuto extends OpMode {
             state==State.SHOOT&&"Shooting".equals(shooter.getShooterStatus()));
         if(state!=State.PARK&&now>=29.5-route.parkReserve(p)){park("Time reserved for parking");report();return;}
         if(state!=State.PARK&&counter.shots>=4){park("Four estimated releases; mechanisms off");report();return;}
+        // Two seconds after feeding may begin, stop being picky about the exact mark.
+        boolean late=now>=DelayedBasketTwoRoute.FEED_NOT_BEFORE_SECONDS+2;
         switch(state){
             case DRIVE: case PARK:
                 if(state==State.DRIVE){
                     shooter.updateSpinupOnly();
-                    if(now>8){park("Could not reach Basket 2 mark");break;}
+                    // Slow to settle: once close enough, hold the mark and wait there instead of giving up.
+                    if(now>8&&at(p,route.shot,3.0,5,6)){waitForAim();break;}
                 }
                 if(Math.hypot(p.x()-target.x(),p.y()-target.y())<2&&!follower.holding())follower.hold(target);
-                if(at(p,target,1.0,2,3)){
+                // Corridor points only need to be passed cleanly once slow or parking; the final point stays tight.
+                boolean relaxed=waypoints.hasNext()&&(state==State.PARK||now>8);
+                if(relaxed?at(p,target,1.5,5,6):at(p,target,1.0,2,3)){
                     if(waypoints.hasNext())nextWaypoint();
                     else if(state==State.PARK)finish("Parked");
                     else waitForAim();
@@ -91,14 +96,15 @@ public abstract class DelayedBasketTwoAuto extends OpMode {
                 break;
             case WAIT:
                 shooter.updateSpinupOnly();
-                if(at(p,route.shot,1.0,2,3)){if(stableSince<0)stableSince=now;}else stableSince=-1;
+                if(late?at(p,route.shot,3.0,5,6):at(p,route.shot,1.0,2,3)){if(stableSince<0)stableSince=now;}
+                else stableSince=-1;
                 if(stableSince>=0&&DelayedBasketTwoRoute.readyToFeed(now,now-stableSince)){
                     state=State.SHOOT;result="Shooting Basket 2";feed(now);
                 }
                 break;
             case SHOOT:
                 // Brief settling corrections pause feeding and reacquire aim instead of instantly parking.
-                if(!at(p,route.shot,1.0,3,4.5)){waitForAim();break;}
+                if(!(late?at(p,route.shot,3.5,6,8):at(p,route.shot,1.0,3,4.5))){waitForAim();break;}
                 feed(now);
                 break;
             default: break;

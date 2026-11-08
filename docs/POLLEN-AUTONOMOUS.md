@@ -41,11 +41,11 @@ The 86-degree launch angle is a physical configuration. Autonomous does not use 
 
 `PreloadShotCounter` estimates release events using intake encoder transport, a previously recovered flywheel, a speed dip and minimum spacing. It cannot guarantee physical inventory without a ball sensor. No detected load does not count as a ball. Sustained low speed cannot repeatedly count the same dip. Stop, parking, lost shooting position, localization faults and timeouts stop Shooter and all Intake outputs.
 
-Legacy unregistered autonomous helpers remain in the repository; the eight menu entries use `FixedShotParkAuto`, `GardenParkAuto`, `DelayedBasketTwoAuto` or `ParkOnlyAuto`, with no camera initialization.
+Legacy unregistered autonomous helpers remain in the repository; the eight menu entries (the Basket 1 shoot-and-park pair share `ShootFourAndParkAuto`) use `GardenParkAuto`, `DelayedBasketTwoAuto` or `ParkOnlyAuto`, with no camera initialization.
 
 ## Teammate parking
 
-Blue Basket 2 Wait 15 parks directly at visualizer (131.44, 19.94), reserving the nearer slot (131.77, 45.55) for its teammate. The other seven active autons use the near alliance slot and reserve the farther slot for a teammate. See the lineup map and coordinate table. Slot centers are 0.55 m apart, leaving 0.0928 m (3.65 inches) between two 18-inch footprints. Both shooting families now use the mark one inch farther from the hive; shooter speed is unchanged. This reserves physical space; coordinate the other robot's route and parking eligibility with the alliance.
+Basket 2 Wait 15 parks directly at visualizer Blue (127.88, 21.27) / Red (13.62, 120.23), the half of the zone nearer its starting wall, reserving the other half for its teammate. The other six active autons use the near alliance slot and reserve the farther slot for a teammate. See the lineup map and coordinate table. Slot centers are 0.55 m apart, leaving 0.0928 m (3.65 inches) between two 18-inch footprints. Both shooting families now use the mark one inch farther from the hive; shooter speed is unchanged. This reserves physical space; coordinate the other robot's route and parking eligibility with the alliance.
 
 ## Verification scope
 
