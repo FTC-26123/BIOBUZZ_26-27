@@ -1,0 +1,821 @@
+{
+  "date": "2026-11-08",
+  "baselineRobotCommit": "e4d5dba",
+  "simulatorRepository": "d-mankotia/BIOBUZZ-sim",
+  "verifiedRemoteCoreTree": "0d6d1c5bf563799652e7aeb30ab9a9092761d233",
+  "coreSourceSHA256": {
+    "Physics.java": "7fe4990088ffc8f97be0e7bae50777ff23e0e70d620a06c288d9de0c61454d1d",
+    "Settings.java": "0a7b2466a16b0c8c861f6b7c9cc25974535d117eee4743433dd92b3da71192b0",
+    "ContactMath.java": "16ff9726447e28e723a28a4da58e38731cf721a031ddbb1dec7fc2417c43160f"
+  },
+  "cameraMode": "Rendered RGB, 20 FPS, 60ms configured latency, 10in height, 7in forward, 43deg pitch",
+  "fixture": "Transfer CRServo mapped to existing plant gate; optional Lab demo retuning disabled; team Constants used; no ball or pose injections",
+  "baseline": [
+    {
+      "name": "RedGardenMovingShots",
+      "elapsed": 12.7488267,
+      "result": "Parked",
+      "shots": 0,
+      "hits": 0,
+      "acknowledged": 0,
+      "movingShots": 0,
+      "held": 4,
+      "collected": {
+        "availablePreplaced": 12,
+        "preplaced": 0,
+        "nectarCollected": 0,
+        "garden": 0,
+        "flowers": 0
+      },
+      "hives": [
+        [
+          -1,
+          0,
+          3
+        ],
+        [
+          1,
+          0,
+          3
+        ]
+      ],
+      "pose": [
+        -1.5927978822120998,
+        0.647695267209007,
+        3.1411344337068345
+      ],
+      "stages": [
+        "",
+        "Clear starting wall",
+        "Shoot four preloads while driving to garden",
+        "Park loading zone"
+      ],
+      "launches": [],
+      "preloadMovingShots": [],
+      "minFrameClearance": 0.10082892260646825,
+      "telemetry": "Auto stage : Park loading zone\nAuto result : Parked\nAuto elapsed : 12.7488267\nConfirmed feed events : 0\nVision interlock : Limelight basket raised\nPedro pose : (-60.814473309854826, 25.23436298520546, 4.7125036160098475)\nFeeder release estimate (s) : 0.24104734354128596\nLast confirmed feed (s) : 0.0\nFast shot gate : v 0.00 -> 0.00, remaining 0.00 m, aim -0.8 deg, RPM ticks 1955/2052, valid true, feed false\nCalculated aim turn (deg/s) : -0.17959881563737304\nShooting angle (deg) : 86.0\nLimelight shooting : Limelight measured 1 shooting tags\nLimelight basket range (m) : 1.099052241987166\nMoving feed events : 0\nLive path replans : 0\n\n",
+      "passed": false
+    },
+    {
+      "name": "BlueGardenMovingShots",
+      "elapsed": 13.0153488,
+      "result": "Parked",
+      "shots": 0,
+      "hits": 0,
+      "acknowledged": 0,
+      "movingShots": 0,
+      "held": 4,
+      "collected": {
+        "availablePreplaced": 12,
+        "preplaced": 0,
+        "nectarCollected": 0,
+        "garden": 0,
+        "flowers": 0
+      },
+      "hives": [
+        [
+          -1,
+          0,
+          3
+        ],
+        [
+          1,
+          0,
+          3
+        ]
+      ],
+      "pose": [
+        1.5675015375898054,
+        -0.6396554083790867,
+        3.7580184947739927e-06
+      ],
+      "stages": [
+        "",
+        "Clear starting wall",
+        "Shoot four preloads while driving to garden",
+        "Park loading zone"
+      ],
+      "launches": [],
+      "preloadMovingShots": [],
+      "minFrameClearance": 0.10419999269221192,
+      "telemetry": "Auto stage : Park loading zone\nAuto result : Parked\nAuto elapsed : 13.0153488\nConfirmed feed events : 0\nVision interlock : Limelight target missing, lowered or inconsistent\nPedro pose : (61.465742456631396, -25.63179797074926, 1.5708011388778687)\nFeeder release estimate (s) : 0.24104734354128596\nLast confirmed feed (s) : 0.0\nFast shot gate : v 0.00 -> 0.00, remaining 0.00 m, aim 15.1 deg, RPM ticks 1970/1950, valid false, feed false\nCalculated aim turn (deg/s) : -0.8568122613015103\nShooting angle (deg) : 86.0\nLimelight shooting : Limelight target missing, lowered or inconsistent\nLimelight basket range (m) : NaN\nMoving feed events : 0\nLive path replans : 0\n\n",
+      "passed": false
+    }
+  ],
+  "corrected": [
+    {
+      "name": "RedGardenMovingShots",
+      "elapsed": 19.6219233,
+      "result": "Parked",
+      "shots": 8,
+      "hits": 8,
+      "acknowledged": 8,
+      "movingShots": 4,
+      "held": 0,
+      "collected": {
+        "nectarCollected": 0,
+        "garden": 4,
+        "flowers": 0,
+        "availablePreplaced": 12,
+        "preplaced": 4
+      },
+      "hives": [
+        [
+          1,
+          1,
+          4
+        ],
+        [
+          1,
+          0,
+          3
+        ]
+      ],
+      "pose": [
+        -1.5820083459749283,
+        0.645061484567567,
+        3.1415736075564924
+      ],
+      "stages": [
+        "",
+        "Clear starting wall",
+        "Shoot four preloads while driving to garden",
+        "Face our garden intake lane",
+        "Strafe across our four garden balls",
+        "Retreat from garden wall before aiming",
+        "Shoot garden batch while crossing to opposite hive",
+        "Park loading zone"
+      ],
+      "launches": [
+        {
+          "id": 1,
+          "speed": 0.15499211843604374
+        },
+        {
+          "id": 2,
+          "speed": 0.1539014112856477
+        },
+        {
+          "id": 3,
+          "speed": 0.15029670385187283
+        },
+        {
+          "id": 4,
+          "speed": 0.1505867395180189
+        },
+        {
+          "id": 5,
+          "speed": 0.00040128472719005623
+        },
+        {
+          "id": 6,
+          "speed": 0.00022375655954517758
+        },
+        {
+          "id": 7,
+          "speed": 0.00018256884519074782
+        },
+        {
+          "id": 8,
+          "speed": 0.00013111638259485244
+        }
+      ],
+      "preloadMovingShots": [
+        {
+          "time": 1.8900000000000208,
+          "speed": 0.15407761104853138,
+          "position": [
+            -0.42541916161835935,
+            -1.3888309549720221
+          ]
+        },
+        {
+          "time": 2.220000000000019,
+          "speed": 0.15493315085335593,
+          "position": [
+            -0.47013325066205086,
+            -1.3672537015013706
+          ]
+        },
+        {
+          "time": 3.199999999999998,
+          "speed": 0.15059151373339133,
+          "position": [
+            -0.6037252887122209,
+            -1.3026964173591837
+          ]
+        },
+        {
+          "time": 3.529999999999991,
+          "speed": 0.15058673951801888,
+          "position": [
+            -0.6483454510634475,
+            -1.2812082263172373
+          ]
+        }
+      ],
+      "minFrameClearance": 0.08953605258604025,
+      "telemetry": "Auto stage : Park loading zone\nAuto result : Parked\nAuto elapsed : 19.6219233\nConfirmed feed events : 8\nVision interlock : Limelight basket raised\nPedro pose : (-60.860893670029526, 25.80575777789739, 4.712370101605551)\nFeeder release estimate (s) : 0.24792942484433297\nLast confirmed feed (s) : 0.246763099999999\nFast shot gate : v 0.00 -> 0.00, remaining 0.00 m, aim 0.1 deg, RPM ticks 1521/1653, valid true, feed false\nCalculated aim turn (deg/s) : 0.794702299063142\nShooting angle (deg) : 86.0\nLimelight shooting : Limelight measured 4 shooting tags\nLimelight basket range (m) : 0.8400013695658914\nMoving feed events : 4\nLive path replans : 0\n\n",
+      "passed": true,
+      "trial": "trial-1",
+      "farMovingShots": 0,
+      "stoppedOutputs": true,
+      "noForbiddenPickups": true
+    },
+    {
+      "name": "BlueGardenMovingShots",
+      "elapsed": 19.9286802,
+      "result": "Parked",
+      "shots": 8,
+      "hits": 7,
+      "acknowledged": 8,
+      "movingShots": 4,
+      "held": 0,
+      "collected": {
+        "nectarCollected": 0,
+        "garden": 4,
+        "flowers": 0,
+        "availablePreplaced": 12,
+        "preplaced": 4
+      },
+      "hives": [
+        [
+          -1,
+          0,
+          3
+        ],
+        [
+          -1,
+          1,
+          4
+        ]
+      ],
+      "pose": [
+        1.5826526130898497,
+        -0.6405940645354263,
+        -7.983599405572873e-05
+      ],
+      "stages": [
+        "",
+        "Clear starting wall",
+        "Shoot four preloads while driving to garden",
+        "Face our garden intake lane",
+        "Strafe across our four garden balls",
+        "Retreat from garden wall before aiming",
+        "Shoot garden batch while crossing to opposite hive",
+        "Park loading zone"
+      ],
+      "launches": [
+        {
+          "id": 1,
+          "speed": 0.15576395611250723
+        },
+        {
+          "id": 2,
+          "speed": 0.15050299375515536
+        },
+        {
+          "id": 3,
+          "speed": 0.15234468053637062
+        },
+        {
+          "id": 4,
+          "speed": 0.14977929651224214
+        },
+        {
+          "id": 5,
+          "speed": 0.00018541196608603364
+        },
+        {
+          "id": 6,
+          "speed": 0.00013252810383233195
+        },
+        {
+          "id": 7,
+          "speed": 0.0004578269340129934
+        },
+        {
+          "id": 8,
+          "speed": 0.00022773637821867757
+        }
+      ],
+      "preloadMovingShots": [
+        {
+          "time": 1.8500000000000199,
+          "speed": 0.15409876604889286,
+          "position": [
+            0.4260887562581195,
+            1.388607692767163
+          ]
+        },
+        {
+          "time": 2.9300000000000037,
+          "speed": 0.15247829117178774,
+          "position": [
+            0.5716896949516582,
+            1.3182135593705817
+          ]
+        },
+        {
+          "time": 3.469999999999992,
+          "speed": 0.1500844159370963,
+          "position": [
+            0.6449482182519548,
+            1.2828668822989984
+          ]
+        },
+        {
+          "time": 4.349999999999974,
+          "speed": 0.14745106925850748,
+          "position": [
+            0.7631267804420357,
+            1.2257196078347115
+          ]
+        }
+      ],
+      "minFrameClearance": 0.0895255103017647,
+      "telemetry": "Auto stage : Park loading zone\nAuto result : Parked\nAuto elapsed : 19.9286802\nConfirmed feed events : 8\nVision interlock : Limelight basket raised\nPedro pose : (60.80762007105069, -25.2297493041031, 1.5707157850265503)\nFeeder release estimate (s) : 0.24454486328992062\nLast confirmed feed (s) : 0.24765279999999734\nFast shot gate : v 0.00 -> 0.00, remaining 0.00 m, aim -0.3 deg, RPM ticks 1494/1653, valid true, feed false\nCalculated aim turn (deg/s) : 0.013052526806117555\nShooting angle (deg) : 86.0\nLimelight shooting : Limelight measured 2 shooting tags\nLimelight basket range (m) : 0.8396901487927747\nMoving feed events : 3\nLive path replans : 0\n\n",
+      "passed": false,
+      "trial": "trial-1",
+      "farMovingShots": 0,
+      "stoppedOutputs": true,
+      "noForbiddenPickups": true
+    },
+    {
+      "name": "RedGardenMovingShots",
+      "elapsed": 19.7594827,
+      "result": "Parked",
+      "shots": 8,
+      "hits": 8,
+      "acknowledged": 8,
+      "movingShots": 4,
+      "held": 0,
+      "collected": {
+        "nectarCollected": 0,
+        "garden": 4,
+        "flowers": 0,
+        "availablePreplaced": 12,
+        "preplaced": 4
+      },
+      "hives": [
+        [
+          1,
+          1,
+          4
+        ],
+        [
+          1,
+          0,
+          3
+        ]
+      ],
+      "pose": [
+        -1.5923898009352626,
+        0.6404269617584161,
+        -3.1415502620803535
+      ],
+      "stages": [
+        "",
+        "Clear starting wall",
+        "Shoot four preloads while driving to garden",
+        "Face our garden intake lane",
+        "Strafe across our four garden balls",
+        "Retreat from garden wall before aiming",
+        "Shoot garden batch while crossing to opposite hive",
+        "Park loading zone"
+      ],
+      "launches": [
+        {
+          "id": 1,
+          "speed": 0.15478643078122778
+        },
+        {
+          "id": 2,
+          "speed": 0.1485701894851791
+        },
+        {
+          "id": 3,
+          "speed": 0.15064290159925484
+        },
+        {
+          "id": 4,
+          "speed": 0.14549051357719708
+        },
+        {
+          "id": 5,
+          "speed": 0.00034493940821928845
+        },
+        {
+          "id": 6,
+          "speed": 0.00032107599358809465
+        },
+        {
+          "id": 7,
+          "speed": 2.7198545987956624e-05
+        },
+        {
+          "id": 8,
+          "speed": 0.00015651189510150682
+        }
+      ],
+      "preloadMovingShots": [
+        {
+          "time": 1.8200000000000192,
+          "speed": 0.15510768921513052,
+          "position": [
+            -0.4290576480243351,
+            -1.3872678016864555
+          ]
+        },
+        {
+          "time": 2.260000000000018,
+          "speed": 0.14924735053861143,
+          "position": [
+            -0.48788663611019273,
+            -1.358668455938949
+          ]
+        },
+        {
+          "time": 2.580000000000011,
+          "speed": 0.15356324906706773,
+          "position": [
+            -0.5313580001615416,
+            -1.337662896611796
+          ]
+        },
+        {
+          "time": 3.1299999999999994,
+          "speed": 0.13711644715150598,
+          "position": [
+            -0.6054956381448381,
+            -1.301829639003392
+          ]
+        }
+      ],
+      "minFrameClearance": 0.08948286138649175,
+      "telemetry": "Auto stage : Park loading zone\nAuto result : Parked\nAuto elapsed : 19.7594827\nConfirmed feed events : 8\nVision interlock : Limelight basket raised\nPedro pose : (-60.53156815175935, 25.227512149360237, 4.712471906338827)\nFeeder release estimate (s) : 0.24584296618937515\nLast confirmed feed (s) : 0.24859670000000023\nFast shot gate : v 0.00 -> 0.00, remaining 0.00 m, aim -0.1 deg, RPM ticks 1480/1653, valid true, feed false\nCalculated aim turn (deg/s) : 0.009733598039906276\nShooting angle (deg) : 86.0\nLimelight shooting : Limelight measured 2 shooting tags\nLimelight basket range (m) : 0.8589376454945892\nMoving feed events : 2\nLive path replans : 0\n\n",
+      "farMovingShots": 0,
+      "passed": true,
+      "trial": "trial-2",
+      "stoppedOutputs": true,
+      "noForbiddenPickups": true
+    },
+    {
+      "name": "BlueGardenMovingShots",
+      "elapsed": 18.7321067,
+      "result": "Parked",
+      "shots": 8,
+      "hits": 8,
+      "acknowledged": 8,
+      "movingShots": 4,
+      "held": 0,
+      "collected": {
+        "nectarCollected": 0,
+        "garden": 4,
+        "flowers": 0,
+        "availablePreplaced": 12,
+        "preplaced": 4
+      },
+      "hives": [
+        [
+          -1,
+          0,
+          3
+        ],
+        [
+          -1,
+          1,
+          4
+        ]
+      ],
+      "pose": [
+        1.5816949615371587,
+        -0.6451398851155635,
+        -0.0006032250270607306
+      ],
+      "stages": [
+        "",
+        "Clear starting wall",
+        "Shoot four preloads while driving to garden",
+        "Face our garden intake lane",
+        "Strafe across our four garden balls",
+        "Retreat from garden wall before aiming",
+        "Shoot garden batch while crossing to opposite hive",
+        "Park loading zone"
+      ],
+      "launches": [
+        {
+          "id": 1,
+          "speed": 0.15202239034880746
+        },
+        {
+          "id": 2,
+          "speed": 0.1487054194523957
+        },
+        {
+          "id": 3,
+          "speed": 0.1515419626543254
+        },
+        {
+          "id": 4,
+          "speed": 0.1522769064018053
+        },
+        {
+          "id": 5,
+          "speed": 0.0003795467918915122
+        },
+        {
+          "id": 6,
+          "speed": 0.00021613447573292987
+        },
+        {
+          "id": 7,
+          "speed": 0.00018526828648111042
+        },
+        {
+          "id": 8,
+          "speed": 0.0002992236619877438
+        }
+      ],
+      "preloadMovingShots": [
+        {
+          "time": 2.500000000000013,
+          "speed": 0.15261598147095215,
+          "position": [
+            0.5059305169562202,
+            1.3499487986270968
+          ]
+        },
+        {
+          "time": 2.9400000000000035,
+          "speed": 0.14751896709854911,
+          "position": [
+            0.5651491186024099,
+            1.3213456403579726
+          ]
+        },
+        {
+          "time": 3.2699999999999965,
+          "speed": 0.1544959016378122,
+          "position": [
+            0.6097769524404599,
+            1.2998267294848576
+          ]
+        },
+        {
+          "time": 3.5899999999999896,
+          "speed": 0.15551453393887843,
+          "position": [
+            0.6523808178885113,
+            1.2792308414075564
+          ]
+        }
+      ],
+      "minFrameClearance": 0.08955382871246353,
+      "telemetry": "Auto stage : Park loading zone\nAuto result : Parked\nAuto elapsed : 18.7321067\nConfirmed feed events : 8\nVision interlock : Limelight basket raised\nPedro pose : (60.9329055425689, -25.6337371585876, 1.570780634880066)\nFeeder release estimate (s) : 0.251885051529971\nLast confirmed feed (s) : 0.27884129999999985\nFast shot gate : v 0.00 -> 0.00, remaining 0.00 m, aim -0.1 deg, RPM ticks 1515/1653, valid true, feed false\nCalculated aim turn (deg/s) : 0.01711445380982345\nShooting angle (deg) : 86.0\nLimelight shooting : Limelight measured 2 shooting tags\nLimelight basket range (m) : 0.8425217409644123\nMoving feed events : 3\nLive path replans : 0\n\n",
+      "farMovingShots": 0,
+      "passed": true,
+      "trial": "trial-2",
+      "stoppedOutputs": true,
+      "noForbiddenPickups": true
+    },
+    {
+      "name": "RedGardenMovingShots",
+      "elapsed": 19.4217613,
+      "result": "Parked",
+      "shots": 8,
+      "hits": 8,
+      "acknowledged": 8,
+      "movingShots": 4,
+      "held": 0,
+      "collected": {
+        "nectarCollected": 0,
+        "garden": 4,
+        "flowers": 0,
+        "availablePreplaced": 12,
+        "preplaced": 4
+      },
+      "hives": [
+        [
+          1,
+          1,
+          4
+        ],
+        [
+          1,
+          0,
+          3
+        ]
+      ],
+      "pose": [
+        -1.5874145755941254,
+        0.6432115140530139,
+        3.1405249948215297
+      ],
+      "stages": [
+        "",
+        "Clear starting wall",
+        "Shoot four preloads while driving to garden",
+        "Face our garden intake lane",
+        "Strafe across our four garden balls",
+        "Retreat from garden wall before aiming",
+        "Shoot garden batch while crossing to opposite hive",
+        "Park loading zone"
+      ],
+      "launches": [
+        {
+          "id": 1,
+          "speed": 0.14860163787122946
+        },
+        {
+          "id": 2,
+          "speed": 0.1502416874439024
+        },
+        {
+          "id": 3,
+          "speed": 0.14987751283318834
+        },
+        {
+          "id": 4,
+          "speed": 0.15093135238582936
+        },
+        {
+          "id": 5,
+          "speed": 0.00013972539661862466
+        },
+        {
+          "id": 6,
+          "speed": 2.0905742215093924e-05
+        },
+        {
+          "id": 7,
+          "speed": 2.0905741512702278e-05
+        },
+        {
+          "id": 8,
+          "speed": 1.0866669590237563e-05
+        }
+      ],
+      "preloadMovingShots": [
+        {
+          "time": 2.2850000000000175,
+          "speed": 0.1488226910924937,
+          "position": [
+            -0.46533748395736285,
+            -1.3695586193978533
+          ]
+        },
+        {
+          "time": 2.830000000000006,
+          "speed": 0.15167225908530402,
+          "position": [
+            -0.5388640686151287,
+            -1.3340842071688235
+          ]
+        },
+        {
+          "time": 3.2699999999999965,
+          "speed": 0.14987751283318834,
+          "position": [
+            -0.598376407958849,
+            -1.305331091533523
+          ]
+        },
+        {
+          "time": 3.709999999999987,
+          "speed": 0.14920370673928368,
+          "position": [
+            -0.6577903832296559,
+            -1.2766095376817166
+          ]
+        }
+      ],
+      "minFrameClearance": 0.0894422008258331,
+      "telemetry": "Auto stage : Park loading zone\nAuto result : Parked\nAuto elapsed : 19.4217613\nConfirmed feed events : 8\nVision interlock : Limelight basket raised\nPedro pose : (-60.41233333077018, 25.350695031834398, 4.715148393307821)\nFeeder release estimate (s) : 0.24366728278633673\nLast confirmed feed (s) : 0.27743050000000125\nFast shot gate : v 0.00 -> 0.00, remaining 0.00 m, aim 0.2 deg, RPM ticks 1480/1653, valid true, feed false\nCalculated aim turn (deg/s) : 0.0072917066826453086\nShooting angle (deg) : 86.0\nLimelight shooting : Limelight measured 3 shooting tags\nLimelight basket range (m) : 0.8483007894286035\nMoving feed events : 4\nLive path replans : 0\n\n",
+      "farMovingShots": 0,
+      "passed": true,
+      "trial": "trial-3",
+      "stoppedOutputs": true,
+      "noForbiddenPickups": true
+    },
+    {
+      "name": "BlueGardenMovingShots",
+      "elapsed": 19.4163706,
+      "result": "Parked",
+      "shots": 8,
+      "hits": 8,
+      "acknowledged": 8,
+      "movingShots": 4,
+      "held": 0,
+      "collected": {
+        "nectarCollected": 0,
+        "garden": 4,
+        "flowers": 0,
+        "availablePreplaced": 12,
+        "preplaced": 4
+      },
+      "hives": [
+        [
+          -1,
+          0,
+          3
+        ],
+        [
+          -1,
+          1,
+          4
+        ]
+      ],
+      "pose": [
+        1.5924505914846279,
+        -0.6449920850320691,
+        -0.000522148087644444
+      ],
+      "stages": [
+        "",
+        "Clear starting wall",
+        "Shoot four preloads while driving to garden",
+        "Face our garden intake lane",
+        "Strafe across our four garden balls",
+        "Retreat from garden wall before aiming",
+        "Shoot garden batch while crossing to opposite hive",
+        "Park loading zone"
+      ],
+      "launches": [
+        {
+          "id": 1,
+          "speed": 0.15696878940950484
+        },
+        {
+          "id": 2,
+          "speed": 0.1492475328748495
+        },
+        {
+          "id": 3,
+          "speed": 0.14932136520372935
+        },
+        {
+          "id": 4,
+          "speed": 0.15022322826499857
+        },
+        {
+          "id": 5,
+          "speed": 0.00048286008362500573
+        },
+        {
+          "id": 6,
+          "speed": 6.142408692387478e-05
+        },
+        {
+          "id": 7,
+          "speed": 7.186946921241344e-05
+        },
+        {
+          "id": 8,
+          "speed": 0.00024380211189719384
+        }
+      ],
+      "preloadMovingShots": [
+        {
+          "time": 1.8300000000000194,
+          "speed": 0.15451296047082788,
+          "position": [
+            0.4206425964638238,
+            1.3910157442981232
+          ]
+        },
+        {
+          "time": 3.7899999999999854,
+          "speed": 0.1491711296056921,
+          "position": [
+            0.6853479915961437,
+            1.263300328711839
+          ]
+        },
+        {
+          "time": 4.559999999999969,
+          "speed": 0.14932993332078717,
+          "position": [
+            0.7890705332575159,
+            1.2132199831308372
+          ]
+        },
+        {
+          "time": 4.99999999999996,
+          "speed": 0.15013631085066725,
+          "position": [
+            0.8482706634886114,
+            1.184540376240143
+          ]
+        }
+      ],
+      "minFrameClearance": 0.08950053272589864,
+      "telemetry": "Auto stage : Park loading zone\nAuto result : Parked\nAuto elapsed : 19.4163706\nConfirmed feed events : 8\nVision interlock : Limelight basket raised\nPedro pose : (60.75349101870079, -25.36457932840182, 1.570848822593689)\nFeeder release estimate (s) : 0.2390037062834017\nLast confirmed feed (s) : 0.25078849999999875\nFast shot gate : v 0.00 -> 0.00, remaining 0.00 m, aim 0.2 deg, RPM ticks 1505/1653, valid true, feed false\nCalculated aim turn (deg/s) : 0.010488725703391048\nShooting angle (deg) : 86.0\nLimelight shooting : Limelight measured 4 shooting tags\nLimelight basket range (m) : 0.8507076968819093\nMoving feed events : 4\nLive path replans : 0\n\n",
+      "farMovingShots": 0,
+      "passed": true,
+      "trial": "trial-3",
+      "stoppedOutputs": true,
+      "noForbiddenPickups": true
+    }
+  ]
+}

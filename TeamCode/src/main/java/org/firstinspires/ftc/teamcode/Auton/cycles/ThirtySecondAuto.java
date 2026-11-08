@@ -339,21 +339,27 @@ public abstract class ThirtySecondAuto extends OpMode {
         }
         Pose launchFrom=shotPose==null?p:shotPose;
         Pose releasePose=new Pose(launchFrom.x()+dx/.0254,launchFrom.y()+dy/.0254,p.heading()+measured.omega*delay);
+        // Keep the heading reference continuous in Pinpoint coordinates. Individual
+        // image-derived ranges can jump when a different tag enters the frame;
+        // they validate the actual release below rather than steering the chassis.
+        Pose planningReleasePose=new Pose(p.x()+dx/.0254,p.y()+dy/.0254,p.heading());
         com.pedropathing.math.Velocity releaseVelocity=new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,measured.omega);
         // Garden-moving shots are never abandoned for parking. Once past the stage limit the arrival
         // window widens so a robot that cannot settle on the exact mark still finishes the batch.
         if(route.gardenMoving()&&!rollingLate&&now-stageStart>stage.limit())rollingLate=true;
         boolean atDestination=rollingStart>=0&&phase>=transitPath.duration()&&Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y())*.0254<(rollingLate?.15:.06);
-        // A stationary fallback aims for zero yaw, rather than chasing each measured yaw
-        // correction and feeding it back into the next heading target. The actual gate below
-        // still validates measured translation/yaw at release before opening the feeder.
-        com.pedropathing.math.Velocity planningVelocity=atDestination&&Math.hypot(vx,vy)<.08
-            ?new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,0):releaseVelocity;
+        // Plan the yaw we want, not the measured corrective yaw. Feeding measured
+        // yaw back into the desired aim amplifies each turn correction and can
+        // repeatedly cancel feeder transport. Evaluation below retains actual yaw.
+        double desiredYaw=atDestination&&Math.hypot(vx,vy)<.08?0:
+            MovingAim.trackable(plannedTurnRate)?plannedTurnRate:0;
+        com.pedropathing.math.Velocity planningVelocity=new com.pedropathing.math.Velocity(
+            futureVx/.0254,futureVy/.0254,desiredYaw);
         // Odometry may acquire the aim while tags are outside the camera view.
         // Feeding still requires a fresh tag pose and an independently evaluated entry.
         if(lastSolve<0||now-lastSolve>.06||movingSolution==null){
             double aimU=route.gardenMoving()?0:route.strategy==CycleRoute.Strategy.NO_FLOWERS&&near?-.16+(mechanisms.fired%3)*.04:(mechanisms.fired%3-1)*.07;
-            movingSolution=MovingShotSolver.rolling(releasePose,planningVelocity,route.blue,near,mechanisms.speed(),0,0,0,aimU*(route.blue?-1:1));
+            movingSolution=MovingShotSolver.rolling(planningReleasePose,planningVelocity,route.blue,near,mechanisms.speed(),0,0,0,aimU*(route.blue?-1:1));
             haveRollingAim=movingSolution!=null;
             plannedTurnRate=Double.NaN;
             if(movingSolution!=null){
@@ -361,8 +367,8 @@ public abstract class ThirtySecondAuto extends OpMode {
                 // Differentiate the ballistic aim, including inherited chassis velocity,
                 // rather than just pointing geometrically at the hive's current bearing.
                 double dt=MovingAim.SAMPLE_SECONDS;
-                Pose later=new Pose(releasePose.x()+planningVelocity.vx*dt,
-                    releasePose.y()+planningVelocity.vy*dt,releasePose.heading());
+                Pose later=new Pose(planningReleasePose.x()+planningVelocity.vx*dt,
+                    planningReleasePose.y()+planningVelocity.vy*dt,planningReleasePose.heading());
                 MovingShotSolver.Solution nextAim=MovingShotSolver.rolling(later,planningVelocity,
                     route.blue,near,movingSolution.ticks(),0,0,0,aimU*(route.blue?-1:1));
                 if(nextAim!=null)plannedTurnRate=MovingAim.turnRate(plannedReleaseHeading,nextAim.heading(),dt);
