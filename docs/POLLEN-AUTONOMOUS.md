@@ -1,5 +1,7 @@
 # Complete basket autonomous programs
 
+Two additional programs, **Red Moving Shots + Garden + Hive** and **Blue Moving Shots + Garden + Hive**, now drive toward the garden while shooting, strafe for four garden balls, and shoot toward the opposite hive. They require Limelight and the predictive mechanism helper. See [moving garden setup and verification limits](MOVING-GARDEN.md). The eight earlier programs described below retain their existing behavior.
+
 The Driver Station offers eight programs under **26123 Flowerless**.
 
 | Red alliance | Blue alliance | Behavior |

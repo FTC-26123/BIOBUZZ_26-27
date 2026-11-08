@@ -36,8 +36,8 @@ public final class CycleRoute {
         }
     }
     public enum Lineup { LEGACY, SOLO, PARTNER, BASKET_ONE_TEAM, BASKET_TWO_TEAM,
-        FOUR_PARK, FOUR_RECOVER_TEAM }
-    public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, ROLL_NEAR, ROLL_FAR, PARK }
+        FOUR_PARK, FOUR_RECOVER_TEAM, GARDEN_MOVING }
+    public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, GARDEN_STRAFE, ROLL_NEAR, ROLL_FAR, PARK }
     public enum Strategy { FLOWERS, TIPPED_POLLEN, ADAPTIVE_ALL, RUSH_TIPS, NO_FLOWERS }
     public static final class Stage {
         private final String name;
@@ -87,6 +87,10 @@ public final class CycleRoute {
         }
         initial=lineup==Lineup.BASKET_TWO_TEAM?pose(-.90,1.564259,-90)
             :lineup==Lineup.LEGACY?pose(startX,-1.564259,90):start.wallPose();
+        if(gardenMoving()){
+            park=pose(-1.55,OUR_PARK_Y_METERS,270);
+            gardenMovingRoute();return;
+        }
         if(floorOnly()){
             park=start.loadingZone();
             floorRoute();
@@ -185,6 +189,22 @@ public final class CycleRoute {
     }
     public boolean rushStyle(){return strategy==Strategy.RUSH_TIPS||strategy==Strategy.NO_FLOWERS;}
     public boolean floorOnly(){return lineup==Lineup.FOUR_PARK||lineup==Lineup.FOUR_RECOVER_TEAM;}
+    public boolean gardenMoving(){return lineup==Lineup.GARDEN_MOVING;}
+
+    private void gardenMovingRoute(){
+        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
+        // The firing stage's destination IS the garden approach. Translation starts
+        // immediately; only the feeder waits for a valid predicted moving shot.
+        double h=Math.toDegrees(Math.atan2(-.392176+1.05,-.32385+1.13));
+        add("Shoot four preloads while driving to garden",-1.13,-1.05,h,Action.ROLL_NEAR,4,10);
+        add("Face our garden intake lane",-1.15,-1.48,255,Action.MOVE,0,4);
+        add("Strafe across our four garden balls",-1.50,-1.48,255,Action.GARDEN_STRAFE,4,4);
+        add("Retreat from garden wall before aiming",-1.15,-1.30,255,Action.MOVE,0,3);
+        // Stop short of the far reserved teammate parking footprint.
+        double farHeading=Math.toDegrees(Math.atan2(.392176-.55,-.32385+1.13));
+        add("Shoot garden batch while crossing to opposite hive",-1.13,.55,farHeading,Action.ROLL_FAR,4,10);
+        bonusIndex=stages.size();
+    }
 
     private void floorRoute(){
         add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
@@ -297,7 +317,7 @@ public final class CycleRoute {
         double inches=0;Pose from=current;
         for(Pose to:parkingPath(current)){inches+=Math.hypot(to.x()-from.x(),to.y()-from.y());from=to;}
         // Include braking the fast pass, turning, and settling inside the loading zone.
-        if(basketTeam()||floorOnly())return 1.90+inches*.0254/1.20;
+        if(basketTeam()||floorOnly()||gardenMoving())return 1.90+inches*.0254/1.20;
         return rushStyle()?1.15+inches*.0254/1.20:strategy==Strategy.ADAPTIVE_ALL?1.45+inches*.0254/1.20:1.05+inches*.0254/.85;
     }
     private Pose pose(double x,double y,double heading) {
