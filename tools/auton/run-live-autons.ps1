@@ -29,16 +29,18 @@ try {
         Copy-Item -LiteralPath $file.FullName -Destination $destination
         $compileFiles+=$destination
     }
-    # SDK adapter ONLY: the existing simulator bot lacks the team's transfer CRServo.
+    # SDK adapter ONLY: the existing simulator bot lacks the team's transfer motor.
     # Add that device and map its inward state to the plant gate; no ball/pose injection.
     $bot=Get-Content (Join-Path $sim 'Controller/src/virtual_robot/robots/classes/BioBuzzBot.java') -Raw
-    if(!$bot.Contains('hardwareMap.put("transferServo"')){ # newer simulators already provide the transfer servo
-        foreach($expected in @('private double physicalGate=.5;','camera=new Limelight3A(MODEL);','gate.getPosition()-physicalGate')) {
+    if(!$bot.Contains('hardwareMap.put("transfer",')){ # add the transfer motor the team Intake needs
+        foreach($expected in @('private double physicalGate=.5;','camera=new Limelight3A(MODEL);')) {
             if(!$bot.Contains($expected)){throw 'Simulator hardware adapter changed; inspect before updating fixture'}
         }
-        $bot=$bot.Replace('private double physicalGate=.5;','private double physicalGate=.5; private CRServoImpl transferServo;')
-        $bot=$bot.Replace('camera=new Limelight3A(MODEL);','transferServo=new CRServoImpl(360);hardwareMap.put("transferServo",transferServo);camera=new Limelight3A(MODEL);')
-        $bot=$bot.Replace('gate.getPosition()-physicalGate','(transferServo.getPower()<-.1?.27:.5)-physicalGate')
+        $bot=$bot.Replace('private double physicalGate=.5;','private double physicalGate=.5; private DcMotorExImpl transferMotor;')
+        $bot=$bot.Replace('camera=new Limelight3A(MODEL);','transferMotor=new DcMotorExImpl(MotorType.Gobilda6000,motorController1,3);hardwareMap.put("transfer",transferMotor);camera=new Limelight3A(MODEL);')
+        # The team Intake drives a DC motor named "transfer" ; running inward (power below -0.1) opens the gate.
+        if($bot.Contains('transferServo.getPower()')){$bot=$bot.Replace('transferServo.getPower()','transferMotor.getPower()')}
+        else{$bot=$bot.Replace('gate.getPosition()-physicalGate','(transferMotor.getPower()<-.1?.27:.5)-physicalGate')}
     }
     $adapter=Join-Path $run 'adapter/virtual_robot/robots/classes/BioBuzzBot.java'
     New-Item -ItemType Directory -Force (Split-Path -Parent $adapter) | Out-Null

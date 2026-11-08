@@ -21,15 +21,17 @@ foreach($file in $files){
     $compileFiles+=$destination
 }
 $bot=Get-Content (Join-Path $sim 'Controller/src/virtual_robot/robots/classes/BioBuzzBot.java') -Raw
-# Newer simulators already provide the transferServo; older ones need the isolated adapter below.
-if(!$bot.Contains('hardwareMap.put("transferServo"')){
-foreach($expected in @('private double physicalGate=.5;','camera=new Limelight3A(MODEL);','gate.getPosition()-physicalGate')){
+# The simulator needs a DC motor named "transfer" (the team Intake's passive-lock transfer); the adapter below adds it.
+if(!$bot.Contains('hardwareMap.put("transfer",')){
+foreach($expected in @('private double physicalGate=.5;','camera=new Limelight3A(MODEL);')){
         if(!$bot.Contains($expected)){throw 'Simulator hardware changed; review transfer adapter'}
     }
     # Supply missing team hardware; do not change Physics, drive dynamics or camera detection.
-    $bot=$bot.Replace('private double physicalGate=.5;','private double physicalGate=.5; private CRServoImpl transferServo;')
-    $bot=$bot.Replace('camera=new Limelight3A(MODEL);','transferServo=new CRServoImpl(360);hardwareMap.put("transferServo",transferServo);camera=new Limelight3A(MODEL);')
-    $bot=$bot.Replace('gate.getPosition()-physicalGate','(transferServo.getPower()<-.1?.27:.5)-physicalGate')
+    $bot=$bot.Replace('private double physicalGate=.5;','private double physicalGate=.5; private DcMotorExImpl transferMotor;')
+    $bot=$bot.Replace('camera=new Limelight3A(MODEL);','transferMotor=new DcMotorExImpl(MotorType.Gobilda6000,motorController1,3);hardwareMap.put("transfer",transferMotor);camera=new Limelight3A(MODEL);')
+    # The team Intake drives a DC motor named "transfer" ; running inward (power below -0.1) opens the gate.
+    if($bot.Contains('transferServo.getPower()')){$bot=$bot.Replace('transferServo.getPower()','transferMotor.getPower()')}
+    else{$bot=$bot.Replace('gate.getPosition()-physicalGate','(transferMotor.getPower()<-.1?.27:.5)-physicalGate')}
     # Surface scheduled-physics exceptions instead of reporting a frozen robot as a controller fault.
     $bot=$bot.Replace('public synchronized void updateStateAndSensors(double ms){','public synchronized void updateStateAndSensors(double ms){ try {')
     $bot=$bot.Replace('camera.sample();webcam.sample();}','camera.sample();webcam.sample();} } catch(RuntimeException|Error fault){fault.printStackTrace();throw fault;}')
