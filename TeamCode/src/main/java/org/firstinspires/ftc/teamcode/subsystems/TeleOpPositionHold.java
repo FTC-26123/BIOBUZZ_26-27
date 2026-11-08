@@ -13,7 +13,7 @@ import org.firstinspires.ftc.teamcode.pedro.Constants;
 public final class TeleOpPositionHold {
     public static final double STICK_DEADBAND = 0.06;
     public static final double ENGAGE_DELAY_SECONDS = 0.15;
-    public static final double MAX_HOLD_POWER = 0.50;
+    public static final double MAX_HOLD_POWER = 0.90;
     private static final double MAX_LOOP_GAP_SECONDS = 0.25;
     private static final double MAX_DISPLACEMENT_INCHES = 12.0;
     private static final double MAX_HEADING_ERROR = Math.toRadians(45);
