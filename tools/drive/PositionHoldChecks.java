@@ -95,6 +95,34 @@ public final class PositionHoldChecks {
         h.update(0, 0, 0, false, .18);
         check(h.getStatus().equals("Holding") && b.powers.turn() < 0, "heading wraps shortest way");
 
+        // A sustained shove from another robot (50 in/s, well past the old 12-inch cut-off) is resisted throughout.
+        b = new Backend(); h = arm(b);
+        double clock = .16;
+        for (int step = 1; step <= 30; step++) {
+            clock += .02; b.pose = new Pose(step, 0, 0);
+            check(h.update(0, 0, 0, false, clock), "hold keeps the motors while being pushed");
+            check(b.powers.forward() < 0, "keeps pushing back at " + step + " inches");
+            check(b.target.x() == 0, "never gives up the original target while pushed");
+        }
+        check(h.getStatus().equals("Resisting push"), "telemetry reports an active push");
+        // Being spun by contact is resisted too.
+        b = new Backend(); h = arm(b); clock = .16;
+        for (int step = 1; step <= 20; step++) {
+            clock += .02; b.pose = new Pose(0, 0, Math.toRadians(4 * step));
+            h.update(0, 0, 0, false, clock);
+            check(b.powers.turn() < 0, "keeps turning back at " + 4 * step + " degrees");
+        }
+        // Carried past the hold range: stop rather than drive back across the field.
+        b = new Backend(); h = arm(b); clock = .16;
+        for (int step = 1; step <= 40; step++) { clock += .02; b.pose = new Pose(step, 0, 0); h.update(0, 0, 0, false, clock); }
+        zero(b);
+        check(h.getStatus().startsWith("Pushed beyond hold range"), "carry past range stops the hold");
+        // An odometry jump far faster than any push is a fault, not a target to chase.
+        b = new Backend(); h = arm(b);
+        b.pose = new Pose(5, 0, 0); h.update(0, 0, 0, false, .18);
+        zero(b);
+        check(h.getStatus().startsWith("Odometry jump"), "pose jump is treated as an odometry fault");
+
         for (int fault = 0; fault < 5; fault++) {
             b = new Backend(); h = arm(b);
             if (fault == 0) b.bad = true;

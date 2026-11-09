@@ -15,8 +15,19 @@ public final class TeleOpPositionHold {
     public static final double ENGAGE_DELAY_SECONDS = 0.15;
     public static final double MAX_HOLD_POWER = 0.90;
     private static final double MAX_LOOP_GAP_SECONDS = 0.25;
-    private static final double MAX_DISPLACEMENT_INCHES = 12.0;
-    private static final double MAX_HEADING_ERROR = Math.toRadians(45);
+    /**
+     * Keep resisting a shove up to this far from the captured target. Beyond it the robot was carried somewhere
+     * else entirely, so driving back could ram something; the hold stops and the driver re-arms with a stick.
+     */
+    public static final double MAX_HOLD_RANGE_INCHES = 36.0;
+    public static final double MAX_HOLD_HEADING = Math.toRadians(120);
+    /**
+     * A real push cannot move the robot faster than this between two updates. A bigger step means the odometry
+     * jumped (reset, glitch, re-localization), and holding would chase a phantom target.
+     */
+    public static final double MAX_PUSH_SPEED_IN_PER_S = 120.0;
+    public static final double MAX_PUSH_TURN_RAD_PER_S = Math.toRadians(720);
+    private static final double MIN_JUMP_INCHES = 4.0, MIN_JUMP_RADIANS = Math.toRadians(15);
 
     // Keeps ownership/transition tests independent of Android; production uses PedroBackend below.
     public interface Backend {
@@ -29,6 +40,7 @@ public final class TeleOpPositionHold {
     private Pose target;
     private double idleSince = Double.NaN;
     private double previousTime = Double.NaN;
+    private Pose previousPose;
     private boolean faulted;
     private String status = "Ready";
 
@@ -61,6 +73,17 @@ public final class TeleOpPositionHold {
         try {
             Pose pose = backend.updatePose();
             if (!finite(pose)) throw new IllegalStateException("Invalid pose");
+            if (previousPose != null) {
+                double step = previousPose.distance(pose);
+                double turn = Math.abs(Math.atan2(Math.sin(pose.heading() - previousPose.heading()),
+                        Math.cos(pose.heading() - previousPose.heading())));
+                if (step > Math.max(MIN_JUMP_INCHES, MAX_PUSH_SPEED_IN_PER_S * dt)
+                        || turn > Math.max(MIN_JUMP_RADIANS, MAX_PUSH_TURN_RAD_PER_S * dt)) {
+                    fail("Odometry jump - move stick to rearm");
+                    return true;
+                }
+            }
+            previousPose = pose;
             if (Double.isNaN(idleSince)) idleSince = now;
             if (now - idleSince < ENGAGE_DELAY_SECONDS) {
                 backend.stop();
@@ -70,13 +93,14 @@ public final class TeleOpPositionHold {
             if (target == null) target = pose;
             double headingError = Math.atan2(Math.sin(target.heading() - pose.heading()),
                     Math.cos(target.heading() - pose.heading()));
-            if (target.distance(pose) > MAX_DISPLACEMENT_INCHES
-                    || Math.abs(headingError) > MAX_HEADING_ERROR) {
-                fail("Displaced too far - move stick to rearm");
+            // Pushes are resisted at any distance up to the hold range; only a carry far past it stops the hold.
+            double offset = target.distance(pose);
+            if (offset > MAX_HOLD_RANGE_INCHES || Math.abs(headingError) > MAX_HOLD_HEADING) {
+                fail("Pushed beyond hold range - move stick to rearm");
                 return true;
             }
             backend.hold(target, dt);
-            status = "Holding";
+            status = offset > 1.0 || Math.abs(headingError) > Math.toRadians(3) ? "Resisting push" : "Holding";
         } catch (RuntimeException e) {
             fail("Odometry/hold fault - move stick to rearm");
         }
@@ -90,6 +114,7 @@ public final class TeleOpPositionHold {
 
     private void fail(String reason) {
         target = null;
+        previousPose = null;
         faulted = true;
         status = reason;
         backend.stop();
@@ -100,6 +125,7 @@ public final class TeleOpPositionHold {
         target = null;
         idleSince = Double.NaN;
         previousTime = Double.NaN;
+        previousPose = null;
         faulted = false;
         status = "Ready";
     }
