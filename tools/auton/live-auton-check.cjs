@@ -73,8 +73,11 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   assert(summary.parked&&summary.elapsed<29.7,'must finish parking before cutoff');
   // A ball that misses a tipping hive can land at the intake and be re-fed, so allow a fifth release.
   // Without the partner fixture Basket 2 is never raised, so Wait 15 shots cannot score and are re-fed.
-  assert(last.shots>=4&&(last.shots<=6||(delayed&&!fixture)),'the four-preload opening (plus at most re-fed misses)');
-  assert(last.hits>=(delayed&&!fixture?0:3),'opening shots reach hive');
+  // Park Only is drive-only: it must not shoot at all.
+  const parkOnly=name.includes('ParkOnly');
+  if(parkOnly)assert.equal(last.shots,0,'Park Only never shoots');
+  else{assert(last.shots>=4&&(last.shots<=6||(delayed&&!fixture)),'the four-preload opening (plus at most re-fed misses)');
+  assert(last.hits>=(delayed&&!fixture?0:3),'opening shots reach hive');}
   if(delayed){assert(summary.firstFeed>=15&&summary.firstFeed<16,'feed gate opens at 15 seconds after settled aim');
    assert(summary.firstShot>=14.5,'actual first launch after wait (telemetry lags the match clock by up to ~0.5 s)');if(fixture)assert.equal(last.hits,4,'all four enter raised Basket 2');}
   // Basket 2 starts on the parking-zone wall, so it takes the half of the zone nearer that wall (Blue (127.88, 21.27) in, Red mirrored).
