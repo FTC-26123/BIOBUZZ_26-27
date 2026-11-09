@@ -39,6 +39,17 @@ public final class AutoPathChecks {
             check(x*sign+half<=Math.max(1e-6,firstAcross+1e-6),what+": stays on our half of the field");
         }
     }
+    /** Nominal parking curves keep at least 4 inches between the footprint and every fixed flower pot. */
+    private static void potMargin(String what,AutoPaths.Leg leg){
+        for(Pose p:leg.sample(400)){
+            double x=p.x()*.0254,y=p.y()*.0254,h=p.heading(),c=Math.cos(h),s=Math.sin(h);
+            for(double[] pot:POTS){
+                double dx=pot[0]-x,dy=pot[1]-y;
+                double a=Math.max(0,Math.abs(dx*c+dy*s)-HALF),b=Math.max(0,Math.abs(-dx*s+dy*c)-HALF);
+                check(Math.hypot(a,b)-.08>=4*.0254,what+": 4-inch pot margin, got "+(Math.hypot(a,b)-.08)/.0254+" in");
+            }
+        }
+    }
     private static void verifyAll(String what,List<AutoPaths.Leg> legs,boolean blue,double teammateY,boolean startAtWall){
         for(AutoPaths.Leg l:legs){verify(what+" / "+l.name,l,blue,teammateY,startAtWall);startAtWall=false;}
     }
@@ -60,6 +71,8 @@ public final class AutoPathChecks {
             check(AutoPaths.plan(basket.approachLeg(),basket.initial,blue).size()==1,"Basket 1 opening is one leg");
             check(basket.parkingLegs(basket.shot()).size()==1,"Basket 1 parking is one leg");
             check(ParkOnlyAuto.legs(start,start.wallPose()).size()==1,"Park Only is one leg");
+            potMargin(side+" Basket 1 park curve",basket.parkLeg());
+            potMargin(side+" Park Only curve",ParkOnlyAuto.leg(start));
             for(Pose p:jitter(basket.initial,true,blue))verifyAll(side+" Basket 1 approach",AutoPaths.plan(basket.approachLeg(),p,blue),blue,1.19,true);
             for(Pose p:jitter(basket.shot(),false,blue))verifyAll(side+" Basket 1 park",basket.parkingLegs(p),blue,1.19,false);
             for(Pose p:jitter(start.wallPose(),true,blue))verifyAll(side+" Park Only",ParkOnlyAuto.legs(start,p),blue,1.19,true);
@@ -81,6 +94,7 @@ public final class AutoPathChecks {
                 at=s.pose();
             }
             check(garden.parkingLegs(at).size()==1&&garden.parkLeg().curved(),"Garden parks in one continuous curve");
+            potMargin(side+" Garden park curve",garden.parkLeg());
             check(garden.parkingLegs(basket.shot()).size()==1,"Garden aborted at the shot mark parks in one curve");
             for(Pose p:jitter(basket.shot(),false,blue))verifyAll(side+" Garden early park",garden.parkingLegs(p),blue,1.19,false);
             verifyAll(side+" Garden park",garden.parkingLegs(at),blue,1.19,true);

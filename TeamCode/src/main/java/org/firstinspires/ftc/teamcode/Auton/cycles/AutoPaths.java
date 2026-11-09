@@ -13,19 +13,20 @@ import java.util.List;
  * Visualizer engine (tools/auton/design-pedro-routes.mjs) and are exported as docs/pedro/*.pp.json.
  *
  * Every designed leg keeps the robot centre at least 2 inches outside {@link FrameClearance}, the
- * 18-inch footprint at least 2 inches from the fixed flower pot and 3 inches from the reserved teammate
- * slot, and the whole footprint on our alliance's half of the field.
+ * 18-inch footprint at least 4 inches from the fixed flower pot on every parking curve (the curves were pulled
+ * inboard of the pot for tracking error; Basket 2's wall start itself sits 1.5 inches from its pot), 3 inches from
+ * the reserved teammate slot, and the whole footprint on our alliance's half of the field.
  *
  * Constants are Red Pedro-visualizer inches (bottom-left origin); Blue is the 180-degree rotation.
  */
 public final class AutoPaths {
     public static final double FIELD_CENTER=70.75;
     /** Shoot mark -> our parking slot, around the outside of the frame corner. */
-    static final double[][] SHOT_TO_PARK={{44.81,21.98},{12.14,20.86}};
+    static final double[][] SHOT_TO_PARK={{43.81,15.98},{18.14,21.86}};
     /** Wall start -> our parking slot (Park Only). */
-    static final double[][] START_TO_PARK={{47.75,21.24},{16.73,15.99}};
+    static final double[][] START_TO_PARK={{41.75,21.24},{22.73,14.99}};
     /** Garden sweep end -> our parking slot, staying inboard of the fixed flower pot. */
-    static final double[][] GARDEN_TO_PARK={{27.12,25.99},{13.22,84.40}};
+    static final double[][] GARDEN_TO_PARK={{31.12,25.99},{19.22,84.40}};
     /** Basket 2 wall start -> its shooting mark: drop straight off the wall before drifting toward the
      * fixed flower pot side, keeping more than 1 inch from that pot. */
     static final double[][] WALL_TO_BASKET2={{61.10,121.00}};
