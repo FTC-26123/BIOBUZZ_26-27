@@ -35,6 +35,7 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
         driveTrain.init(hardwareMap, aprilTagAlignment);
         intake.init(hardwareMap);
         shooter.init(hardwareMap, intake);
+        driveTrain.enablePositionHold(hardwareMap);
     }
 
     @Override
@@ -52,7 +53,8 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
 
         // Driver 1 Drivetrain Control
         handleDrivetrainDpadSpeedSwitching(gamepad1);
-        driveTrain.drive(gamepad1.left_stick_y, gamepad1.left_stick_x, gamepad1.right_stick_x);
+        driveTrain.driveWithPositionHold(gamepad1.left_stick_y, gamepad1.left_stick_x,
+                gamepad1.right_stick_x, gamepad1.left_trigger > 0.3 || gamepad1.right_stick_button);
 
         // Driver 2 Intake Control
         handleManualIntakeControl(gamepad2);
@@ -71,7 +73,13 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
         telemetry.addData("Current Motor Speed", "%.0f ticks/s", shooter.getCurrentSpeed());
         telemetry.addData("Runtime (s)", "%.2f", TeleOpRuntime.seconds());
         telemetry.setMsTransmissionInterval(30);
+        telemetry.addData("Position hold (hold G1 right stick button to bypass)", driveTrain.getPositionHoldStatus());
         telemetry.update();
+    }
+
+    @Override
+    public void stop() {
+        driveTrain.stop();
     }
 
     // ---------------------- Driver Input Handlers ----------------------
@@ -123,3 +131,4 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
         }
     }
 }
+

@@ -19,6 +19,40 @@ public class MecanumDrive {
     private DcMotor backRightMotor;
     private AprilTagAlignment aprilTagAlignment;
     private OdometryMovement odometryMovement;
+    private TeleOpPositionHold positionHold;
+    private String holdUnavailable = "Disabled";
+
+    /** Opt in only from standard TeleOps; diagnostics and autonomous retain their own ownership. */
+    public void enablePositionHold(HardwareMap hwMap) {
+        try {
+            positionHold = TeleOpPositionHold.create(hwMap);
+        } catch (RuntimeException e) {
+            positionHold = null;
+            holdUnavailable = "Unavailable - check Pinpoint configuration";
+            stop();
+        }
+    }
+
+    public void driveWithPositionHold(double y, double x, double rx, boolean bypass) {
+        if (positionHold != null && positionHold.update(y, x, rx, bypass, System.nanoTime() / 1e9)) return;
+        if (!bypass && TeleOpPositionHold.sticksIdle(y, x, rx)) {
+            y = 0; x = 0; rx = 0;
+        }
+        drive(y, x, rx);
+    }
+
+    public String getPositionHoldStatus() {
+        return positionHold == null ? holdUnavailable : positionHold.getStatus();
+    }
+
+    public void stop() {
+        if (positionHold != null) positionHold.release();
+        // Direct zero bypasses alignment offsets and cached Pedro motor commands.
+        if (frontLeftMotor != null) frontLeftMotor.setPower(0);
+        if (frontRightMotor != null) frontRightMotor.setPower(0);
+        if (backLeftMotor != null) backLeftMotor.setPower(0);
+        if (backRightMotor != null) backRightMotor.setPower(0);
+    }
 
     // ----------------------- Calculated Motor Powers -----------------
     double frontLeftMotorSpeed = 0;
@@ -170,3 +204,4 @@ public class MecanumDrive {
         setSpeedMultiplier(drivingSpeeds[drivingSpeedsIndex]);
     }
 }
+
