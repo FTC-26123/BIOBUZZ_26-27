@@ -10,7 +10,10 @@ import java.util.List;
 
 /** One continuous Pedro curve from the wall start, around the frame corner, into our parking slot. */
 public abstract class ParkOnlyAuto extends OpMode {
-    private static final double DEADLINE_SECONDS = 12;
+    /** Keep correcting toward the slot for the whole autonomous period; stop only at the end. */
+    private static final double DEADLINE_SECONDS = 29.5;
+    /** After this long the arrival window widens so a robot that cannot settle exactly still counts as parked. */
+    private static final double LATE_SECONDS = 12;
     private final ElapsedTime timer = new ElapsedTime();
     private Follower follower;
     private GoBildaPinpointDriver pinpoint;
@@ -77,8 +80,9 @@ public abstract class ParkOnlyAuto extends OpMode {
         if (distance < 2 && !follower.holding()) follower.hold(target);
         double headingError = pose.heading() - target.heading();
         double speed = Math.hypot(follower.velocity().vx, follower.velocity().vy);
-        if (distance < .65 && speed < 3
-                && Math.abs(Math.atan2(Math.sin(headingError), Math.cos(headingError))) < Math.toRadians(2)) {
+        boolean late = timer.seconds() >= LATE_SECONDS;
+        if (distance < (late ? 3.0 : .65) && speed < (late ? 6 : 3)
+                && Math.abs(Math.atan2(Math.sin(headingError), Math.cos(headingError))) < Math.toRadians(late ? 6 : 2)) {
             nextWaypoint();
         }
     }

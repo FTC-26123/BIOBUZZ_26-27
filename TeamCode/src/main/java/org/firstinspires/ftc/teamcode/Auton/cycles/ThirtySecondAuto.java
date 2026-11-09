@@ -276,10 +276,17 @@ public abstract class ThirtySecondAuto extends OpMode {
             double turn=Math.abs(Math.atan2(Math.sin(route.stages.get(index).pose().heading()-stage.pose().heading()),Math.cos(route.stages.get(index).pose().heading()-stage.pose().heading())));
             if(turn<Math.toRadians(5))moveTolerance=2.0;
         }
-        boolean at=distance<(precision?.10:moveTolerance)&&error<Math.toRadians(precision?.25:2);
+        // Moving-garden drive/park stages never stop the robot for being slow: once past the stage limit
+        // they accept a wider arrival window, and a stalled robot (pinned, wheel slip) re-plans from where it is.
+        boolean lateMove=route.gardenMoving()&&!precision&&now-stageStart>stage.limit();
+        if(lateMove)moveTolerance=Math.max(moveTolerance,3.0);
+        boolean at=distance<(precision?.10:moveTolerance)&&error<Math.toRadians(precision?.25:lateMove?6:2);
         if(!at){settled=-1;mechanisms.close();
             if(adaptive()&&stage.action()==CycleRoute.Action.COLLECT&&distance<8&&error<Math.toRadians(8))mechanisms.collect(true);
-            if(now-lastProgress>2.5){finish("No path progress");}
+            if(now-lastProgress>2.5){
+                if(route.gardenMoving()){followStage();lastProgress=now;lastX=p.x();lastY=p.y();vision="Stalled; re-planned from current pose";}
+                else finish("No path progress");
+            }
         }else{
             if(settled<0){settled=now;follower.hold(stage.pose());}
             if(stage.action()==CycleRoute.Action.MOVE||stage.action()==CycleRoute.Action.PARK){next();}
@@ -312,7 +319,7 @@ public abstract class ThirtySecondAuto extends OpMode {
                 if(mechanisms.fired-shotBase>=stage.count()){mechanisms.close();if(now-settled>.45)next();}
             }
         }
-        if(!done&&now-stageStart>stage.limit()){
+        if(!done&&now-stageStart>stage.limit()&&!route.gardenMoving()){
             if(stage.action()==CycleRoute.Action.WAIT_TIP||bonusPickup||route.basketTeam()&&!parking)beginPark();
             else finish("Stage timeout: "+stage.name());
         }

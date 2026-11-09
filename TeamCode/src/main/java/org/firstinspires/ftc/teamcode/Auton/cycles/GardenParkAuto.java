@@ -30,7 +30,7 @@ public abstract class GardenParkAuto extends OpMode {
     private double phaseStarted,sweepSeconds;
     private static final double SHOOT_SECONDS=13; // Default Shooter needs at most ~13 s for four balls.
     private int fireIndex;
-    private boolean mechanismsReady,correcting,lateAim;
+    private boolean mechanismsReady,correcting,lateAim,stageLate;
     private String result="Ready";
 
     @Override public void init(){
@@ -51,7 +51,7 @@ public abstract class GardenParkAuto extends OpMode {
     }
     private CycleRoute.Stage stage(){return route.stages.get(stageIndex);}
     private void enterStage(){
-        shooter.stop();intake.stop();phaseStarted=timer.seconds();
+        shooter.stop();intake.stop();phaseStarted=timer.seconds();stageLate=false;
         if(stageIndex>=route.stages.size()){park("Garden sweep complete; carrying pollen to TeleOp");return;}
         if(stage().action()==CycleRoute.Action.SWEEP){
             // A moving hold target limits the floor sweep without retuning the team's follower.
@@ -105,18 +105,20 @@ public abstract class GardenParkAuto extends OpMode {
             // Slow to settle on the shot mark: close enough, shoot from here and keep correcting.
             result="Shooting from close-enough fallback";beginShooting();report();return;
         }
-        if(state!=State.PARK&&state!=State.SHOOT&&now-phaseStarted>stage().limit()){
+        if(state!=State.PARK&&state!=State.SHOOT&&!stageLate&&now-phaseStarted>stage().limit()){
             // A stuck wall-clearing stop must not cost the opening shot: skip ahead to the shot mark.
             if(stageIndex<fireIndex){stageIndex=fireIndex;enterStage();report();return;}
-            park("Stage timeout; parking");report();return;
+            // Never park just because a stage is slow: keep correcting with a wider arrival window.
+            // Only the park-time reserve above ends the stage early.
+            stageLate=true;result="Late: "+stage().name()+" (widened arrival window)";
         }
         switch(state){
             case SWEEP:
                 double u=sweepSeconds<=0?1:Math.min(1,(now-phaseStarted)/sweepSeconds);
                 follower.hold(new Pose(sweepFrom.x()+(target.x()-sweepFrom.x())*u,
                     sweepFrom.y()+(target.y()-sweepFrom.y())*u,target.heading()));
-                if(u>=1&&at(target,GardenParkRoute.PICKUP_POSITION_TOLERANCE_INCHES,
-                    GardenParkRoute.PICKUP_HEADING_TOLERANCE_DEGREES)){state=State.CAPTURE;phaseStarted=now;}
+                if(u>=1&&(stageLate?at(target,3.0,8,6):at(target,GardenParkRoute.PICKUP_POSITION_TOLERANCE_INCHES,
+                    GardenParkRoute.PICKUP_HEADING_TOLERANCE_DEGREES))){state=State.CAPTURE;phaseStarted=now;}
                 break;
             case CAPTURE:
                 if(now-phaseStarted>=GardenParkRoute.CAPTURE_DWELL_SECONDS){stageIndex++;enterStage();}
@@ -128,7 +130,12 @@ public abstract class GardenParkAuto extends OpMode {
                     releases+=counter.shots;
                     counter=null;
                     stageIndex++;enterStage();
-                }else if(now-phaseStarted>=stage().limit())park("Incomplete batch; parking");
+                }else if(now-phaseStarted>=stage().limit()){
+                    // The release counter can miss a shot. The garden is still worth collecting, so move on
+                    // to it instead of parking; the park-time reserve still applies.
+                    releases+=counter.shots;counter=null;result="Shooting timeout; continuing to the garden";
+                    stageIndex++;enterStage();
+                }
                 else{
                     // The hold keeps correcting the whole time. Feeding pauses only while clearly off the mark.
                     Pose shot=stage().pose();
@@ -145,8 +152,9 @@ public abstract class GardenParkAuto extends OpMode {
             case DRIVE: case PARK:
                 if(Math.hypot(p.x()-target.x(),p.y()-target.y())<2&&!follower.holding())follower.hold(target);
                 // Corridor points only need to be passed cleanly once late or parking; final points stay tight.
-                boolean relaxed=waypoints.hasNext()&&(state==State.PARK||lateAim);
-                if(relaxed?at(target,1.5,5,6):at(target)){
+                boolean relaxed=waypoints.hasNext()&&(state==State.PARK||lateAim||stageLate);
+                boolean lateFinal=stageLate&&state!=State.PARK&&!waypoints.hasNext();
+                if(relaxed?at(target,1.5,5,6):lateFinal?at(target,3.0,6,6):at(target)){
                     if(waypoints.hasNext())nextWaypoint();
                     else if(state==State.PARK)finish("Parked");
                     else if(stage().action()==CycleRoute.Action.FIRE)beginShooting();

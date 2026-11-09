@@ -37,9 +37,10 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   let prior='';
   for(let i=0;i<290;i++){
    await wait(100);const s=await api('state');
-   const stage=s.telemetry?.match(/Auto stage\s*:\s*(.*)/)?.[1]||'initializing';
+   // Park Only reports only an Auto result line; treat its Parked result as the DONE stage.
+   const stage=s.telemetry?.match(/Auto stage\s*:\s*(.*)/)?.[1]||(s.telemetry?.includes('Auto result : Parked')?'DONE':'initializing');
    const route=s.telemetry?.match(/Route\s*:\s*(.*)/)?.[1]||'';
-   const elapsed=Number(s.telemetry?.match(/Elapsed \(s\)\s*:\s*(\S+)/)?.[1]??-1);
+   const elapsed=Number(s.telemetry?.match(/Elapsed \(s\)\s*:\s*(\S+)/)?.[1]??s.telemetry?.match(/Auto elapsed\s*:\s*(\S+)/)?.[1]??-1);
    trace.push({time:s.time,elapsed,stage,route,robot:s.robot,shots:s.shots,hits:s.hits,held:s.held,collected:s.collected,
     motorPowers:s.motorPowers,windmill:s.windmillPower??0,intake:s.intake,telemetry:s.telemetry,hives:s.hives});
    assert(Math.abs(s.robot[0])>1.04||Math.abs(s.robot[1])>.89,'actual follower entered frame keepout');
@@ -58,7 +59,7 @@ const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const last=trace.at(-1),garden=name.includes('Garden'),sign=name.startsWith('Blue')?-1:1;
   // The community simulator has no pickup counters; fall back to the pollen held after the sweep.
   last.collected=last.collected||{garden:last.held,flowers:0,nectarCollected:0};
-  const summary={name,elapsed:Number(last.telemetry.match(/Elapsed \(s\)\s*:\s*(\S+)/)?.[1]),simulationTime:last.time,
+  const summary={name,elapsed:Number(last.telemetry.match(/Elapsed \(s\)\s*:\s*(\S+)/)?.[1]??last.telemetry.match(/Auto elapsed\s*:\s*(\S+)/)?.[1]),simulationTime:last.time,
    parked:last.telemetry.includes('Auto result : Parked'),shots:last.shots,hits:last.hits,held:last.held,
    garden:last.collected.garden,flowers:last.collected.flowers,nectar:last.collected.nectarCollected,
    end:last.robot.slice(0,3),stages:[...new Set(trace.map(row=>row.stage))]};
