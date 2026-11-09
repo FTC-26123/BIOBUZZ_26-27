@@ -16,6 +16,7 @@ public abstract class ThirtySecondAuto extends OpMode {
     private final SpillCollector collector=new SpillCollector();
     private final FlowerPickup flowerPickup=new FlowerPickup();
     private final GardenSweep garden=new GardenSweep();
+    private final GardenStrafe gardenStrafe=new GardenStrafe();
     private final LimelightShotPose shotVision=new LimelightShotPose();
     private int visionPipeline=VisionRules.SHOT_PIPELINE;
     private MovingShotSolver.Solution movingSolution;
@@ -25,7 +26,9 @@ public abstract class ThirtySecondAuto extends OpMode {
     private double velocityTime=-1,lastVx,lastVy,accelX,accelY;
     private boolean adaptive(){return route.strategy==CycleRoute.Strategy.ADAPTIVE_ALL||route.rushStyle();}
     private double rollingStart=-1;
+    private boolean rollingLate;
     private double plannedReleaseHeading;
+    private double plannedTurnRate;
     private TransitPath transitPath;
     private boolean haveRollingAim;
     private String shotStatus="Waiting";
@@ -68,9 +71,10 @@ public abstract class ThirtySecondAuto extends OpMode {
         telemetry.addData("Place robot (m)",String.format("%.3f, %.3f",route.initial.x()*.0254,route.initial.y()*.0254));
         telemetry.addData("Pedro heading (deg)",Math.toDegrees(route.initial.heading()));
         telemetry.addLine("Verify hardware calibration: 4 pollen preloads, camera height 10 in, forward offset 7 in, pitch +43 degrees, shot elevation 86 degrees.");
+        if(route.gardenMoving())telemetry.addLine("Moving preload shots to garden, sideways pickup, then opposite-hive shots. Limelight required.");
         telemetry.update();
     }
-    @Override public void start(){timer.reset();index=0;stage=null;cellSafeAt=0;partnerTipConfirmed=false;usedBasketFallback=false;basketCycleDry=false;done=false;parking=false;result="Running";next();}
+    @Override public void start(){timer.reset();velocityTime=-1;accelX=accelY=0;index=0;stage=null;cellSafeAt=0;partnerTipConfirmed=false;usedBasketFallback=false;basketCycleDry=false;done=false;parking=false;result="Running";next();}
     private void beginPark(){
         mechanisms.stop();parking=true;result="Parking";
         parkSteps=route.parkingPath(follower.pose()).iterator();nextPark();
@@ -132,7 +136,13 @@ public abstract class ThirtySecondAuto extends OpMode {
         }
         mechanisms.target(preparedSpeed);
         shotBase=mechanisms.fired;lastProgress=stageStart;lastX=follower.pose().x();lastY=follower.pose().y();
-        rollingStart=-1;haveRollingAim=false;emptyBase=mechanisms.emptyPulses;transitPath=new TransitPath(follower.pose(),stage.pose(),route.blue,route.avoidFrame());
+        rollingStart=-1;rollingLate=false;haveRollingAim=false;plannedTurnRate=Double.NaN;emptyBase=mechanisms.emptyPulses;
+        // Four preloads remain ballistically reachable at this modeled slow diagonal pace.
+        boolean gardenOpening=route.gardenMoving()&&stage.action()==CycleRoute.Action.ROLL_NEAR;
+        transitPath=new TransitPath(follower.pose(),stage.pose(),route.blue,route.avoidFrame(),
+            gardenOpening?.15:route.gardenMoving()?.40:TransitPath.SPEED,
+            gardenOpening?.30:route.gardenMoving()?.60:TransitPath.ACCEL);
+        gardenStrafe.reset();
         flowerPickup.reset();
         collector.reset(follower.pose());
         pathReplans+=garden.replans;garden.reset(follower.pose());movingSolution=null;lastSolve=-1;
@@ -142,6 +152,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         if(route.avoidFrame()&&(stage.action()==CycleRoute.Action.ROLL_NEAR||stage.action()==CycleRoute.Action.ROLL_FAR)){
             moveSteps=null;moveTarget=null;follower.hold(follower.pose());return;
         }
+        if(stage.action()==CycleRoute.Action.GARDEN_STRAFE){moveSteps=null;moveTarget=null;follower.hold(follower.pose());return;}
         if(route.avoidFrame()){
             moveSteps=FrameClearance.path(follower.pose(),stage.pose(),route.blue).iterator();advanceMove();
         }else{moveTarget=null;follower.follow(Paths.line(follower.pose(),stage.pose()).linear(follower.pose(),stage.pose()));}
@@ -179,6 +190,17 @@ public abstract class ThirtySecondAuto extends OpMode {
         if(!parking&&now>=29.5-route.parkReserve(p)){beginPark();report();return;}
         if(!parking&&!bonusPickup)mechanisms.spin();
         if(stage.action()==CycleRoute.Action.ROLL_NEAR||stage.action()==CycleRoute.Action.ROLL_FAR){rolling(now,p);report();return;}
+        if(stage.action()==CycleRoute.Action.GARDEN_STRAFE){
+            // Never park for a missed pickup window: keep correcting onto the lane, widen the capture
+            // window once late, and only the park-reserve check above can end the stage early.
+            boolean late=now-stageStart>stage.limit();
+            Pose designedFrom=index>=2?route.stages.get(index-2).pose():null;
+            follower.hold(gardenStrafe.target(p,designedFrom,stage.pose(),now,late));mechanisms.collect(true);
+            vision=gardenStrafe.skipped()?"Garden pass skipped: no frame-safe lane from here"
+                :late?"Late garden pass: widened capture window":"Timed sideways garden intake; inventory is not sensed";
+            if(gardenStrafe.complete(now)||now-stageStart>stage.limit()+GardenStrafe.GIVE_UP_GRACE_SECONDS)next();
+            report();return;
+        }
         if(stage.action()==CycleRoute.Action.SWEEP){
             if(garden.update(follower,mechanisms,camera.getLatestResult(),route.blue,now)||now-stageStart>stage.limit())next();
             vision=garden.status;report();return;
@@ -254,10 +276,17 @@ public abstract class ThirtySecondAuto extends OpMode {
             double turn=Math.abs(Math.atan2(Math.sin(route.stages.get(index).pose().heading()-stage.pose().heading()),Math.cos(route.stages.get(index).pose().heading()-stage.pose().heading())));
             if(turn<Math.toRadians(5))moveTolerance=2.0;
         }
-        boolean at=distance<(precision?.10:moveTolerance)&&error<Math.toRadians(precision?.25:2);
+        // Moving-garden drive/park stages never stop the robot for being slow: once past the stage limit
+        // they accept a wider arrival window, and a stalled robot (pinned, wheel slip) re-plans from where it is.
+        boolean lateMove=route.gardenMoving()&&!precision&&now-stageStart>stage.limit();
+        if(lateMove)moveTolerance=Math.max(moveTolerance,3.0);
+        boolean at=distance<(precision?.10:moveTolerance)&&error<Math.toRadians(precision?.25:lateMove?6:2);
         if(!at){settled=-1;mechanisms.close();
             if(adaptive()&&stage.action()==CycleRoute.Action.COLLECT&&distance<8&&error<Math.toRadians(8))mechanisms.collect(true);
-            if(now-lastProgress>2.5){finish("No path progress");}
+            if(now-lastProgress>2.5){
+                if(route.gardenMoving()){followStage();lastProgress=now;lastX=p.x();lastY=p.y();vision="Stalled; re-planned from current pose";}
+                else finish("No path progress");
+            }
         }else{
             if(settled<0){settled=now;follower.hold(stage.pose());}
             if(stage.action()==CycleRoute.Action.MOVE||stage.action()==CycleRoute.Action.PARK){next();}
@@ -290,7 +319,7 @@ public abstract class ThirtySecondAuto extends OpMode {
                 if(mechanisms.fired-shotBase>=stage.count()){mechanisms.close();if(now-settled>.45)next();}
             }
         }
-        if(!done&&now-stageStart>stage.limit()){
+        if(!done&&now-stageStart>stage.limit()&&!route.gardenMoving()){
             if(stage.action()==CycleRoute.Action.WAIT_TIP||bonusPickup||route.basketTeam()&&!parking)beginPark();
             else finish("Stage timeout: "+stage.name());
         }
@@ -298,6 +327,8 @@ public abstract class ThirtySecondAuto extends OpMode {
     }
     private void rolling(double now,Pose p){
         boolean near=stage.action()==CycleRoute.Action.ROLL_NEAR;
+        // Start driving toward the pickup immediately, independently of shot acquisition.
+        if(route.gardenMoving()&&rollingStart<0)rollingStart=now;
         double delay=mechanisms.releaseDelay(now);
         com.pedropathing.math.Velocity measured=follower.velocity();double vx=measured.vx*.0254,vy=measured.vy*.0254;
         Pose shotPose=shotVision.measured(camera.getLatestResult(),p,measured,route.blue,near,accelX,accelY);
@@ -315,21 +346,46 @@ public abstract class ThirtySecondAuto extends OpMode {
         }
         Pose launchFrom=shotPose==null?p:shotPose;
         Pose releasePose=new Pose(launchFrom.x()+dx/.0254,launchFrom.y()+dy/.0254,p.heading()+measured.omega*delay);
+        // Keep the heading reference continuous in Pinpoint coordinates. Individual
+        // image-derived ranges can jump when a different tag enters the frame;
+        // they validate the actual release below rather than steering the chassis.
+        Pose planningReleasePose=new Pose(p.x()+dx/.0254,p.y()+dy/.0254,p.heading());
         com.pedropathing.math.Velocity releaseVelocity=new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,measured.omega);
-        boolean atDestination=rollingStart>=0&&phase>=transitPath.duration()&&Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y())*.0254<.06;
-        // A stationary fallback aims for zero yaw, rather than chasing each measured yaw
-        // correction and feeding it back into the next heading target. The actual gate below
-        // still validates measured translation/yaw at release before opening the feeder.
-        com.pedropathing.math.Velocity planningVelocity=atDestination&&Math.hypot(vx,vy)<.08
-            ?new com.pedropathing.math.Velocity(futureVx/.0254,futureVy/.0254,0):releaseVelocity;
-        if(shotPose==null)movingSolution=null;
-        if(shotPose!=null&&(lastSolve<0||now-lastSolve>.06||movingSolution==null)){
-            double aimU=route.strategy==CycleRoute.Strategy.NO_FLOWERS&&near?-.16+(mechanisms.fired%3)*.04:(mechanisms.fired%3-1)*.07;
-            movingSolution=MovingShotSolver.rolling(releasePose,planningVelocity,route.blue,near,mechanisms.speed(),0,0,0,aimU*(route.blue?-1:1));
-            if(movingSolution!=null){plannedReleaseHeading=movingSolution.heading();haveRollingAim=true;}
+        // Garden-moving shots are never abandoned for parking. Once past the stage limit the arrival
+        // window widens so a robot that cannot settle on the exact mark still finishes the batch.
+        if(route.gardenMoving()&&!rollingLate&&now-stageStart>stage.limit())rollingLate=true;
+        boolean atDestination=rollingStart>=0&&phase>=transitPath.duration()&&Math.hypot(p.x()-stage.pose().x(),p.y()-stage.pose().y())*.0254<(rollingLate?.15:.06);
+        // Plan the yaw we want, not the measured corrective yaw. Feeding measured
+        // yaw back into the desired aim amplifies each turn correction and can
+        // repeatedly cancel feeder transport. Evaluation below retains actual yaw.
+        double desiredYaw=atDestination&&Math.hypot(vx,vy)<.08?0:
+            MovingAim.trackable(plannedTurnRate)?plannedTurnRate:0;
+        com.pedropathing.math.Velocity planningVelocity=new com.pedropathing.math.Velocity(
+            futureVx/.0254,futureVy/.0254,desiredYaw);
+        // Odometry may acquire the aim while tags are outside the camera view.
+        // Feeding still requires a fresh tag pose and an independently evaluated entry.
+        if(lastSolve<0||now-lastSolve>.06||movingSolution==null){
+            double aimU=route.gardenMoving()?0:route.strategy==CycleRoute.Strategy.NO_FLOWERS&&near?-.16+(mechanisms.fired%3)*.04:(mechanisms.fired%3-1)*.07;
+            movingSolution=MovingShotSolver.rolling(planningReleasePose,planningVelocity,route.blue,near,mechanisms.speed(),0,0,0,aimU*(route.blue?-1:1));
+            haveRollingAim=movingSolution!=null;
+            plannedTurnRate=Double.NaN;
+            if(movingSolution!=null){
+                plannedReleaseHeading=movingSolution.heading();haveRollingAim=true;
+                // Differentiate the ballistic aim, including inherited chassis velocity,
+                // rather than just pointing geometrically at the hive's current bearing.
+                double dt=MovingAim.SAMPLE_SECONDS;
+                Pose later=new Pose(planningReleasePose.x()+planningVelocity.vx*dt,
+                    planningReleasePose.y()+planningVelocity.vy*dt,planningReleasePose.heading());
+                MovingShotSolver.Solution nextAim=MovingShotSolver.rolling(later,planningVelocity,
+                    route.blue,near,movingSolution.ticks(),0,0,0,aimU*(route.blue?-1:1));
+                if(nextAim!=null)plannedTurnRate=MovingAim.turnRate(plannedReleaseHeading,nextAim.heading(),dt);
+            }
             lastSolve=now;
         }
-        double h=haveRollingAim?plannedReleaseHeading:stage.pose().heading();
+        double rate=MovingAim.trackable(plannedTurnRate)?plannedTurnRate:0;
+        double hiveX=route.blue?.32385:-.32385,hiveY=(near?-1:1)*(route.blue?-1:1)*.392176;
+        double h=haveRollingAim?MovingAim.commandHeading(plannedReleaseHeading+rate*Math.max(0,now-lastSolve),
+            rate,delay):Math.atan2(hiveY-p.y()*.0254,hiveX-p.x()*.0254);
         double aimError=Math.abs(Math.atan2(Math.sin(p.heading()-h),Math.cos(p.heading()-h)));
         // At the inner corridor, translate outward before a turn whose swept body
         // would cross the center line, even when its final heading would fit.
@@ -342,19 +398,21 @@ public abstract class ThirtySecondAuto extends OpMode {
         MovingShotSolver.Solution direct=shotPose==null?null:MovingShotSolver.evaluate(releasePose,releaseVelocity,route.blue,near,mechanisms.predictedReleaseSpeed(now),0,0,0);
         double speed=Math.hypot(vx,vy),futureSpeed=Math.hypot(futureVx,futureVy);
         boolean arrived=atDestination;
-        boolean fast=speed>.40&&futureSpeed>.75;
         // Finish an unsafe-in-transit shot at the actual pickup approach, never by making extra passes.
         boolean settledAtPickup=arrived&&speed<.08&&Math.abs(measured.omega)<.10;
-        boolean openingFour=route.floorOnly()&&index==2;
+        boolean requireFullBatch=route.gardenMoving()||route.floorOnly()&&index==2;
         boolean complete=mechanisms.fired-shotBase>=stage.count()
-            ||!openingFour&&mechanisms.emptyPulses-emptyBase>=1;
+            ||!requireFullBatch&&mechanisms.emptyPulses-emptyBase>=1;
         boolean fresh=rollingVisionReady(now,p,near,arrived)&&shotPose!=null;
         if(shotPose==null)vision=shotVision.status;
-        boolean permit=!complete&&now>=cellSafeAt&&rollingStart>=0&&(fast||settledAtPickup)&&movingSolution!=null&&direct!=null&&fresh&&chassisFits(p,h)&&chassisFits(releasePose,h);
+        boolean translating=speed>.02&&futureSpeed>.02;
+        boolean permit=!complete&&now>=cellSafeAt&&rollingStart>=0&&(translating||settledAtPickup)
+            &&MovingAim.trackable(plannedTurnRate)&&turnFits&&movingSolution!=null&&direct!=null&&fresh
+            &&chassisFits(p,h)&&chassisFits(releasePose,releasePose.heading());
         mechanisms.feedPredicted(now,permit,fresh&&!complete);
         shotStatus=String.format(java.util.Locale.US,"v %.2f -> %.2f, remaining %.2f m, aim %.1f deg, RPM ticks %.0f/%.0f, valid %s, feed %s",speed,futureSpeed,current.remaining(),Math.toDegrees(Math.atan2(Math.sin(releasePose.heading()-h),Math.cos(releasePose.heading()-h))),mechanisms.speed(),movingSolution==null?0:movingSolution.ticks(),direct!=null,permit);
         if(complete&&arrived){next();return;}
-        if(now-stageStart>stage.limit()){
+        if(now-stageStart>stage.limit()&&!route.gardenMoving()){
             if(route.floorOnly()||route.basketTeam()||route.lineup==CycleRoute.Lineup.PARTNER||route.rushStyle()&&!vision.contains("No fresh"))beginPark();
             else finish("Rolling stage timeout: "+stage.name());
         }
@@ -366,7 +424,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         return Math.abs(x)+ex<1.790&&Math.abs(y)+ey<1.790&&x*(route.blue?-1:1)+ex<-.002;
     }
     private boolean rollingVisionReady(double now,Pose pose,boolean near,boolean arrived){
-        if(route.basketTeam()||route.floorOnly()){
+        if(route.basketTeam()||route.floorOnly()||route.gardenMoving()){
             int first=route.blue?(near?42:38):(near?34:30);
             boolean raised=tags.readyRaisedCell(first,pose,route.blue,near);
             vision=tags.status;
@@ -407,6 +465,7 @@ public abstract class ThirtySecondAuto extends OpMode {
         telemetry.addData("Vision interlock",vision);telemetry.addData("Pedro pose",follower.pose());
         telemetry.addData("Feeder release estimate (s)",mechanisms.releaseDelay(timer.seconds()));telemetry.addData("Last confirmed feed (s)",mechanisms.lastFeedDuration());
         telemetry.addData("Fast shot gate",shotStatus);
+        telemetry.addData("Calculated aim turn (deg/s)",Math.toDegrees(plannedTurnRate));
         telemetry.addData("Shooting angle (deg)",MovingShotSolver.LAUNCH_ANGLE_DEGREES);
         telemetry.addData("Limelight shooting",shotVision.status);
         telemetry.addData("Limelight basket range (m)",shotVision.rangeMeters);

@@ -11,7 +11,7 @@ public final class ShooterSpinupChecks {
         HardwareMap hw=new HardwareMap();hw.setActive(true);double[] power={0};
         DcMotorExImpl roller=new DcMotorExImpl(MotorType.Gobilda6000,new DcMotorControllerImpl(),0);
         DcMotorExImpl windmill=new DcMotorExImpl(MotorType.Gobilda192,new DcMotorControllerImpl(),0);
-        CRServoImpl transfer=new CRServoImpl(360);
+        DcMotorExImpl transfer=new DcMotorExImpl(MotorType.Gobilda6000,new DcMotorControllerImpl(),0);
         DcMotorEx motor=(DcMotorEx)Proxy.newProxyInstance(DcMotorEx.class.getClassLoader(),new Class<?>[]{DcMotorEx.class},
             (proxy,method,values)->{
                 switch(method.getName()){
@@ -23,7 +23,7 @@ public final class ShooterSpinupChecks {
                     default:return null;
                 }
             });
-        hw.put("intake",roller);hw.put("windmill",windmill);hw.put("transferServo",transfer);hw.put("shooter",motor);
+        hw.put("intake",roller);hw.put("windmill",windmill);hw.put("transfer",transfer);hw.put("shooter",motor);
         Intake intake=new Intake();Shooter shooter=new Shooter();intake.init(hw);shooter.init(hw,intake);
         shooter.start();Thread.sleep(70); // Let the unchanged minimum readiness pause expire.
         for(int i=0;i<20;i++){
@@ -33,7 +33,7 @@ public final class ShooterSpinupChecks {
         check(power[0]>0,"flywheel PIDF runs during spin-up");
         check(shooter.getTargetLaunchPower()==1500,"same default target");
         shooter.update();
-        check(roller.getPower()==Intake.INTAKE_IN&&windmill.getPower()==Intake.WINDMILL_IN&&transfer.getPower()==Intake.TRANSFER_SERVO_POWER,
+        check(roller.getPower()==Intake.INTAKE_IN&&windmill.getPower()==Intake.WINDMILL_IN&&transfer.getPower()==Intake.TRANSFER_POWER,
             "existing update() still feeds when ready");
         shooter.updateSpinupOnly();
         check(roller.getPower()==0&&windmill.getPower()==0&&transfer.getPower()==0,"losing aim pauses every feeder output");

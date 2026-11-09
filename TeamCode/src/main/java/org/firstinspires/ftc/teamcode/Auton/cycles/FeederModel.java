@@ -3,7 +3,7 @@ package org.firstinspires.ftc.teamcode.Auton.cycles;
 /** Onboard calibration, not simulator state. CAD path and estimated slip require real measurements. */
 public final class FeederModel {
     public static final double PATH=.6285866147,DIAMETER=.072,REDUCTION=1,TRANSFER=.25,TICKS_PER_REV=28;
-    // Estimated transfer startup latency; measure again with the current CRServo feed.
+    // Estimated transfer startup latency; measure again with the current transfer motor feed.
     public static final double POWER=.8,FREE_TICKS=2800,TAU=.1089607,START_DELAY=.035,MIN_INTERVAL=.35;
     private double travelTicks=PATH/(Math.PI*DIAMETER/REDUCTION*TRANSFER)*TICKS_PER_REV;
     private double progress,lastTime=-1,lastSpeed,opened=-1;

@@ -7,6 +7,8 @@ import java.util.*;
 public final class CycleRoute {
     // Two 18-inch footprints along the loading wall, with a 3.65-inch gap.
     public static final double OUR_PARK_Y_METERS=.64,TEAMMATE_PARK_Y_METERS=1.19;
+    /** Parking x: about 4 inches off the loading-zone wall so the robot never touches it. Teammate slot stays at -1.55. */
+    public static final double PARK_X_METERS=-1.451;
     public enum Start {
         RED_WEST(false, false), RED_EAST(false, true),
         BLUE_EAST(true, false), BLUE_WEST(true, true);
@@ -28,7 +30,7 @@ public final class CycleRoute {
         }
 
         Pose loadingZone() {
-            return alliancePose(blue, -1.55, OUR_PARK_Y_METERS, 90);
+            return alliancePose(blue, PARK_X_METERS, OUR_PARK_Y_METERS, 90);
         }
 
         public Pose teammateParking() {
@@ -36,8 +38,8 @@ public final class CycleRoute {
         }
     }
     public enum Lineup { LEGACY, SOLO, PARTNER, BASKET_ONE_TEAM, BASKET_TWO_TEAM,
-        FOUR_PARK, FOUR_RECOVER_TEAM }
-    public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, ROLL_NEAR, ROLL_FAR, PARK }
+        FOUR_PARK, FOUR_RECOVER_TEAM, GARDEN_MOVING }
+    public enum Action { MOVE, COLLECT, FLOWER_COLLECT, FIRE, BONUS_FIRE, WAIT_TIP, VISION_COLLECT, VISION_NECTAR, SWEEP, GARDEN_STRAFE, ROLL_NEAR, ROLL_FAR, PARK }
     public enum Strategy { FLOWERS, TIPPED_POLLEN, ADAPTIVE_ALL, RUSH_TIPS, NO_FLOWERS }
     public static final class Stage {
         private final String name;
@@ -87,6 +89,10 @@ public final class CycleRoute {
         }
         initial=lineup==Lineup.BASKET_TWO_TEAM?pose(-.90,1.564259,-90)
             :lineup==Lineup.LEGACY?pose(startX,-1.564259,90):start.wallPose();
+        if(gardenMoving()){
+            park=pose(-1.55,OUR_PARK_Y_METERS,270);
+            gardenMovingRoute();return;
+        }
         if(floorOnly()){
             park=start.loadingZone();
             floorRoute();
@@ -94,7 +100,7 @@ public final class CycleRoute {
         }
         if(basketTeam()){
             // Split the loading zone along its length so both robots can park.
-            park=pose(-1.55,basketOne()?.66:1.17,90);
+            park=pose(PARK_X_METERS,basketOne()?.66:1.17,90);
             basketTeamRoute();
             return;
         }
@@ -185,10 +191,26 @@ public final class CycleRoute {
     }
     public boolean rushStyle(){return strategy==Strategy.RUSH_TIPS||strategy==Strategy.NO_FLOWERS;}
     public boolean floorOnly(){return lineup==Lineup.FOUR_PARK||lineup==Lineup.FOUR_RECOVER_TEAM;}
+    public boolean gardenMoving(){return lineup==Lineup.GARDEN_MOVING;}
+
+    private void gardenMovingRoute(){
+        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
+        // The firing stage's destination IS the garden approach. Translation starts
+        // immediately; only the feeder waits for a valid predicted moving shot.
+        double h=Math.toDegrees(Math.atan2(-.392176+1.05,-.32385+1.13));
+        add("Shoot four preloads while driving to garden",-1.13,-1.05,h,Action.ROLL_NEAR,4,10);
+        add("Face our garden intake lane",-1.15,-1.48,255,Action.MOVE,0,4);
+        add("Strafe across our four garden balls",-1.50,-1.48,255,Action.GARDEN_STRAFE,4,4);
+        add("Retreat from garden wall before aiming",-1.15,-1.30,255,Action.MOVE,0,3);
+        // Stop short of the far reserved teammate parking footprint.
+        double farHeading=Math.toDegrees(Math.atan2(.392176-.55,-.32385+1.13));
+        add("Shoot garden batch while crossing to opposite hive",-1.13,.55,farHeading,Action.ROLL_FAR,4,10);
+        bonusIndex=stages.size();
+    }
 
     private void floorRoute(){
-        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
         if(lineup==Lineup.FOUR_PARK){
+            // No separate wall-clear stop: one straight Pedro leg from the wall start to the mark (see approachLeg).
             // Pedro visualizer uses bottom-left inches on a 141.5-inch field.
             double x=(57.05-70.75)*.0254,y=(28.48-70.75)*.0254;
             double aim=Math.atan2(-.392176-y,-.32385-x);
@@ -200,6 +222,7 @@ public final class CycleRoute {
             stages.add(new Stage("Shoot four with team Shooter default",pose(x,y,heading),Action.FIRE,4,14));
             bonusIndex=stages.size();return;
         }
+        add("Clear starting wall",-.36,-1.43,90,Action.MOVE,0,3);
         add("Shoot four preloads into Basket 1",-.36,-1.43,90,Action.ROLL_NEAR,4,12);
         if(lineup==Lineup.FOUR_RECOVER_TEAM){
             add("Move forward toward the spill",-.36,-1.18,90,Action.MOVE,0,3);
@@ -283,6 +306,14 @@ public final class CycleRoute {
         if(a==Action.FIRE||a==Action.BONUS_FIRE){ x=-1.13; y=(stages.isEmpty()||a==Action.BONUS_FIRE)?-.85:.85; }
         stages.add(new Stage(name,pose(x,y,h),a,count,limit));
     }
+    /** FOUR_PARK: the fixed shooting mark. */
+    public Pose shot(){return stages.get(0).pose();}
+    /** FOUR_PARK: wall start straight to the shooting mark, turning the last 2 degrees on the way. */
+    public AutoPaths.Leg approachLeg(){return AutoPaths.Leg.line("Drive to the shot mark",initial,shot());}
+    /** FOUR_PARK: one continuous curve from the shooting mark around the frame corner into our slot. */
+    public AutoPaths.Leg parkLeg(){return AutoPaths.curve("Park",blue,shot(),park,AutoPaths.SHOT_TO_PARK);}
+    /** FOUR_PARK parking from the measured pose: the designed curve near the mark, else the corridor. */
+    public java.util.List<AutoPaths.Leg> parkingLegs(Pose current){return AutoPaths.plan(parkLeg(),current,blue);}
     /** Collision-clear return corridor; points are generated from the current measured pose. */
     public List<Pose> parkingPath(Pose current) {
         if(avoidFrame())return FrameClearance.path(current,park,blue);
@@ -294,10 +325,11 @@ public final class CycleRoute {
         return result;
     }
     public double parkReserve(Pose current) {
+        if(lineup==Lineup.FOUR_PARK)return 1.90+AutoPaths.reserveSeconds(parkingLegs(current))-.8;
         double inches=0;Pose from=current;
         for(Pose to:parkingPath(current)){inches+=Math.hypot(to.x()-from.x(),to.y()-from.y());from=to;}
         // Include braking the fast pass, turning, and settling inside the loading zone.
-        if(basketTeam()||floorOnly())return 1.90+inches*.0254/1.20;
+        if(basketTeam()||floorOnly()||gardenMoving())return 1.90+inches*.0254/1.20;
         return rushStyle()?1.15+inches*.0254/1.20:strategy==Strategy.ADAPTIVE_ALL?1.45+inches*.0254/1.20:1.05+inches*.0254/.85;
     }
     private Pose pose(double x,double y,double heading) {

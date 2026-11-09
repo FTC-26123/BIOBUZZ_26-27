@@ -12,7 +12,7 @@ public final class IntakeSubsystemChecks {
         HardwareMap hw=new HardwareMap();hw.setActive(true);
         DcMotorExImpl roller=new DcMotorExImpl(MotorType.Gobilda6000,new DcMotorControllerImpl(),0);
         DcMotorExImpl windmill=new DcMotorExImpl(MotorType.Gobilda192,new DcMotorControllerImpl(),0);
-        CRServoImpl transfer=new CRServoImpl(360);
+        DcMotorExImpl transfer=new DcMotorExImpl(MotorType.Gobilda6000,new DcMotorControllerImpl(),0);
         // A recovered flywheel allows the test to exercise the feed permission transition.
         DcMotorEx flywheel=(DcMotorEx)Proxy.newProxyInstance(DcMotorEx.class.getClassLoader(),new Class<?>[]{DcMotorEx.class},
             (proxy,method,values)->{
@@ -22,21 +22,26 @@ public final class IntakeSubsystemChecks {
                 if(method.getName().equals("toString"))return "Recovered flywheel fixture";
                 return null;
             });
-        hw.put("intake",roller);hw.put("windmill",windmill);hw.put("transferServo",transfer);hw.put("shooter",flywheel);
+        hw.put("intake",roller);hw.put("windmill",windmill);hw.put("transfer",transfer);hw.put("shooter",flywheel);
         CycleMechanisms auto=new CycleMechanisms(hw);
         check(roller.getDirection()==DcMotorSimple.Direction.REVERSE,"subsystem roller direction");
         check(windmill.getDirection()==DcMotorSimple.Direction.FORWARD,"subsystem windmill direction");
         check(roller.getMode()==DcMotor.RunMode.RUN_WITHOUT_ENCODER,"subsystem roller mode");
         check(windmill.getMode()==DcMotor.RunMode.RUN_WITHOUT_ENCODER,"subsystem windmill mode");
+        check(transfer.getZeroPowerBehavior()==DcMotor.ZeroPowerBehavior.BRAKE,"transfer brakes at zero power from init");
+        check(transfer.getPower()==0,"transfer starts stopped");
+        check(transfer.getDirection()==Intake.TRANSFER_DIRECTION,"transfer direction constant applied");
         auto.collect(true);
         check(roller.getPower()==Intake.INTAKE_IN,"uses current subsystem intake power");
-        check(transfer.getPower()==Intake.TRANSFER_SERVO_POWER,"uses subsystem inward transfer");
+        check(transfer.getPower()==Intake.TRANSFER_POWER,"uses subsystem inward transfer");
         check(windmill.getPower()==0,"collection keeps feeder off");
         auto.feed(0,true);auto.feed(.13,true);
         check(windmill.getPower()==Intake.WINDMILL_IN,"permitted feeding starts subsystem windmill");
         auto.close();
+        check(transfer.getZeroPowerBehavior()==DcMotor.ZeroPowerBehavior.BRAKE,"closing leaves the transfer braking");
         check(roller.getPower()==0&&windmill.getPower()==0&&transfer.getPower()==0,"closing stops every intake actuator");
         auto.collect(true);auto.stop();
+        check(transfer.getZeroPowerBehavior()==DcMotor.ZeroPowerBehavior.BRAKE,"stop leaves the transfer braking");
         check(roller.getPower()==0&&windmill.getPower()==0&&transfer.getPower()==0,"stop cancels collection");
         System.out.println("PASS "+checks+" existing Intake initialization, collection, feeder and shutdown checks");
     }

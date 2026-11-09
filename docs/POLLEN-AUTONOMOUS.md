@@ -1,11 +1,13 @@
 # Complete basket autonomous programs
 
+Two additional programs, **Red Moving Shots + Garden + Hive** and **Blue Moving Shots + Garden + Hive**, now drive toward the garden while shooting, strafe for four garden balls, and shoot toward the opposite hive. They require Limelight and the predictive mechanism helper. See [moving garden setup and verification limits](MOVING-GARDEN.md). The eight earlier programs described below retain their existing behavior.
+
 The Driver Station offers eight programs under **26123 Flowerless**.
 
 | Red alliance | Blue alliance | Behavior |
 | --- | --- | --- |
 | Red Basket 1 Shoot 4 and Park | Blue Basket 1 Shoot 4 and Park | Shoot four preloads and park. |
-| Red Park Only | Blue Park Only | Leave a separate wall mark and park using the drivetrain and Pinpoint. |
+| Red Park Only | Blue Park Only | Start on the same wall mark as Shoot 4 and Park, then park using the drivetrain and Pinpoint. |
 | Red Shoot 4 + Garden and Park | Blue Shoot 4 + Garden and Park | Shoot the opening, collect our garden and park with pollen for TeleOp. |
 | Red Basket 2 Wait 15 Shoot 4 and Park | Blue Basket 2 Wait 15 Shoot 4 and Park | Opposite-wall start; wait/aim/spin up, feed four after 15 seconds, then park. Teammate must raise Basket 2. |
 
@@ -13,7 +15,7 @@ The eight selectable programs are flowerless. Recovery programs are unregistered
 
 The existing Basket 1 shooting routines call the team's `Shooter` and `Intake` classes through their normal update methods. Shooter's default preset is 1500 encoder ticks/second. Its existing PIDF, battery compensation and speed hysteresis control the flywheel and feeding. Those Basket 1 routines start it only after arriving at the shooting pose; movement and parking keep the mechanisms stopped. The delayed Basket 2 pair instead spins up with feeders off during its approach and wait. Four estimated releases or a 14-second timeout begin parking, with a 29.7-second hard deadline.
 
-See the [official CAD setup map and starting coordinates](AUTONOMOUS-LINEUP.md). Park Only uses a different wall mark from the shooting routines and the former Basket 2 start.
+See the [official CAD setup map and starting coordinates](AUTONOMOUS-LINEUP.md). Park Only starts on the same wall mark as the shooting routines; the former Basket 2 start is different.
 
 ## Robot configuration
 
@@ -41,11 +43,11 @@ The 86-degree launch angle is a physical configuration. Autonomous does not use 
 
 `PreloadShotCounter` estimates release events using intake encoder transport, a previously recovered flywheel, a speed dip and minimum spacing. It cannot guarantee physical inventory without a ball sensor. No detected load does not count as a ball. Sustained low speed cannot repeatedly count the same dip. Stop, parking, lost shooting position, localization faults and timeouts stop Shooter and all Intake outputs.
 
-Legacy unregistered autonomous helpers remain in the repository; the eight menu entries use `FixedShotParkAuto`, `GardenParkAuto`, `DelayedBasketTwoAuto` or `ParkOnlyAuto`, with no camera initialization.
+Legacy unregistered autonomous helpers remain in the repository; the eight menu entries (the Basket 1 shoot-and-park pair share `ShootFourAndParkAuto`) use `GardenParkAuto`, `DelayedBasketTwoAuto` or `ParkOnlyAuto`, with no camera initialization.
 
 ## Teammate parking
 
-Blue Basket 2 Wait 15 parks directly at visualizer (131.44, 19.94), reserving the nearer slot (131.77, 45.55) for its teammate. The other seven active autons use the near alliance slot and reserve the farther slot for a teammate. See the lineup map and coordinate table. Slot centers are 0.55 m apart, leaving 0.0928 m (3.65 inches) between two 18-inch footprints. Both shooting families now use the mark one inch farther from the hive; shooter speed is unchanged. This reserves physical space; coordinate the other robot's route and parking eligibility with the alliance.
+Basket 2 Wait 15 parks directly at visualizer Blue (127.88, 21.27) / Red (13.62, 120.23), the half of the zone nearer its starting wall, reserving the other half for its teammate. The other six active autons use the near alliance slot and reserve the farther slot for a teammate. See the lineup map and coordinate table. Slot centers are 0.55 m apart, leaving 0.0928 m (3.65 inches) between two 18-inch footprints. Both shooting families now use the mark one inch farther from the hive; shooter speed is unchanged. This reserves physical space; coordinate the other robot's route and parking eligibility with the alliance.
 
 ## Verification scope
 

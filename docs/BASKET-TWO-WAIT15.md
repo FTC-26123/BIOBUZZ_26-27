@@ -25,7 +25,7 @@ Load four pollen. These starts face inward from the wall beside Basket 2, as req
 
 The shooting pose is reflected from the current Basket 1 mark across the field's horizontal centerline, then rotated 180 degrees for Blue. Its horizontal distance to the raised Basket 2 center is exactly the same **27.8468 inches** as the current Basket 1 mark, including the one-inch backoff. The existing Shooter default remains **1500 encoder ticks/second**, using the team's existing PIDF and readiness logic.
 
-Parking uses the usual near slot: Red visualizer (9.73, 95.95), heading 270°; Blue (131.77, 45.55), heading 90°. The outside-lane approach leaves the farther stationary teammate footprint clear. Coordinate moving teammate traffic separately.
+Parking uses the half of the zone nearer our starting wall: Red visualizer (13.62, 120.23), heading 270°; Blue (127.88, 21.27), heading 90°. Both drive straight there from the shooting mark, leaving the other half (Red (9.73, 95.95) / Blue (131.77, 45.55)) for the teammate. Coordinate moving teammate traffic separately.
 
 ## Implementation
 

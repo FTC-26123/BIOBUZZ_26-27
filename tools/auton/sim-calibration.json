@@ -1,0 +1,6 @@
+{
+  "shooterMaxTicks": 2800,
+  "angleDeg": 85,
+  "speedFactor": 0.56,
+  "driveRpm": 440
+}

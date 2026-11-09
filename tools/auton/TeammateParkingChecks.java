@@ -21,6 +21,7 @@ public final class TeammateParkingChecks {
             from=to;
         }
     }
+    private static List<Pose> sampled(List<AutoPaths.Leg> legs){List<Pose> out=new ArrayList<>();for(AutoPaths.Leg l:legs){List<Pose> s=l.sample(200);out.addAll(s.subList(1,s.size()));}return out;}
     public static void main(String[] args){
         for(boolean blue:new boolean[]{false,true}){
             CycleRoute.Start start=blue?CycleRoute.Start.BLUE_WEST:CycleRoute.Start.RED_EAST;
@@ -37,8 +38,9 @@ public final class TeammateParkingChecks {
                 previous=stage.pose();
             }
             verify(previous,r.parkingPath(previous),teammate);
-            CycleRoute.Start park=blue?CycleRoute.Start.BLUE_EAST:CycleRoute.Start.RED_WEST;
-            verify(park.wallPose(),ParkOnlyAuto.waypoints(park),teammate);
+            CycleRoute.Start park=start; // Park Only starts on the same wall mark as the shooting autons
+            verify(park.wallPose(),sampled(ParkOnlyAuto.legs(park,park.wallPose())),teammate);
+            verify(r.shot(),sampled(r.parkingLegs(r.shot())),teammate);
             check(Math.hypot(park.loadingZone().x()-r.park.x(),park.loadingZone().y()-r.park.y())<1e-9,"shooting and park-only share our assigned slot");
         }
         System.out.println("PASS "+checks+" teammate parking gap, mirrored destinations and occupied-slot approach checks");

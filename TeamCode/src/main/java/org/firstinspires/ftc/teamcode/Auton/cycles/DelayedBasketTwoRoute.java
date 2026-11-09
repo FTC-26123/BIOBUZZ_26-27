@@ -17,11 +17,12 @@ public final class DelayedBasketTwoRoute {
         clearWall=pose(-.245,1.43,270);
         // Reflect the current Basket 1 mark across Y=0: exactly the same hive standoff.
         Pose near=new CycleRoute(CycleRoute.Start.RED_EAST,CycleRoute.Strategy.NO_FLOWERS,
-            CycleRoute.Lineup.FOUR_PARK).stages.get(1).pose();
+            CycleRoute.Lineup.FOUR_PARK).shot();
         double heading=2*Math.PI-near.heading()+(blue?Math.PI:0);
         shot=new Pose(sign*near.x(),-sign*near.y(),Math.atan2(Math.sin(heading),Math.cos(heading)));
-        park=blue ? new Pose(131.44-70.75,19.94-70.75,Math.PI/2)
-            : pose(-1.55,CycleRoute.OUR_PARK_Y_METERS,270);
+        // Park in the half of our parking zone nearer our own starting wall; the teammate takes the half nearer theirs.
+        // Blue visualizer (127.88, 21.27); Red is its 180-degree rotation, (13.62, 120.23).
+        park=new Pose(-sign*(127.88-70.75),-sign*(21.27-70.75),blue?Math.PI/2:3*Math.PI/2);
     }
     private Pose pose(double x,double y,double degrees){
         double heading=Math.toRadians(degrees+(blue?180:0));
@@ -30,24 +31,27 @@ public final class DelayedBasketTwoRoute {
     public static boolean readyToFeed(double now,double stableFor){
         return Double.isFinite(now+stableFor)&&now>=FEED_NOT_BEFORE_SECONDS&&stableFor>=AIM_SETTLE_SECONDS;
     }
+    /** Wall start to the shooting mark in one Pedro curve (no separate wall-clear stop). */
+    public AutoPaths.Leg approachLeg(){return AutoPaths.curve("Aim for Basket 2; feed after 15 seconds",blue,initial,shot,AutoPaths.WALL_TO_BASKET2);}
+    public List<AutoPaths.Leg> approachLegs(Pose from){
+        List<Pose> fallback=new ArrayList<>();fallback.add(clearWall);fallback.addAll(FrameClearance.path(clearWall,shot,blue));
+        return AutoPaths.plan(approachLeg(),from,fallback);
+    }
+    /** The waypoints of {@link #approachLegs} from the start pose (for checks and export). */
     public List<Pose> approachPath(){
-        List<Pose> result=new ArrayList<>();result.add(clearWall);
-        result.addAll(FrameClearance.path(clearWall,shot,blue));return result;
+        List<Pose> result=new ArrayList<>();for(AutoPaths.Leg l:approachLegs(initial))result.add(l.end);return result;
+    }
+    /** Shooting mark straight to park above the frame: one leg. */
+    public List<AutoPaths.Leg> parkingLegs(Pose from){
+        List<Pose> path=parkingPath(from);return AutoPaths.lines("Park",from,path);
     }
     public List<Pose> parkingPath(Pose from){
         List<Pose> result=new ArrayList<>();
-        if(blue){
-            // Preserve the clear approach corridor for an early abort; after shooting drive straight to park.
-            if(Math.hypot(from.x()-shot.x(),from.y()-shot.y())>1e-6)
-                result.addAll(FrameClearance.path(from,shot,true));
-            result.add(park);
-            return result;
-        }
-        Pose upper=pose(-1.06,.94,Math.toDegrees(shot.heading())-(blue?180:0));
-        Pose lower=new Pose(upper.x(),sign*.50/.0254,shot.heading());
-        result.addAll(FrameClearance.path(from,upper,blue));
-        result.addAll(FrameClearance.path(upper,lower,blue));
-        result.addAll(FrameClearance.path(lower,park,blue));return result;
+        // Preserve the clear approach corridor for an early abort; after shooting drive straight to park (both alliances).
+        if(Math.hypot(from.x()-shot.x(),from.y()-shot.y())>1e-6)
+            result.addAll(FrameClearance.path(from,shot,blue));
+        result.add(park);
+        return result;
     }
     public double parkReserve(Pose from){
         double seconds=.8;
