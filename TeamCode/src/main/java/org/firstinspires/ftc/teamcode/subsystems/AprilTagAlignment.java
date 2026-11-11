@@ -14,6 +14,13 @@ public class AprilTagAlignment {
     // --------------------- Hardware Dependencies ---------------------
     private Limelight limelight;
     private ElapsedTime runtime;
+    /**
+     * When set, rotation aims at OUR BASKET using the camera's angle to its tags. When null (the old tuning
+     * OpModes), the legacy behaviour is kept: rotate until the field yaw from the Limelight bot pose is 0.
+     */
+    private TargetTracker tracker;
+    /** +1 or -1: flips the turn direction of auto-rotate (ShotConfig.AIM_DIRECTION). */
+    private double aimDirection = 1.0;
 
     // --------------------- Target Grace & Stall Protection ---------------------
     private final ElapsedTime targetLostTimer = new ElapsedTime();
@@ -101,6 +108,39 @@ public class AprilTagAlignment {
         this.kD_strafe = kDValueStrafe;
     }
 
+    /** Aim at our basket using this tracker's angle instead of the field yaw. */
+    public void useTargetTracker(TargetTracker tracker) {
+        this.tracker = tracker;
+    }
+
+    /** Sets the rotation gains (turn power per degree, and damping). */
+    public void setRotationGains(double kP, double kD) {
+        kP_rotation = kP;
+        kD_rotation = kD;
+        modifiableValues[0] = kP;
+        modifiableValues[1] = kD;
+    }
+
+    /** +1 or -1. Use -1 if auto-rotate turns away from the target. */
+    public void setAimDirection(double direction) {
+        aimDirection = direction < 0 ? -1.0 : 1.0;
+    }
+
+    /** The robot stops turning once the aim error is inside this many degrees. */
+    public void setAngleTolerance(double degrees) {
+        angleTolerance = Math.max(0.05, degrees);
+    }
+
+    /** @return the rotation error currently being corrected (degrees), 0 when no target. */
+    public double getRotationError() {
+        return rawRotError;
+    }
+
+    private boolean targetVisibleNow() {
+        if (tracker != null) return tracker.isVisible();
+        return limelight != null && limelight.isTargetVisible();
+    }
+
     /**
      * Resets runtime timers and clears error history for a fresh start.
      */
@@ -139,21 +179,27 @@ public class AprilTagAlignment {
         curTime = runtime.time();
         dt = curTime - lastTime;
 
-        boolean targetVisible = limelight != null && limelight.isTargetVisible();
+        boolean targetVisible = targetVisibleNow();
 
         if (targetVisible) {
             targetLostTimer.reset(); // Reset grace timer while target is in view
 
-            // Prefer 3D MegaTag2 IMU-anchored orientation (rock-solid, zero jumping when tags flicker)
-            Pose3D botPose = limelight.getBotPose();
             double newRotError;
-            if (botPose != null) {
-                newRotError = -botPose.getOrientation().getYaw(AngleUnit.DEGREES);
+            double newStrafeError;
+            if (tracker != null) {
+                // Aim at our basket: the error is the camera's horizontal angle to its tags.
+                newRotError = goalX - tracker.getAimErrorDeg();
+                newStrafeError = 0;
             } else {
-                newRotError = goalX - limelight.getHorizontalDelta();
+                // Legacy (tuning OpModes): field yaw from the bot pose, falling back to tx.
+                Pose3D botPose = limelight.getBotPose();
+                if (botPose != null) {
+                    newRotError = -botPose.getOrientation().getYaw(AngleUnit.DEGREES);
+                } else {
+                    newRotError = goalX - limelight.getHorizontalDelta();
+                }
+                newStrafeError = goalX - limelight.get3DXDistance();
             }
-
-            double newStrafeError = goalX - limelight.get3DXDistance();
 
             // First frame target acquired: initialize error history without derivative spike
             if (!targetWasVisible) {
@@ -227,14 +273,14 @@ public class AprilTagAlignment {
      * Disables manual joystick rotation (`rotationMultiplier = 0`) and applies calculated PD power.
      */
     public void autoRotate() {
-        boolean isTargetValid = (limelight != null && limelight.isTargetVisible()) || (targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
+        boolean isTargetValid = targetVisibleNow() || (targetLostTimer.seconds() < TARGET_LOST_TIMEOUT);
 
         if (isTargetValid) {
             rotationMultiplier = 0; // Lock manual joystick rotation
             if (Math.abs(rawRotError) < angleTolerance) {
                 addedRotation = 0; // Within angle tolerance deadband
             } else {
-                addedRotation = -rotOutput;
+                addedRotation = -rotOutput * aimDirection;
             }
         } else {
             setManualRotation();

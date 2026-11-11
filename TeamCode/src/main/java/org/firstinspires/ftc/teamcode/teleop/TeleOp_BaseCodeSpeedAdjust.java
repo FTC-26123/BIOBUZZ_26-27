@@ -6,6 +6,7 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.subsystems.AprilTagAlignment;
+import org.firstinspires.ftc.teamcode.subsystems.AutoShot;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Limelight;
 import org.firstinspires.ftc.teamcode.subsystems.MecanumDrive;
@@ -15,7 +16,7 @@ import org.firstinspires.ftc.teamcode.subsystems.Shooter;
  * Dual-controller TeleOp OpMode with dynamic shooter target speed adjustment.
  * Driver 1 controls Mecanum driving, drive speed switching, and AprilTag alignment.
  * Driver 2 controls intake, shooter, servo gate, preset speed switching,
- * and fine-tuning shooter target speed (+50 / -50 ticks/sec).
+ * and trimming the shot speed of each preset.
  */
 @TeleOp
 public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
@@ -27,39 +28,51 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
     public ElapsedTime TeleOpRuntime = new ElapsedTime();
     public Limelight limelight = new Limelight();
     public AprilTagAlignment aprilTagAlignment = new AprilTagAlignment();
+    /** Camera aiming + distance-based shot speed. Does nothing until ShotConfig.AUTO_SHOT_ENABLED is true. */
+    public AutoShot autoShot = new AutoShot();
 
     @Override
     public void init() {
-//        limelight.init(hardwareMap);
         aprilTagAlignment.init(limelight, TeleOpRuntime);
+        autoShot.init(hardwareMap, limelight, aprilTagAlignment, shooter, TeleOpRuntime);
         driveTrain.init(hardwareMap, aprilTagAlignment);
         intake.init(hardwareMap);
         shooter.init(hardwareMap, intake);
         driveTrain.enablePositionHold(hardwareMap);
     }
 
+    /**
+     * While waiting for Play: pick the alliance for camera aiming (gamepad 1 X = blue, B = red).
+     */
+    @Override
+    public void init_loop() {
+        autoShot.selectAlliance(gamepad1, telemetry);
+        telemetry.update();
+    }
+
     @Override
     public void start() {
         TeleOpRuntime.reset();
-//        limelight.start();
+        autoShot.start();
     }
 
     @Override
     public void loop() {
         // Vision alignment & auto rotation
-//        limelight.update();
+        boolean aim = aimButton();
+        autoShot.update(aim);
         aprilTagAlignment.update();
-        handleAutoRotation(gamepad1);
+        handleAutoRotation(aim);
 
         // Driver 1 Drivetrain Control
         handleDrivetrainDpadSpeedSwitching(gamepad1);
         driveTrain.driveWithPositionHold(gamepad1.left_stick_y, gamepad1.left_stick_x,
-                gamepad1.right_stick_x, gamepad1.left_trigger > 0.3 || gamepad1.right_stick_button);
+                gamepad1.right_stick_x, aim || gamepad1.right_stick_button);
 
         // Driver 2 Intake Control
         handleManualIntakeControl(gamepad2);
 
-        // Driver 2 Shooter Flywheel & Target Speed Adjustment (+50 / -50 ticks/s)
+        // Driver 2 Shooter Flywheel & shot preset / trim
         handleManualShootingControl(gamepad2);
         handleShooterSpeedControl(gamepad2);
         shooter.update();
@@ -67,10 +80,14 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
         // ---------------- Telemetry Status Output ----------------
         telemetry.addData("Drive Speed Multiplier (G1 Dpad Right)", driveTrain.getSpeedMultiplier());
         telemetry.addLine("---------------- Statuses ---------------");
-        telemetry.addData("Shooter Status (G2 RT/RB)", shooter.getShooterStatus());
+        telemetry.addData("Shooter (G2 hold RT fire / Y spin up / RB off)", shooter.getShooterStatus());
         telemetry.addData("Intake Status (G2 LT/Back/LB)", intake.getIntakeStatus());
-        telemetry.addData("Target Launch Speed (+50 G2 DpadRight / -50 G2 DpadLeft)", "%.0f ticks/s", shooter.getTargetLaunchPower());
-        telemetry.addData("Current Motor Speed", "%.0f ticks/s", shooter.getCurrentSpeed());
+        telemetry.addData("Shot preset (Dpad Up next, Dpad Down prev, Dpad Right/Dpad Left +/-" + (int) Shooter.TRIM_STEP
+                + ", X clear)", shooter.getPresetText());
+        telemetry.addData("Flywheel", "%.0f of %.0f ticks/s  %s", shooter.getLastSpeed(),
+                shooter.getTargetLaunchPower(), shooter.isReady() ? "READY" : shooter.isRunning() ? "..." : "off");
+        if (intake.isJammed()) telemetry.addLine("!! FEED JAMMED - eject with Back, then fire again !!");
+        autoShot.addTelemetry(telemetry);
         telemetry.addData("Runtime (s)", "%.2f", TeleOpRuntime.seconds());
         telemetry.setMsTransmissionInterval(30);
         telemetry.addData("Position hold (hold G1 right stick button to bypass)", driveTrain.getPositionHoldStatus());
@@ -80,30 +97,49 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
     @Override
     public void stop() {
         driveTrain.stop();
+        autoShot.stop();
     }
 
     // ---------------------- Driver Input Handlers ----------------------
 
+    /**
+     * Shooter: HOLD the right trigger to fire (balls feed one at a time, each only when the flywheel is at
+     * speed). Releasing it stops feeding but keeps the flywheel spinning for the next volley. Y spins the
+     * flywheel up without feeding. Right bumper turns the flywheel off.
+     */
     private void handleManualShootingControl(Gamepad gamepad2) {
-        if (gamepad2.right_trigger > 0.5) {
-            shooter.start();
-        } else if (gamepad2.right_bumper) {
+        if (gamepad2.right_bumper) {
             shooter.stop();
+        } else if (gamepad2.right_trigger > 0.5) {
+            shooter.start();
+        } else {
+            shooter.holdFire();   // does nothing unless the shooter was firing
+        }
+        if (gamepad2.yWasPressed()) {
+            shooter.spinUp();
         }
     }
 
+    /**
+     * Shot power: Dpad Up = next preset, Dpad Down = previous preset,
+     * Dpad Right / Dpad Left = +/- {@link Shooter#TRIM_STEP} ticks/sec on the current preset, X = clear that trim.
+     * The trim stays with its preset, so a correction made at one shooting spot is still there next time.
+     */
     private void handleShooterSpeedControl(Gamepad gamepad2) {
-        // Cycle predefined speed presets on Dpad Up
         if (gamepad2.dpadUpWasPressed()) {
             shooter.switchSpeed();
         }
-        // Increase target speed by 50 ticks/sec on Dpad Right
-        if (gamepad2.dpadRightWasPressed()) {
-            shooter.increaseTargetSpeed(50);
+        if (gamepad2.dpadDownWasPressed()) {
+            shooter.previousSpeed();
         }
-        // Decrease target speed by 50 ticks/sec on Dpad Left
+        if (gamepad2.dpadRightWasPressed()) {
+            shooter.increaseTargetSpeed(Shooter.TRIM_STEP);
+        }
         if (gamepad2.dpadLeftWasPressed()) {
-            shooter.decreaseTargetSpeed(50);
+            shooter.decreaseTargetSpeed(Shooter.TRIM_STEP);
+        }
+        if (gamepad2.xWasPressed()) {
+            shooter.resetTrim();
         }
     }
 
@@ -123,8 +159,22 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
         }
     }
 
-    private void handleAutoRotation(Gamepad gamepad1) {
-        if (gamepad1.left_trigger > 0.3) {
+    /**
+     * AIM BUTTON. Hold it to turn the robot toward our basket and set the shot speed from the distance.
+     * It also bypasses the position hold so the robot is free to turn.
+     *
+     * TO CHANGE THE BUTTON: edit the one line below. Examples:
+     *   gamepad1.left_trigger > 0.3     (current: driver's left trigger)
+     *   gamepad1.left_stick_button      (click the left stick)
+     *   gamepad2.left_stick_button      (let the operator aim instead)
+     * Then update the "AIM" label in the telemetry line if you want the screen to match.
+     */
+    private boolean aimButton() {
+        return gamepad1.left_trigger > 0.3;
+    }
+
+    private void handleAutoRotation(boolean aim) {
+        if (aim) {
             aprilTagAlignment.autoRotate();
         } else {
             aprilTagAlignment.setManualRotation();

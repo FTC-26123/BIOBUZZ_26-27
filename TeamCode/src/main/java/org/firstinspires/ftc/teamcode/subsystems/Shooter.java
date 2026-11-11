@@ -14,11 +14,18 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
  *
  * Features:
  *  - Software PIDF velocity control (derivative on filtered measurement, no kick on target change)
+ *  - Full-power recovery boost when the flywheel is far below target (spin-up and after each shot)
  *  - Battery voltage compensation of the feedforward term
- *  - Auto-feed with hysteresis: feeding pauses when speed sags, resumes once recovered
- *  - "Stopping" state: motor coasts/brakes to rest before reporting "Off"
+ *  - One ball at a time: feeding only happens while the flywheel is inside its speed window. The moment a shot
+ *    pulls the speed down, the gate closes (windmill braked, transfer stopped) and reopens as soon as the speed
+ *    is back, so every ball leaves at the target speed with no extra waiting
+ *  - Flywheel-only mode ("Spinning") so TeleOp can keep the wheel at speed between volleys
+ *  - Speed presets with a per-preset trim the drivers can change during a match
  *
- * Status values: "Off", "Starting", "Shooting", "Stopping".
+ * Status values: "Off", "Starting", "Shooting", "Spinning", "Stopping".
+ *   Starting = fire requested, waiting for the flywheel (gate closed)
+ *   Shooting = fire requested and flywheel in its window (feeding)
+ *   Spinning = flywheel held at speed, not feeding (TeleOp only)
  *
  * NOTE: All PID gains and thresholds below are starting points. Tune them on the robot.
  */
@@ -32,14 +39,30 @@ public class Shooter {
     // ---------------------- Speed Presets & Limits (ticks/sec) ----------------------
     private static final double[] LAUNCHING_POWERS = {1500, 1600, 1700, 1900};
     private static final double MAX_TARGET_VELOCITY = 2400; // set to your motor's real limit
+    /** One press of a driver trim button changes the current preset by this much (ticks/sec). */
+    public static final double TRIM_STEP = 25;
+    /** Driver trim added to each preset; kept per preset so a correction made at one spot is still there later. */
+    private final double[] presetTrim = new double[LAUNCHING_POWERS.length];
     private int launchingIndex = 0;
-    private double customTargetPower = LAUNCHING_POWERS[0];
-    private boolean useCustomPower = false;
+    /**
+     * AUTO speed (set by AutoShot from the camera distance). While active it replaces the preset; the driver's
+     * trim buttons then move {@link #autoTrim}, one offset that applies at every distance.
+     */
+    private boolean autoActive = false;
+    private double autoBase = 0, autoTrim = 0;
+    /** false = hold fire even at speed (AutoShot: not pointed at the basket yet). Always true unless set. */
+    private boolean feedPermit = true;
 
     // ---------------------- Feeding / Readiness Thresholds ----------------------
     private static final double READY_TOLERANCE = 50;      // +/- window for isReady() (display)
-    private static final double PAUSE_BELOW_TARGET = 100;  // pause feeding if speed < target - this
-    private static final double RESUME_BELOW_TARGET = 40;  // resume feeding when speed >= target - this
+    /**
+     * Gate closes (feeding pauses) when speed < target - this. Keep it at or above the shot-detection drop used
+     * by the autonomous PreloadShotCounter (5% of target, at least 40), or autonomous shots stop being counted.
+     */
+    private static final double PAUSE_BELOW_TARGET = 100;
+    private static final double RESUME_BELOW_TARGET = 40;  // gate may reopen when speed >= target - this ...
+    private static final double RESUME_ABOVE_TARGET = 80;  // ... and speed <= target + this (no over-speed shots)
+    private static final double PAUSE_ABOVE_TARGET = 150;  // gate closes when speed > target + this (target lowered)
     private static final double MIN_PAUSE_SEC = 0.05;      // minimum time feeding stays paused
     private static final double STOPPED_VELOCITY = 20;     // below this the flywheel counts as stopped
 
@@ -57,8 +80,17 @@ public class Shooter {
     public double kI = 0.0001;
     public double kD = 0.00005;
     public double kF = 0.00035;
+    /**
+     * Recovery boost: while the flywheel is more than this many ticks/sec BELOW target it gets full power, then
+     * the PIDF takes over for the last part. Shortens spin-up and the recovery after each shot. Lower it for a
+     * faster recovery; raise it (or set 0 to turn it off) if the speed overshoots the target after a shot.
+     * It is ignored while kP is 0 so the tuning OpMode's pure-feedforward calibration is not disturbed.
+     */
+    public double recoveryBoostError = 120;
 
     private static final double VELOCITY_FILTER_ALPHA = 0.4; // 1.0 = no filtering
+    private static final double INTEGRAL_ZONE = 100;         // integrate only within this error
+    private static final double INTEGRAL_LIMIT = 2500;
 
     private double integralSum = 0;
     private double filteredVelocity = 0;
@@ -66,20 +98,42 @@ public class Shooter {
     private double lastPower = 0;
     private final ElapsedTime pidTimer = new ElapsedTime();
     private boolean pidInitialized = false;
+    /** Flywheel speed sampled once per update(); everything inside one loop uses this same reading. */
+    private double velocity = 0;
 
     // ---------------------- Status ----------------------
-    private String shooterStatus = "Off";
+    private static final String OFF = "Off", STARTING = "Starting", SHOOTING = "Shooting",
+            SPINNING = "Spinning", STOPPING = "Stopping";
+    private String shooterStatus = OFF;
     private final ElapsedTime pauseTimer = new ElapsedTime();
+    /** true = feed whenever the flywheel is in its window; false = flywheel only. */
+    private boolean feedRequested = false;
 
-    // ---------------------- Feed sequence (see startFeeding) ----------------------
-    /** How long ONLY the windmill and transfer run in reverse before the first feed after start(). */
+    // ---------------------- Feed sequence (see advanceFeed) ----------------------
+    /**
+     * How long ONLY the windmill and transfer run in reverse before the first feed of a volley, to take the
+     * balls' weight off the windmill. It runs while the flywheel is still spinning up when possible, and only
+     * when the intake has run (or the shooter was started) since the last volley.
+     */
     public static final double CLEAR_REVERSE_SEC = 0.15;
-    /** How long the windmill runs forward alone before the roller and transfer come on. */
+    /** First feed of a volley: how long the windmill runs forward alone before the roller and transfer come on. */
     public static final double WINDMILL_SPINUP_SEC = 0.10;
-    private enum FeedStage { NONE, CLEAR, WINDMILL, FEED }
+    /**
+     * Same head start for the windmill when feeding resumes BETWEEN shots. 0 = none: the windmill goes straight
+     * to feed power and the transfer soft-starts behind it. Raise it a little (0.03) only if the windmill stalls
+     * on the second and later balls.
+     */
+    public static final double WINDMILL_RESUME_SEC = 0.0;
+
+    /** NONE = shooter is not driving the intake; HOLD = gate closed, waiting for flywheel speed. */
+    private enum FeedStage { NONE, CLEAR, HOLD, WINDMILL, FEED }
     private FeedStage feedStage = FeedStage.NONE;
     private final ElapsedTime feedTimer = new ElapsedTime();
-    private boolean clearedSinceStart = false;
+    private boolean needsClear = true;       // reverse-clear before the next feed
+    private boolean firstFeed = true;        // next feed is the first of a volley (uses WINDMILL_SPINUP_SEC)
+    private boolean driverIntakeWasOn = false; // roller state to restore when feeding ends
+    private double windmillLead = 0;
+    private double gateTarget = 0;             // target the gate was last judged against
 
     // =====================================================================
     // Initialization
@@ -95,7 +149,9 @@ public class Shooter {
         shooter = hwMap.get(DcMotorEx.class, "shooter"); // throws if misconfigured (intended)
         shooter.setDirection(DcMotorSimple.Direction.FORWARD);
         shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        shooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        // FLOAT: a flywheel should coast, not be braked. Braking wastes the stored speed and makes the next
+        // spin-up start from zero.
+        shooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
         voltageSensor = null;
         for (VoltageSensor sensor : hwMap.voltageSensor) {
@@ -104,6 +160,13 @@ public class Shooter {
         }
         voltageRead = false;
 
+        shooterStatus = OFF;
+        feedRequested = false;
+        feedStage = FeedStage.NONE;
+        needsClear = true;
+        firstFeed = true;
+        autoActive = false;
+        feedPermit = true;
         resetPID();
     }
 
@@ -112,30 +175,75 @@ public class Shooter {
     // =====================================================================
 
     /**
-     * Spools the flywheel up to the active target. Does nothing if the target is 0.
-     * Safe to call while "Stopping".
+     * FIRE: spools the flywheel up to the active target and feeds whenever it is inside its speed window.
+     * Safe to call every loop (holding a trigger): it does nothing if firing is already requested.
+     * Does nothing if the target is 0. Safe to call while "Stopping".
      */
     public void start() {
         if (getTargetLaunchPower() <= 0) {
-            shooterStatus = "Off";
+            shooterStatus = OFF;
             return;
         }
-        shooterStatus = "Starting";
+        if (feedRequested && (STARTING.equals(shooterStatus) || SHOOTING.equals(shooterStatus))) return;
+        feedRequested = true;
+        if (SPINNING.equals(shooterStatus) || STARTING.equals(shooterStatus) || SHOOTING.equals(shooterStatus)) {
+            // Flywheel already running: keep its PID state, the gate opens as soon as the speed is in the window.
+            shooterStatus = STARTING;
+            return;
+        }
+        shooterStatus = STARTING;
         pauseTimer.reset();
         resetPID();
-        clearedSinceStart = false;   // the next time the flywheel reaches speed, clear in reverse first
+        needsClear = true;    // unload the windmill once before this volley
+        firstFeed = true;
         feedStage = FeedStage.NONE;
     }
 
     /**
-     * Begins shutdown: intake stops immediately; the flywheel
-     * is cut to 0 power (brake mode) and status becomes "Off" once it has slowed down.
+     * FLYWHEEL ONLY: brings the flywheel to the target speed and keeps it there without feeding. Use it to be
+     * ready before reaching the shooting spot. If the shooter is firing, this stops the feeding and keeps the
+     * flywheel running.
+     */
+    public void spinUp() {
+        if (getTargetLaunchPower() <= 0) return;
+        if (OFF.equals(shooterStatus) || STOPPING.equals(shooterStatus)) {
+            pauseTimer.reset();
+            resetPID();
+            needsClear = true;
+            firstFeed = true;
+            feedRequested = false;
+            feedStage = FeedStage.NONE;
+            shooterStatus = SPINNING;
+        } else {
+            holdFire();
+        }
+    }
+
+    /**
+     * Stops feeding but keeps the flywheel at speed ("Spinning"), ready for the next volley. Does nothing unless
+     * the shooter is firing. The intake goes back to what the driver had before the volley (running or stopped).
+     */
+    public void holdFire() {
+        if (!feedRequested) return;
+        feedRequested = false;
+        if (STARTING.equals(shooterStatus) || SHOOTING.equals(shooterStatus)) {
+            if (feedStage == FeedStage.CLEAR) needsClear = true;   // the clear was cut short; redo it next time
+            releaseIntake();
+            firstFeed = true;
+            shooterStatus = SPINNING;
+        }
+    }
+
+    /**
+     * Begins shutdown: feeding stops immediately; the flywheel is cut to 0 power and coasts, and status becomes
+     * "Off" once it has slowed down.
      */
     public void stop() {
-        if (!"Off".equals(shooterStatus)) {
-            shooterStatus = "Stopping";
+        if (!OFF.equals(shooterStatus)) {
+            shooterStatus = STOPPING;
         }
-        stopFeeding();
+        feedRequested = false;
+        releaseIntake();
         if (shooter != null) {
             shooter.setPower(0);
         }
@@ -143,38 +251,95 @@ public class Shooter {
         resetPID();
     }
 
+    /**
+     * Raises the trim (ticks/sec). In manual mode it changes the current preset and stays with that preset;
+     * in AUTO speed mode it changes the one auto trim that is added at every distance.
+     */
     public void increaseTargetSpeed(double delta) {
-        customTargetPower = Math.min(MAX_TARGET_VELOCITY, getTargetLaunchPower() + delta);
-        useCustomPower = true;
-        resetPID();
+        double wanted = Math.max(0, Math.min(MAX_TARGET_VELOCITY, getTargetLaunchPower() + delta));
+        if (autoActive) autoTrim = wanted - autoBase;
+        else presetTrim[launchingIndex] = wanted - LAUNCHING_POWERS[launchingIndex];
     }
 
+    /** Lowers the trim of the current preset (ticks/sec). The trim stays with that preset. */
     public void decreaseTargetSpeed(double delta) {
-        customTargetPower = Math.max(0, getTargetLaunchPower() - delta);
-        useCustomPower = true;
-        resetPID();
+        increaseTargetSpeed(-delta);
+    }
+
+    /** Removes the driver trim from the current preset. */
+    public void resetTrim() {
+        if (autoActive) autoTrim = 0;
+        else presetTrim[launchingIndex] = 0;
     }
 
     /**
-     * Cycles preset target velocity (1500 -> 1600 -> 1700 -> 1900 ticks/sec).
+     * AUTO speed: use this flywheel speed (from the distance table) instead of the preset. The driver's auto
+     * trim is added on top. Stays active until {@link #clearAutoTarget()} or a preset button is pressed.
+     */
+    public void setAutoTarget(double ticksPerSec) {
+        if (Double.isNaN(ticksPerSec) || ticksPerSec <= 0) return;
+        autoBase = Math.min(MAX_TARGET_VELOCITY, ticksPerSec);
+        autoActive = true;
+    }
+
+    /** Back to the manual presets. */
+    public void clearAutoTarget() {
+        autoActive = false;
+    }
+
+    /** @return true while the speed comes from the distance table rather than a preset. */
+    public boolean isAutoTarget() {
+        return autoActive;
+    }
+
+    /** @return the table speed last given to {@link #setAutoTarget} (without the driver trim). */
+    public double getAutoBaseSpeed() {
+        return autoBase;
+    }
+
+    /**
+     * Extra condition for feeding, on top of flywheel speed. false = keep the gate closed (for example: not
+     * pointed at the basket yet). The flywheel keeps running. Defaults to true; autonomous never changes it.
+     */
+    public void setFeedPermit(boolean permit) {
+        feedPermit = permit;
+    }
+
+    /**
+     * Next preset (1500 -> 1600 -> 1700 -> 1900 -> 1500 ticks/sec, each plus its own trim).
      */
     public void switchSpeed() {
+        if (autoActive) { autoActive = false; return; }   // first press: leave AUTO speed, keep the current preset
         launchingIndex = (launchingIndex + 1) % LAUNCHING_POWERS.length;
-        customTargetPower = LAUNCHING_POWERS[launchingIndex];
-        useCustomPower = false;
-        resetPID();
+    }
+
+    /** Previous preset. */
+    public void previousSpeed() {
+        if (autoActive) { autoActive = false; return; }   // first press: leave AUTO speed, keep the current preset
+        launchingIndex = (launchingIndex + LAUNCHING_POWERS.length - 1) % LAUNCHING_POWERS.length;
     }
 
     // =====================================================================
     // Getters
     // =====================================================================
 
+    /**
+     * Fresh flywheel speed straight from the motor. Autonomous shot counting relies on this being a new reading.
+     * For display and anything inside the control loop prefer {@link #getLastSpeed()}, which costs no hub read.
+     */
     public double getCurrentSpeed() {
         return shooter != null ? shooter.getVelocity() : 0;
     }
 
+    /** Flywheel speed as sampled by the most recent update() (no extra hub read). */
+    public double getLastSpeed() {
+        return velocity;
+    }
+
     public double getTargetLaunchPower() {
-        return useCustomPower ? customTargetPower : LAUNCHING_POWERS[launchingIndex];
+        double target = autoActive ? autoBase + autoTrim
+                : LAUNCHING_POWERS[launchingIndex] + presetTrim[launchingIndex];
+        return Math.max(0, Math.min(MAX_TARGET_VELOCITY, target));
     }
 
     public String getShooterStatus() {
@@ -185,8 +350,42 @@ public class Shooter {
         return launchingIndex;
     }
 
+    public int getPresetCount() {
+        return LAUNCHING_POWERS.length;
+    }
+
+    /** Untrimmed speed of the current preset. */
+    public double getPresetSpeed() {
+        return LAUNCHING_POWERS[launchingIndex];
+    }
+
+    /** Driver trim in effect (ticks/sec, may be negative): the preset's trim, or the auto trim in AUTO speed. */
+    public double getPresetTrim() {
+        return getTargetLaunchPower() - (autoActive ? autoBase : LAUNCHING_POWERS[launchingIndex]);
+    }
+
+    /** One line for the driver: "2/4  1600 +25 = 1625", or "AUTO  1640 +25 = 1665" in AUTO speed. */
+    public String getPresetText() {
+        if (autoActive) {
+            return String.format(java.util.Locale.US, "AUTO  %.0f %+.0f = %.0f", autoBase, getPresetTrim(),
+                    getTargetLaunchPower());
+        }
+        return String.format(java.util.Locale.US, "%d/%d  %.0f %+.0f = %.0f", launchingIndex + 1,
+                LAUNCHING_POWERS.length, getPresetSpeed(), getPresetTrim(), getTargetLaunchPower());
+    }
+
     public double getLastPower() {
         return lastPower;
+    }
+
+    /** @return true while firing is requested (feeding whenever the flywheel is in its window). */
+    public boolean isFiring() {
+        return feedRequested && (STARTING.equals(shooterStatus) || SHOOTING.equals(shooterStatus));
+    }
+
+    /** @return true while the flywheel is being driven (Starting, Shooting or Spinning). */
+    public boolean isRunning() {
+        return STARTING.equals(shooterStatus) || SHOOTING.equals(shooterStatus) || SPINNING.equals(shooterStatus);
     }
 
     /**
@@ -209,12 +408,12 @@ public class Shooter {
     }
 
     /**
-     * Two-sided check: speed within +/- READY_TOLERANCE of target. Intended for
-     * telemetry/driver display; feeding uses the one-sided hysteresis instead.
+     * Two-sided check: speed within +/- READY_TOLERANCE of target, using the speed from the last update().
+     * Intended for telemetry/driver display; feeding uses the hysteresis window instead.
      */
     public boolean isReady() {
         double target = getTargetLaunchPower();
-        return target > 0 && Math.abs(getCurrentSpeed() - target) <= READY_TOLERANCE;
+        return isRunning() && target > 0 && Math.abs(velocity - target) <= READY_TOLERANCE;
     }
 
     /**
@@ -222,11 +421,13 @@ public class Shooter {
      */
     public void addTelemetry(Telemetry telemetry) {
         telemetry.addData("Shooter status", shooterStatus);
+        telemetry.addData("Preset", getPresetText());
         telemetry.addData("Target (t/s)", "%.0f", getTargetLaunchPower());
-        telemetry.addData("Velocity (t/s)", "%.0f", getCurrentSpeed());
+        telemetry.addData("Velocity (t/s)", "%.0f", velocity);
         telemetry.addData("Power", "%.3f", lastPower);
         telemetry.addData("Battery (V)", "%.2f", getBatteryVoltage());
         telemetry.addData("Ready (+/-50)", isReady());
+        telemetry.addData("Feed step", feedStage.name());
     }
 
     // =====================================================================
@@ -234,56 +435,61 @@ public class Shooter {
     // =====================================================================
 
     /** Continue the existing velocity PIDF without feeding. Call start() before using this.
-     * Used by delayed autonomous: spin up while all three Intake outputs stay stopped.
-     * Normal update() and all existing TeleOp behavior are unchanged. */
+     * Used by delayed autonomous: spin up while all three Intake outputs stay stopped. */
     public void updateSpinupOnly() {
         if (intake != null) intake.stop();
         if (intake != null) intake.update();
-        if ("Starting".equals(shooterStatus) || "Shooting".equals(shooterStatus)) {
+        feedStage = FeedStage.NONE;   // the intake was just stopped; the next update() starts the sequence again
+        velocity = getCurrentSpeed();
+        if (isRunning()) {
             if (getTargetLaunchPower() <= 0) stop();
             else {
+                if (intake != null) intake.setBatteryVoltage(getBatteryVoltage());
                 updatePIDF();
-                shooterStatus = "Starting";
+                shooterStatus = STARTING;
             }
         } else {
-            update(); // Off/Stopping only; neither state permits feeding.
+            idle();
         }
     }
 
     public void update() {
         if (intake != null) intake.update();
-        switch (shooterStatus) {
-            case "Off":
-                if (shooter != null) {
-                    shooter.setPower(0);
-                }
-                lastPower = 0;
-                break;
-
-            case "Stopping":
-                if (shooter != null) {
-                    shooter.setPower(0);
-                }
-                lastPower = 0;
-                if (getCurrentSpeed() < STOPPED_VELOCITY) {
-                    shooterStatus = "Off";
-                }
-                break;
-
-            default: // "Starting" or "Shooting"
-                if (getTargetLaunchPower() <= 0) {
-                    stop(); // target dropped to 0: wind down
-                    break;
-                }
-                updatePIDF();
-                handleAutoShooting();
-                break;
+        velocity = getCurrentSpeed();   // the only flywheel speed read this loop
+        if (!isRunning()) {
+            idle();
+            return;
+        }
+        if (getTargetLaunchPower() <= 0) {
+            stop(); // target dropped to 0: wind down
+            return;
+        }
+        if (intake != null) intake.setBatteryVoltage(getBatteryVoltage());
+        updatePIDF();
+        if (feedRequested) {
+            handleAutoShooting();
+        } else {
+            // Flywheel only. The driver owns the intake; remember that balls were moved so the next volley
+            // unloads the windmill first.
+            shooterStatus = SPINNING;
+            if (intake != null && intake.isRollerIn()) needsClear = true;
         }
     }
 
     // =====================================================================
     // Internals
     // =====================================================================
+
+    /** "Off" and "Stopping": no power; Stopping becomes Off once the wheel has coasted down. */
+    private void idle() {
+        if (shooter != null) {
+            shooter.setPower(0);
+        }
+        lastPower = 0;
+        if (STOPPING.equals(shooterStatus) && velocity < STOPPED_VELOCITY) {
+            shooterStatus = OFF;
+        }
+    }
 
     private void resetPID() {
         integralSum = 0;
@@ -292,12 +498,12 @@ public class Shooter {
     }
 
     /**
-     * PIDF with voltage-scaled feedforward. The derivative acts on the low-pass filtered
-     * measurement (not the error), so changing the target does not cause a derivative spike.
+     * PIDF with voltage-scaled feedforward and a full-power recovery boost. The derivative acts on the low-pass
+     * filtered measurement (not the error), so changing the target does not cause a derivative spike.
      */
     private void updatePIDF() {
         double target = getTargetLaunchPower();
-        double rawVelocity = getCurrentSpeed();
+        double rawVelocity = velocity;
 
         double measuredDt = pidTimer.seconds();
         pidTimer.reset();
@@ -319,18 +525,20 @@ public class Shooter {
         double derivative = -(filteredVelocity - lastFilteredVelocity) / dt;
         lastFilteredVelocity = filteredVelocity;
 
-        // Anti-windup: integrate only near target
-        if (Math.abs(error) < 100) {
+        // Anti-windup: integrate only near target. Outside the zone the integral is HELD, not cleared, so the
+        // trim it has learned is still there when the speed comes back after a shot.
+        if (Math.abs(error) < INTEGRAL_ZONE) {
             integralSum += error * dt;
-            integralSum = Math.max(-2500, Math.min(2500, integralSum));
-        } else {
-            integralSum = 0;
+            integralSum = Math.max(-INTEGRAL_LIMIT, Math.min(INTEGRAL_LIMIT, integralSum));
         }
 
         double voltageScale = REFERENCE_VOLTAGE / getBatteryVoltage();
         double ff = kF * target * voltageScale;
 
         double calculatedPower = ff + (kP * error) + (kI * integralSum) + (kD * derivative);
+        if (recoveryBoostError > 0 && kP > 0 && error > recoveryBoostError) {
+            calculatedPower = 1.0;   // far below target: recover as fast as the motor allows
+        }
         lastPower = Math.max(0.0, Math.min(1.0, calculatedPower));
 
         if (shooter != null) {
@@ -339,86 +547,128 @@ public class Shooter {
     }
 
     /**
-     * Feeding with hysteresis:
-     *  - "Starting": feed begins once speed >= target - RESUME_BELOW_TARGET and the minimum pause elapsed.
-     *  - "Shooting": feed pauses if speed < target - PAUSE_BELOW_TARGET (overshoot never pauses feeding).
+     * Speed gate with hysteresis, then the feed sequence:
+     *  - "Starting": the gate opens once the minimum pause has passed and the speed is inside
+     *                [target - RESUME_BELOW_TARGET, target + RESUME_ABOVE_TARGET].
+     *  - "Shooting": the gate closes when speed < target - PAUSE_BELOW_TARGET (a ball just went through, or the
+     *                battery sagged), speed > target + PAUSE_ABOVE_TARGET, or the driver changed the target and the
+     *                speed is not inside the new window yet.
      */
     private void handleAutoShooting() {
         double target = getTargetLaunchPower();
-        double speed = getCurrentSpeed();
+        double speed = velocity;
 
-        switch (shooterStatus) {
-            case "Shooting":
-                if (speed < target - PAUSE_BELOW_TARGET) {
-                    stopFeeding();
-                    shooterStatus = "Starting";
-                    pauseTimer.reset();
-                } else {
-                    startFeeding();
-                }
-                break;
-            case "Starting":
-                if (pauseTimer.seconds() >= MIN_PAUSE_SEC && speed >= target - RESUME_BELOW_TARGET) {
-                    shooterStatus = "Shooting";
-                    feedStage = FeedStage.NONE;   // begin the feed sequence fresh
-                    startFeeding();
-                }
-                break;
+        boolean inWindow = speed >= target - RESUME_BELOW_TARGET && speed <= target + RESUME_ABOVE_TARGET;
+        // A changed target (preset or trim) must be re-earned: never feed at the old speed.
+        boolean targetMoved = target != gateTarget && !inWindow;
+        gateTarget = target;
+
+        if (SHOOTING.equals(shooterStatus)) {
+            if (speed < target - PAUSE_BELOW_TARGET || speed > target + PAUSE_ABOVE_TARGET || targetMoved) {
+                shooterStatus = STARTING;
+                pauseTimer.reset();
+            }
+        } else {
+            shooterStatus = STARTING;
+            if (pauseTimer.seconds() >= MIN_PAUSE_SEC && inWindow) {
+                shooterStatus = SHOOTING;
+            }
         }
+        advanceFeed(SHOOTING.equals(shooterStatus) && feedPermit);
     }
 
     /**
-     * Feed sequence, called every loop while "Shooting":
-     *  1. CLEAR   - first time the flywheel reaches speed after start(): ONLY the windmill and transfer run in
-     *               reverse for {@link #CLEAR_REVERSE_SEC} (roller off) to unload them.
-     *  2. WINDMILL - the windmill alone turns forward at its feed speed for {@link #WINDMILL_SPINUP_SEC}.
-     *  3. FEED    - only now the roller and transfer come on, and feeding continues.
-     * After a speed-dip pause the reverse clear is skipped (steps 2 and 3 only); a new start() re-arms it.
+     * Feed sequence, called every loop while firing is requested. {@code gateOpen} is true while the flywheel is
+     * inside its speed window.
+     *  1. CLEAR    - once per volley (only if the intake ran or the shooter was started since the last one): ONLY
+     *                the windmill and transfer run in reverse for {@link #CLEAR_REVERSE_SEC} (roller off) to
+     *                unload them. This starts right away, so it overlaps the flywheel spin-up.
+     *  2. HOLD     - gate closed: windmill braked, transfer stopped. Nothing can reach the flywheel.
+     *  3. WINDMILL - gate open: the windmill alone turns forward for a short head start
+     *                ({@link #WINDMILL_SPINUP_SEC} for the first ball, {@link #WINDMILL_RESUME_SEC} after that).
+     *  4. FEED     - roller and transfer on. The moment the flywheel speed drops (a ball went through) the gate
+     *                closes again: back to HOLD until the speed has recovered.
      */
-    private void startFeeding() {
+    private void advanceFeed(boolean gateOpen) {
         if (intake == null) return;
         intake.setWindmillFeedFromFlywheel(getTargetLaunchPower());
-        switch (feedStage) {
-            case NONE:
+
+        if (feedStage == FeedStage.NONE) {
+            // Taking the intake over from the driver: remember whether it was running so it can be restored.
+            driverIntakeWasOn = intake.isRollerIn();
+            if (driverIntakeWasOn) needsClear = true;
+            if (needsClear) {
+                needsClear = false;
+                firstFeed = true;
+                feedStage = FeedStage.CLEAR;
                 feedTimer.reset();
-                if (!clearedSinceStart) {
-                    clearedSinceStart = true;
-                    feedStage = FeedStage.CLEAR;
-                    intake.clearReverse();
-                } else {
-                    feedStage = FeedStage.WINDMILL;
-                    intake.startWindmillOnly();
-                }
-                break;
+                intake.clearReverse();
+                return;
+            }
+            closeGate();
+        }
+
+        switch (feedStage) {
             case CLEAR:
-                if (feedTimer.seconds() >= CLEAR_REVERSE_SEC) {
-                    feedStage = FeedStage.WINDMILL;
-                    feedTimer.reset();
-                    intake.startWindmillOnly();
-                }
+                if (feedTimer.seconds() >= CLEAR_REVERSE_SEC) closeGate();
+                else break;
+                // fall through: the gate may open in this same loop
+            case HOLD:
+                if (!intake.isHoldingFeed()) intake.holdFeed();   // re-assert if a driver command changed it
+                if (gateOpen) openGate();
                 break;
             case WINDMILL:
-                if (feedTimer.seconds() >= WINDMILL_SPINUP_SEC) {
-                    feedStage = FeedStage.FEED;
+                if (!gateOpen) closeGate();
+                else if (feedTimer.seconds() >= windmillLead) beginFeed();
+                break;
+            case FEED:
+                if (!gateOpen) {
+                    closeGate();
+                } else {
                     intake.start();
                     intake.startWindmill();
                 }
                 break;
-            case FEED:
-                intake.start();
-                intake.startWindmill();
+            default:
                 break;
         }
     }
 
+    private void closeGate() {
+        feedStage = FeedStage.HOLD;
+        intake.holdFeed();
+    }
+
+    private void openGate() {
+        windmillLead = firstFeed ? WINDMILL_SPINUP_SEC : WINDMILL_RESUME_SEC;
+        if (windmillLead <= 0) {
+            // Between shots: windmill straight back to feed power, transfer soft-starts behind it.
+            intake.resumeWindmill();
+            intake.start();
+            feedStage = FeedStage.FEED;
+            firstFeed = false;
+            return;
+        }
+        feedStage = FeedStage.WINDMILL;
+        feedTimer.reset();
+        intake.startWindmillOnly();
+    }
+
+    private void beginFeed() {
+        feedStage = FeedStage.FEED;
+        firstFeed = false;
+        intake.start();
+        intake.startWindmill();
+    }
+
     /**
-     * Stops feeding when the flywheel dips or the shooter stops. Mid-sequence (clearing or windmill-only) everything
-     * stops; during normal feeding only the windmill stops, as before.
+     * Hands the intake back when feeding ends: if the driver had the intake running before the volley it goes
+     * back to intaking (roller in, windmill gate, gentle transfer); otherwise everything stops.
      */
-    private void stopFeeding() {
-        if (intake != null) {
-            if (feedStage == FeedStage.CLEAR || feedStage == FeedStage.WINDMILL) intake.stop();
-            else intake.stopWindmill();
+    private void releaseIntake() {
+        if (intake != null && feedStage != FeedStage.NONE) {
+            intake.stop();
+            if (driverIntakeWasOn) intake.start();
         }
         feedStage = FeedStage.NONE;
     }
