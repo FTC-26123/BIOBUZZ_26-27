@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.subsystems.AprilTagAlignment;
 import org.firstinspires.ftc.teamcode.subsystems.AutoShot;
+import org.firstinspires.ftc.teamcode.subsystems.FlowerArm;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Limelight;
 import org.firstinspires.ftc.teamcode.subsystems.MecanumDrive;
@@ -29,6 +30,8 @@ public class TeleOp_BaseCodeOneControllerSpeedAdjust extends OpMode {
     public AprilTagAlignment aprilTagAlignment = new AprilTagAlignment();
     /** Camera aiming + distance-based shot speed. Does nothing until ShotConfig.AUTO_SHOT_ENABLED is true. */
     public AutoShot autoShot = new AutoShot();
+    /** Servo arm for the flower bed. Does nothing until FlowerArm.ENABLED is true. */
+    public FlowerArm flowerArm = new FlowerArm();
 
     @Override
     public void init() {
@@ -36,6 +39,7 @@ public class TeleOp_BaseCodeOneControllerSpeedAdjust extends OpMode {
         autoShot.init(hardwareMap, limelight, aprilTagAlignment, shooter, TeleOpRuntime);
         driveTrain.init(hardwareMap, aprilTagAlignment);
         intake.init(hardwareMap);
+        flowerArm.init(hardwareMap);   // does not move the arm
         shooter.init(hardwareMap, intake);
         driveTrain.enablePositionHold(hardwareMap);
     }
@@ -75,6 +79,7 @@ public class TeleOp_BaseCodeOneControllerSpeedAdjust extends OpMode {
         handleManualShootingControl(gamepad1);
         handleShooterSpeedControl(gamepad1);
         shooter.update();
+        handleFlowerArm();
 
         // ---------------- Telemetry Status Output ----------------
         telemetry.addData("Drive Speed Multiplier (G1 Dpad Right)", driveTrain.getSpeedMultiplier());
@@ -86,6 +91,7 @@ public class TeleOp_BaseCodeOneControllerSpeedAdjust extends OpMode {
         telemetry.addData("Flywheel", "%.0f of %.0f ticks/s  %s", shooter.getLastSpeed(),
                 shooter.getTargetLaunchPower(), shooter.isReady() ? "READY" : shooter.isRunning() ? "..." : "off");
         if (intake.isJammed()) telemetry.addLine("!! FEED JAMMED - eject with Back, then fire again !!");
+        flowerArm.addTelemetry(telemetry, "G1 A down / B up");
         autoShot.addTelemetry(telemetry);
         telemetry.addData("Runtime (s)", "%.2f", TeleOpRuntime.seconds());
         telemetry.setMsTransmissionInterval(30);
@@ -152,6 +158,21 @@ public class TeleOp_BaseCodeOneControllerSpeedAdjust extends OpMode {
     private void handleDrivetrainDpadSpeedSwitching(Gamepad gamepad1) {
         if (gamepad1.dpadRightWasPressed()) {
             driveTrain.switchSpeed();
+        }
+    }
+
+    /**
+     * FLOWER ARM. A = arm DOWN (then drive into the flower bed with the intake running), B = arm UP.
+     *
+     * TO CHANGE THE BUTTONS: edit the two lines below, e.g. gamepad1.guideWasPressed(),
+     * and the label in the telemetry line.
+     */
+    private void handleFlowerArm() {
+        if (gamepad1.aWasPressed()) {
+            flowerArm.down();
+        }
+        if (gamepad1.bWasPressed()) {
+            flowerArm.up();
         }
     }
 

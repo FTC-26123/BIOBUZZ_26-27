@@ -4,7 +4,7 @@ package org.firstinspires.ftc.teamcode.subsystems;
  * ALL the numbers and switches for camera aiming and distance-based shot speed in TeleOp, in one place.
  *
  * <p>Everything marked FILL IN has to be measured on the robot. Step-by-step instructions are in
- * NOTES/PHASE-3-SETUP-STEPS.md. Until {@link #AUTO_SHOT_ENABLED} is set to true none of this runs and TeleOp
+ * NOTES/ROBOT-SETUP.md (step 8). Until {@link #AUTO_SHOT_ENABLED} is set to true none of this runs and TeleOp
  * behaves exactly as it does with manual presets.
  *
  * <p>The camera mount numbers (height, forward offset, pitch) are NOT here: they live in
@@ -19,7 +19,7 @@ public final class ShotConfig {
 
     /**
      * MASTER SWITCH. false = the Limelight is not even started and the aim button does nothing.
-     * Set true only after Phases 1 and 2 have been checked on the robot (NOTES/ROBOT-CHECKLIST.md A-E).
+     * Set true only after Phases 1 and 2 have been checked on the robot (NOTES/ROBOT-SETUP.md, steps 1-5).
      */
     public static final boolean AUTO_SHOT_ENABLED = false;
 

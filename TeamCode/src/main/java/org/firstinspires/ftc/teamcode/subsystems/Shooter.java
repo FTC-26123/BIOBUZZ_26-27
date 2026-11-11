@@ -52,6 +52,8 @@ public class Shooter {
     private double autoBase = 0, autoTrim = 0;
     /** false = hold fire even at speed (AutoShot: not pointed at the basket yet). Always true unless set. */
     private boolean feedPermit = true;
+    /** Balls counted as shot: the flywheel speed dropped while the feed was open (see getShotCount). */
+    private int shotCount = 0;
 
     // ---------------------- Feeding / Readiness Thresholds ----------------------
     private static final double READY_TOLERANCE = 50;      // +/- window for isReady() (display)
@@ -564,6 +566,8 @@ public class Shooter {
         gateTarget = target;
 
         if (SHOOTING.equals(shooterStatus)) {
+            // A speed drop while the feed is open is a ball going through the flywheel.
+            if (speed < target - PAUSE_BELOW_TARGET && feedStage == FeedStage.FEED) shotCount++;
             if (speed < target - PAUSE_BELOW_TARGET || speed > target + PAUSE_ABOVE_TARGET || targetMoved) {
                 shooterStatus = STARTING;
                 pauseTimer.reset();
@@ -671,6 +675,18 @@ public class Shooter {
             if (driverIntakeWasOn) intake.start();
         }
         feedStage = FeedStage.NONE;
+    }
+
+    /**
+     * Estimated number of balls shot since the last {@link #resetShotCount()}: one per flywheel speed drop while
+     * feeding. It is an estimate (no ball sensor): a ball that barely slows the flywheel is not counted.
+     */
+    public int getShotCount() {
+        return shotCount;
+    }
+
+    public void resetShotCount() {
+        shotCount = 0;
     }
 
     /** @return the current step of the feed sequence, for telemetry. */
