@@ -33,8 +33,8 @@ public final class ShooterSpinupChecks {
         check(power[0]>0,"flywheel PIDF runs during spin-up");
         check(shooter.getTargetLaunchPower()==1500,"same default target");
         shooter.update();
-        check(roller.getPower()==Intake.INTAKE_IN&&windmill.getPower()==Intake.WINDMILL_IN&&transfer.getPower()==Intake.TRANSFER_POWER,
-            "existing update() still feeds when ready");
+        check(roller.getPower()==0&&windmill.getPower()<0&&transfer.getPower()>0,
+            "first ready update clears ONLY the windmill and transfer in reverse");
         shooter.updateSpinupOnly();
         check(roller.getPower()==0&&windmill.getPower()==0&&transfer.getPower()==0,"losing aim pauses every feeder output");
         shooter.stop();

@@ -13,6 +13,7 @@ $source = Join-Path $repoRoot 'TeamCode/src/main/java/org/firstinspires/ftc/team
 & $javac -source 8 -target 8 -cp $Classpath -d $classes `
     (Join-Path $source 'pedro/Constants.java') `
     (Join-Path $source 'subsystems/TeleOpPositionHold.java') `
+    (Join-Path $source 'subsystems/BulkReads.java') `
     (Join-Path $PSScriptRoot 'PositionHoldChecks.java')
 if ($LASTEXITCODE -ne 0) { throw 'Position hold checks did not compile' }
 & $java -cp "$classes;$Classpath" org.firstinspires.ftc.teamcode.subsystems.PositionHoldChecks

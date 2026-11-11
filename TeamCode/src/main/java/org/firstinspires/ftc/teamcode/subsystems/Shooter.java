@@ -71,6 +71,16 @@ public class Shooter {
     private String shooterStatus = "Off";
     private final ElapsedTime pauseTimer = new ElapsedTime();
 
+    // ---------------------- Feed sequence (see startFeeding) ----------------------
+    /** How long ONLY the windmill and transfer run in reverse before the first feed after start(). */
+    public static final double CLEAR_REVERSE_SEC = 0.15;
+    /** How long the windmill runs forward alone before the roller and transfer come on. */
+    public static final double WINDMILL_SPINUP_SEC = 0.10;
+    private enum FeedStage { NONE, CLEAR, WINDMILL, FEED }
+    private FeedStage feedStage = FeedStage.NONE;
+    private final ElapsedTime feedTimer = new ElapsedTime();
+    private boolean clearedSinceStart = false;
+
     // =====================================================================
     // Initialization
     // =====================================================================
@@ -79,6 +89,7 @@ public class Shooter {
      * Initializes flywheel motor and voltage sensor from the hardware map.
      */
     public void init(HardwareMap hwMap, Intake intake) {
+        BulkReads.enable(hwMap);
         this.intake = intake;
 
         shooter = hwMap.get(DcMotorEx.class, "shooter"); // throws if misconfigured (intended)
@@ -112,6 +123,8 @@ public class Shooter {
         shooterStatus = "Starting";
         pauseTimer.reset();
         resetPID();
+        clearedSinceStart = false;   // the next time the flywheel reaches speed, clear in reverse first
+        feedStage = FeedStage.NONE;
     }
 
     /**
@@ -225,6 +238,7 @@ public class Shooter {
      * Normal update() and all existing TeleOp behavior are unchanged. */
     public void updateSpinupOnly() {
         if (intake != null) intake.stop();
+        if (intake != null) intake.update();
         if ("Starting".equals(shooterStatus) || "Shooting".equals(shooterStatus)) {
             if (getTargetLaunchPower() <= 0) stop();
             else {
@@ -237,6 +251,7 @@ public class Shooter {
     }
 
     public void update() {
+        if (intake != null) intake.update();
         switch (shooterStatus) {
             case "Off":
                 if (shooter != null) {
@@ -345,6 +360,7 @@ public class Shooter {
             case "Starting":
                 if (pauseTimer.seconds() >= MIN_PAUSE_SEC && speed >= target - RESUME_BELOW_TARGET) {
                     shooterStatus = "Shooting";
+                    feedStage = FeedStage.NONE;   // begin the feed sequence fresh
                     startFeeding();
                 }
                 break;
@@ -352,21 +368,63 @@ public class Shooter {
     }
 
     /**
-     * Once the flywheel is at speed: runs the intake roller and windmill.
+     * Feed sequence, called every loop while "Shooting":
+     *  1. CLEAR   - first time the flywheel reaches speed after start(): ONLY the windmill and transfer run in
+     *               reverse for {@link #CLEAR_REVERSE_SEC} (roller off) to unload them.
+     *  2. WINDMILL - the windmill alone turns forward at its feed speed for {@link #WINDMILL_SPINUP_SEC}.
+     *  3. FEED    - only now the roller and transfer come on, and feeding continues.
+     * After a speed-dip pause the reverse clear is skipped (steps 2 and 3 only); a new start() re-arms it.
      */
     private void startFeeding() {
-        if (intake != null) {
-            intake.start();
-            intake.startWindmill();
+        if (intake == null) return;
+        intake.setWindmillFeedFromFlywheel(getTargetLaunchPower());
+        switch (feedStage) {
+            case NONE:
+                feedTimer.reset();
+                if (!clearedSinceStart) {
+                    clearedSinceStart = true;
+                    feedStage = FeedStage.CLEAR;
+                    intake.clearReverse();
+                } else {
+                    feedStage = FeedStage.WINDMILL;
+                    intake.startWindmillOnly();
+                }
+                break;
+            case CLEAR:
+                if (feedTimer.seconds() >= CLEAR_REVERSE_SEC) {
+                    feedStage = FeedStage.WINDMILL;
+                    feedTimer.reset();
+                    intake.startWindmillOnly();
+                }
+                break;
+            case WINDMILL:
+                if (feedTimer.seconds() >= WINDMILL_SPINUP_SEC) {
+                    feedStage = FeedStage.FEED;
+                    intake.start();
+                    intake.startWindmill();
+                }
+                break;
+            case FEED:
+                intake.start();
+                intake.startWindmill();
+                break;
         }
     }
 
     /**
-     * Stops the windmill when feeding pauses or shooter stops.
+     * Stops feeding when the flywheel dips or the shooter stops. Mid-sequence (clearing or windmill-only) everything
+     * stops; during normal feeding only the windmill stops, as before.
      */
     private void stopFeeding() {
         if (intake != null) {
-            intake.stopWindmill();
+            if (feedStage == FeedStage.CLEAR || feedStage == FeedStage.WINDMILL) intake.stop();
+            else intake.stopWindmill();
         }
+        feedStage = FeedStage.NONE;
+    }
+
+    /** @return the current step of the feed sequence, for telemetry. */
+    public String getFeedStage() {
+        return feedStage.name();
     }
 }

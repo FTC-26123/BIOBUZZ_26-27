@@ -10,7 +10,7 @@ $source=Join-Path $repo 'TeamCode/src/main/java'
 $team='org/firstinspires/ftc/teamcode'
 $files=@(Get-ChildItem (Join-Path $source "$team/Auton") -Filter '*.java' -File)
 $files+=Get-ChildItem (Join-Path $source "$team/Auton/cycles") -Filter '*.java' -File
-foreach($name in @('Intake','Shooter')){$files+=Get-Item (Join-Path $source "$team/subsystems/$name.java")}
+foreach($name in @('Intake','Shooter','BulkReads')){$files+=Get-Item (Join-Path $source "$team/subsystems/$name.java")}
 $files+=Get-Item (Join-Path $source "$team/pedro/Constants.java")
 $compileFiles=@()
 foreach($file in $files){

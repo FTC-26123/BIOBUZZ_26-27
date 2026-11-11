@@ -69,6 +69,7 @@ public class MecanumDrive {
      * Initializes hardware motors and configures direction and brake behavior with AprilTagAlignment reference.
      */
     public void init(HardwareMap hwMap, AprilTagAlignment aprilTagAlignment) {
+        BulkReads.enable(hwMap);
         this.aprilTagAlignment = aprilTagAlignment;
         frontLeftMotor = hwMap.get(DcMotor.class, "frontLeftMotor");
         frontRightMotor = hwMap.get(DcMotor.class, "frontRightMotor");
@@ -86,6 +87,7 @@ public class MecanumDrive {
         backRightMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
     }
     public void init(HardwareMap hwMap) {
+        BulkReads.enable(hwMap);
         frontLeftMotor = hwMap.get(DcMotor.class, "frontLeftMotor");
         frontRightMotor = hwMap.get(DcMotor.class, "frontRightMotor");
         backLeftMotor = hwMap.get(DcMotor.class, "backLeftMotor");
@@ -125,6 +127,7 @@ public class MecanumDrive {
      * Initializes hardware motors and configures direction and brake behavior with OdometryMovement reference.
      */
     public void init(HardwareMap hwMap, OdometryMovement odometryMovement) {
+        BulkReads.enable(hwMap);
         this.odometryMovement = odometryMovement;
         frontLeftMotor = hwMap.get(DcMotor.class, "frontLeftMotor");
         frontRightMotor = hwMap.get(DcMotor.class, "frontRightMotor");

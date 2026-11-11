@@ -19,7 +19,7 @@ try {
     foreach($name in @('AutoPaths','CycleRoute','FrameClearance','GardenParkRoute','GardenParkAuto','ShootFourAndParkAuto','ParkOnlyAuto','FeederModel','PreloadShotCounter','DelayedBasketTwoRoute','DelayedBasketTwoAuto')) {
         $files+=Get-Item (Join-Path $source "$team/Auton/cycles/$name.java")
     }
-    foreach($name in @('Intake','Shooter')){$files+=Get-Item (Join-Path $source "$team/subsystems/$name.java")}
+    foreach($name in @('Intake','Shooter','BulkReads')){$files+=Get-Item (Join-Path $source "$team/subsystems/$name.java")}
     $files+=Get-Item (Join-Path $source "$team/pedro/Constants.java")
     $compileFiles=@()
     foreach($file in $files){

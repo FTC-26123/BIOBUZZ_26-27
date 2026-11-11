@@ -13,7 +13,70 @@ import org.firstinspires.ftc.teamcode.pedro.Constants;
 public final class TeleOpPositionHold {
     public static final double STICK_DEADBAND = 0.06;
     public static final double ENGAGE_DELAY_SECONDS = 0.15;
-    public static final double MAX_HOLD_POWER = 0.90;
+    public static final double MAX_HOLD_POWER = 1.00;
+    /**
+     * Integral term added on top of Pedro's hold. A steady push makes the extra power grow over time, so the robot
+     * is walked back to its spot instead of settling short. HOLD_KI is how fast it grows (0 turns it off); the
+     * extra power from it never exceeds HOLD_I_LIMIT_POWER per axis. The stored integral is cleared whenever the
+     * hold releases or faults, and drains quickly when a push ends so it does not overshoot.
+     */
+    public static final double HOLD_KI = 1.0;
+    public static final double HOLD_I_LIMIT_POWER = 0.35;
+    public static final double HOLD_I_DRAIN_PER_S = 5.0;
+    /**
+     * Damping: extra power proportional to how fast Pedro's correction is changing, which reacts to the speed of a
+     * shove and calms shaking from the stiff gains. HOLD_KD_SECONDS is the look-ahead time (0 turns it off);
+     * HOLD_D_FILTER smooths the signal (1.0 = no smoothing).
+     */
+    public static final double HOLD_KD_SECONDS = 0.05;
+    public static final double HOLD_D_FILTER = 0.3;
+    /** Most extra power the damping term may add per axis (Pedro's output jumps at its 2.5 in gain switch). */
+    public static final double HOLD_D_LIMIT_POWER = 0.20;
+
+    /**
+     * Integral and damping added on top of Pedro's hold output, per axis in Pedro's own robot-frame powers.
+     * Shared by the TeleOp hold and the hold tuner so both behave the same.
+     */
+    public static final class HoldExtras {
+        public double kI = HOLD_KI, kD = HOLD_KD_SECONDS;
+        private double iF, iS, iT, pF, pS, pT, dF, dS, dT;
+        private boolean havePrevious;
+
+        public void reset() {
+            iF = iS = iT = dF = dS = dT = 0;
+            havePrevious = false;
+        }
+
+        private double integrate(double integral, double power, double dt) {
+            if (kI <= 0) return 0;
+            // A correction that opposes the stored integral means the push ended: drain it fast to avoid overshoot.
+            if (integral * power < 0) integral *= Math.max(0, 1 - HOLD_I_DRAIN_PER_S * dt);
+            integral += power * dt;
+            double limit = HOLD_I_LIMIT_POWER / kI;
+            return Math.max(-limit, Math.min(limit, integral));
+        }
+
+        private static double clampD(double v) {
+            return Math.max(-HOLD_D_LIMIT_POWER, Math.min(HOLD_D_LIMIT_POWER, v));
+        }
+
+        public DrivePowers apply(DrivePowers p, double dt) {
+            iF = integrate(iF, p.forward(), dt);
+            iS = integrate(iS, p.strafe(), dt);
+            iT = integrate(iT, p.turn(), dt);
+            if (havePrevious && dt > 1e-4) {
+                dF += HOLD_D_FILTER * ((p.forward() - pF) / dt - dF);
+                dS += HOLD_D_FILTER * ((p.strafe() - pS) / dt - dS);
+                dT += HOLD_D_FILTER * ((p.turn() - pT) / dt - dT);
+            }
+            pF = p.forward(); pS = p.strafe(); pT = p.turn();
+            havePrevious = true;
+            return new DrivePowers(
+                    p.forward() + kI * iF + clampD(kD * dF),
+                    p.strafe() + kI * iS + clampD(kD * dS),
+                    p.turn() + kI * iT + clampD(kD * dT));
+        }
+    }
     private static final double MAX_LOOP_GAP_SECONDS = 0.25;
     /**
      * Keep resisting a shove up to this far from the captured target. Beyond it the robot was carried somewhere
@@ -143,7 +206,7 @@ public final class TeleOpPositionHold {
         return new DrivePowers(forward / scale, strafe / scale, turn / scale);
     }
 
-    /** Exactly the same localizer, drivetrain and Foresight tuning as autonomous. */
+    /** Same localizer, drivetrain and Foresight tuning as autonomous, with the TeleOp hold stiffness. */
     private static final class PedroBackend implements Backend {
         private final Follower follower;
         private final GoBildaPinpointDriver pinpoint;
@@ -157,7 +220,7 @@ public final class TeleOpPositionHold {
                 hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.backLeftName.get()),
                 hardwareMap.get(DcMotor.class, Constants.drivetrainConfig.backRightName.get())
             };
-            follower = Constants.create(hardwareMap);
+            follower = Constants.createTeleOpHold(hardwareMap);
             stop();
         }
 
@@ -175,16 +238,19 @@ public final class TeleOpPositionHold {
             return follower.pose();
         }
 
+        private final HoldExtras extras = new HoldExtras();
+
         @Override public void hold(Pose target, double dt) {
             // Same operation as Follower HOLD; split out so sensor validation precedes output.
-            // true honors the hold-point scaling in the existing ForesightConfig too.
+            // true applies the TeleOp hold stiffness (Constants.TELEOP_HOLD_STIFFNESS).
             DrivePowers powers = follower.algorithm().calculateHold(follower.drivetrain,
                     target, follower.localizer.state(), true, dt);
             // L1 bound keeps every mixed wheel <= the hold power limit, preserving ratios.
-            follower.drivetrain.drive(limitPowers(powers), false);
+            follower.drivetrain.drive(limitPowers(extras.apply(powers, dt)), false);
         }
 
         @Override public void stop() {
+            extras.reset();
             follower.stop();
             // Follower.stop() only changes mode; force the actual motor zero immediately.
             follower.drivetrain.stop(true);

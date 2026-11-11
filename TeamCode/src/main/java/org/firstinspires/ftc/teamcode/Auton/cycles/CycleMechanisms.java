@@ -36,6 +36,7 @@ public final class CycleMechanisms {
     public double predictedReleaseSpeed(double now){return FlywheelForecast.after(speed(),feedCommand(now),releaseDelay(now));}
     /** Observe before planning so confirmed shots and remaining travel use current encoders. */
     public void update(double now){
+        intakeSubsystem.update();
         feeder.observe(now,intake.getVelocity());
         double measured=speed(),expected=lastUpdate<0?measured:FlywheelForecast.after(lastObserved,commanded,Math.max(0,now-lastUpdate));
         lastObserved=measured;lastUpdate=now;
@@ -78,7 +79,7 @@ public final class CycleMechanisms {
         if(Math.abs(velocity-targetSpeed)<25){if(readySince<0)readySince=now;}
         else readySince=-1;
         if(readySince>=0&&now-readySince>.12&&now-lastShot>.4&&now>=retryAt){
-            opened=now;feeder.begin(now,lastShot);armed=true;armedSpeed=targetSpeed;collect(true);intakeSubsystem.startWindmill();
+            opened=now;feeder.begin(now,lastShot);armed=true;armedSpeed=targetSpeed;collect(true);intakeSubsystem.setWindmillFeedFromFlywheel(targetSpeed);intakeSubsystem.startWindmill();
         }
     }
     /** Predictive feeding: trajectory validity replaces the fixed speed/settle window.
@@ -99,7 +100,7 @@ public final class CycleMechanisms {
         requestVelocity(feedCommand(now));
         if(!permit){collect(prepare);return;}
         // Start transport during recovery/spacing, rather than waiting and then paying transit again.
-        if(now-lastShot>.07&&now>=retryAt){opened=now;feeder.begin(now,lastShot);armed=true;armedSpeed=velocity;collect(true);intakeSubsystem.startWindmill();}
+        if(now-lastShot>.07&&now>=retryAt){opened=now;feeder.begin(now,lastShot);armed=true;armedSpeed=velocity;collect(true);intakeSubsystem.setWindmillFeedFromFlywheel(velocity);intakeSubsystem.startWindmill();}
     }
     public void stop(){requestVelocity(0);close();}
 }

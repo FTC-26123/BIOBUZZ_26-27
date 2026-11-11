@@ -39,7 +39,32 @@ public class Constants {
         c.offsetUnits.set(DistanceUnit.INCH);
     });
     /** Team-provided hardware tuning; simulator cycles use their separate SimPedro model. */
-    public static ForesightConfig foresightConfig = new ForesightConfig(c -> {
+    public static ForesightConfig foresightConfig = new ForesightConfig(Constants::applyForesight);
+
+    /**
+     * TeleOp position hold only: multiplies the translational hold correction. 1.0 = the autonomous strength;
+     * raise it to resist pushes harder, lower it if the robot shakes while holding. Autonomous never uses this
+     * config, so its path endings and holds keep their tuning.
+     */
+    public static final double TELEOP_HOLD_STIFFNESS = 2.5;
+
+    /** Same tuning as {@link #foresightConfig} plus a hold-point stiffness multiplier. */
+    public static ForesightConfig holdConfig(double translationalScaling) {
+        return new ForesightConfig(c -> {
+            applyForesight(c);
+            c.holdPointTranslationalScaling.set(translationalScaling);
+        });
+    }
+
+    /** Follower for the TeleOp position hold: same hardware and tuning as autonomous, stiffer hold. */
+    public static Follower createTeleOpHold(HardwareMap h) {
+        org.firstinspires.ftc.teamcode.subsystems.BulkReads.enable(h);
+        return new Follower(new PinpointLocalizer(h, localizerConfig),
+                new Mecanum(h, drivetrainConfig), new Foresight(holdConfig(TELEOP_HOLD_STIFFNESS)));
+    }
+
+    /** Team-provided hardware tuning, shared by autonomous and the TeleOp hold. */
+    public static void applyForesight(ForesightConfig c) {
         Controller primaryTranslationalForward = Controller.proportional(0.30024079620465516);
         Controller secondaryTranslationalForward = Controller.proportional(0.11093095161579151);
         Controller primaryTranslationalLateral = Controller.proportional(0.4587871728667344);
@@ -57,9 +82,10 @@ public class Constants {
         c.maxAchievableStrafeVelocity.set(60.78246577619209);
         c.naturalForwardDeceleration.set(29.473446284393383);
         c.naturalStrafeDeceleration.set(58.541903035672625);
-    });
+    }
 
     public static Follower create(HardwareMap h) {
+        org.firstinspires.ftc.teamcode.subsystems.BulkReads.enable(h);
         return new Follower(new PinpointLocalizer(h, localizerConfig),
                 new Mecanum(h, drivetrainConfig), new Foresight(foresightConfig));
     }

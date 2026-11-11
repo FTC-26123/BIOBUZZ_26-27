@@ -15,6 +15,7 @@ try {
         "$auton/CycleRoute.java" "$auton/FrameClearance.java" "$auton/GardenParkRoute.java" `
         "$auton/CycleMechanisms.java" "$auton/FeederModel.java" "$auton/FlywheelForecast.java" `
         "TeamCode/src/main/java/org/firstinspires/ftc/teamcode/subsystems/Intake.java" `
+        "TeamCode/src/main/java/org/firstinspires/ftc/teamcode/subsystems/BulkReads.java" `
         tools/auton/GardenParkRouteChecks.java tools/auton/GardenParkSimStudy.java tools/auton/IntakeSubsystemChecks.java
     if ($LASTEXITCODE) { throw "Garden-park study compilation failed" }
     & $java -cp $cp org.firstinspires.ftc.teamcode.Auton.cycles.GardenParkRouteChecks
