@@ -54,18 +54,30 @@ public class Shooter {
     private boolean feedPermit = true;
     /** Balls counted as shot: the flywheel speed dropped while the feed was open (see getShotCount). */
     private int shotCount = 0;
+    /** Slow average of the flywheel speed while feeding: the level a shot's drop is measured from. */
+    private double feedReference = 0;
+    private boolean feedReferenceValid = false;
 
     // ---------------------- Feeding / Readiness Thresholds ----------------------
     private static final double READY_TOLERANCE = 50;      // +/- window for isReady() (display)
     /**
-     * Gate closes (feeding pauses) when speed < target - this. Keep it at or above the shot-detection drop used
-     * by the autonomous PreloadShotCounter (5% of target, at least 40), or autonomous shots stop being counted.
+     * Gate always closes (feeding pauses) when speed < target - this. A smaller sudden drop is caught earlier
+     * by {@link #SHOT_DROP}. (The older, now hidden autonomous programs count shots with PreloadShotCounter,
+     * which expects to see the drop before the gate closes; BioBuzzAuto uses getShotCount() instead.)
      */
     private static final double PAUSE_BELOW_TARGET = 100;
     private static final double RESUME_BELOW_TARGET = 40;  // gate may reopen when speed >= target - this ...
     private static final double RESUME_ABOVE_TARGET = 80;  // ... and speed <= target + this (no over-speed shots)
     private static final double PAUSE_ABOVE_TARGET = 150;  // gate closes when speed > target + this (target lowered)
     private static final double MIN_PAUSE_SEC = 0.05;      // minimum time feeding stays paused
+    /**
+     * A ball going through shows as a sudden drop in flywheel speed. While feeding, a drop of at least this many
+     * ticks/sec below the steady feeding speed counts as one shot and closes the gate until the speed is back,
+     * even when the speed is still above target - PAUSE_BELOW_TARGET. Lower it if balls are not being counted
+     * (the autonomous then waits for its "no more balls" timeout); raise it if the gate closes with no ball
+     * (speed ripple). The hub reports speed in steps of about 20, so keep it above 40.
+     */
+    public static final double SHOT_DROP = 45;
     private static final double STOPPED_VELOCITY = 20;     // below this the flywheel counts as stopped
 
     // ---------------------- Voltage Compensation ----------------------
@@ -566,13 +578,27 @@ public class Shooter {
         gateTarget = target;
 
         if (SHOOTING.equals(shooterStatus)) {
-            // A speed drop while the feed is open is a ball going through the flywheel.
-            if (speed < target - PAUSE_BELOW_TARGET && feedStage == FeedStage.FEED) shotCount++;
-            if (speed < target - PAUSE_BELOW_TARGET || speed > target + PAUSE_ABOVE_TARGET || targetMoved) {
+            // A speed drop while the feed is open is a ball going through the flywheel: count it and close the
+            // gate so the next ball waits for the speed to come back.
+            boolean shot = false;
+            if (feedStage == FeedStage.FEED) {
+                if (!feedReferenceValid) {
+                    feedReference = speed;
+                    feedReferenceValid = true;
+                }
+                shot = speed <= feedReference - SHOT_DROP || speed < target - PAUSE_BELOW_TARGET;
+                if (shot) shotCount++;
+                else feedReference += 0.15 * (speed - feedReference);
+            } else {
+                feedReferenceValid = false;
+            }
+            if (shot || speed < target - PAUSE_BELOW_TARGET || speed > target + PAUSE_ABOVE_TARGET || targetMoved) {
                 shooterStatus = STARTING;
                 pauseTimer.reset();
+                feedReferenceValid = false;
             }
         } else {
+            feedReferenceValid = false;
             shooterStatus = STARTING;
             if (pauseTimer.seconds() >= MIN_PAUSE_SEC && inWindow) {
                 shooterStatus = SHOOTING;
@@ -679,7 +705,8 @@ public class Shooter {
 
     /**
      * Estimated number of balls shot since the last {@link #resetShotCount()}: one per flywheel speed drop while
-     * feeding. It is an estimate (no ball sensor): a ball that barely slows the flywheel is not counted.
+     * feeding (see {@link #SHOT_DROP}). It is an estimate (no ball sensor): a ball that barely slows the flywheel
+     * is not counted.
      */
     public int getShotCount() {
         return shotCount;

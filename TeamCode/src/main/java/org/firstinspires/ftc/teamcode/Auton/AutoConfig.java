@@ -186,8 +186,11 @@ public final class AutoConfig {
      * in. Must be far enough that the arm can swing down without hitting the flower bed.
      */
     public static final double FLOWER_STANDOFF_IN = 12.0;
-    /** Time for the arm to finish swinging down before the robot moves in (seconds). */
-    public static final double FLOWER_ARM_DOWN_SEC = 0.5;
+    /**
+     * Time for the arm to finish swinging down before the robot moves in (seconds). The arm travels the full
+     * 270 degrees, which is slow: time it on the robot (step 9.2) and put the measured time plus 0.2 here.
+     */
+    public static final double FLOWER_ARM_DOWN_SEC = 1.2;
     /** Speed of the push into the flower bed and of the retreat (metres per second). */
     public static final double FLOWER_PUSH_M_PER_S = 0.25;
     /** FILL IN (measure): how long to sit at the flower with the intake running while the balls come out. */

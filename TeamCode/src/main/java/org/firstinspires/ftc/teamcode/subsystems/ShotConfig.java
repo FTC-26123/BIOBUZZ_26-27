@@ -18,10 +18,12 @@ public final class ShotConfig {
     // =====================================================================
 
     /**
-     * MASTER SWITCH. false = the Limelight is not even started and the aim button does nothing.
+     * MASTER SWITCH for the real robot: change {@code false} to {@code true} to turn camera aiming on.
+     * (In the desktop simulator it is always on, so it can be tried there first: "|| InSimulator.YES".)
+     * false = the Limelight is not even started and the aim button does nothing.
      * Set true only after Phases 1 and 2 have been checked on the robot (NOTES/ROBOT-SETUP.md, steps 1-5).
      */
-    public static final boolean AUTO_SHOT_ENABLED = false;
+    public static final boolean AUTO_SHOT_ENABLED = false || InSimulator.YES;
 
     /**
      * Shot speed from distance. Needs {@link #SHOT_TABLE} to have at least two rows; with an empty table the
@@ -41,9 +43,10 @@ public final class ShotConfig {
 
     /**
      * FILL IN: the Limelight pipeline number that detects AprilTags (check the Limelight web page).
-     * TeleOp used 0 before; the autonomous code uses 1 (VisionRules.SHOT_PIPELINE). They must be the same pipeline.
+     * 1 is what the older autonomous code uses (VisionRules.SHOT_PIPELINE) and what the simulator's AprilTag
+     * pipeline is; the old TeleOp code used 0. Set it to whatever slot holds the AprilTag pipeline on your camera.
      */
-    public static final int APRILTAG_PIPELINE = 0;
+    public static final int APRILTAG_PIPELINE = 1;
 
     /** Camera frames older than this are ignored (milliseconds). */
     public static final double MAX_FRAME_AGE_MS = 150;
