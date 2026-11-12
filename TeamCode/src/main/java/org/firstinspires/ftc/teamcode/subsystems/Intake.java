@@ -21,6 +21,11 @@ import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
  *
  * <p>Shooting order (driven by {@link Shooter}): {@link #clearReverse()} for a short moment, then
  * {@link #startWindmillOnly()}, then {@link #start()} + {@link #startWindmill()} to bring the roller and transfer in.
+ * Between shots, while the flywheel recovers, {@link #holdFeed()} closes the gate (windmill stopped with BRAKE,
+ * transfer stopped) so the next ball cannot reach a slow flywheel; {@link #resumeWindmill()} reopens it.
+ *
+ * <p>JAM RECOVERY: if a feeding windmill stays bogged down, the windmill and transfer back up for a moment and
+ * try again (see {@link #UNJAM_AFTER_SEC}).
  */
 public class Intake {
 
@@ -82,7 +87,7 @@ public class Intake {
      * Open-loop power (0..1) for the transfer while intaking with the windmill not feeding. Raise it if balls do
      * not climb the transfer; set 0 to keep the transfer off while intaking.
      */
-    public static final double TRANSFER_INTAKE_POWER = 0.25;
+    public static final double TRANSFER_INTAKE_POWER = 0.35;
     /** Soft start for the transfer velocity (ticks/sec per second) and its starting fraction. */
     public static final double TRANSFER_RAMP_TICKS_PER_SEC2 = 6000;
     public static final double TRANSFER_START_FRACTION = 0.40;
@@ -102,6 +107,29 @@ public class Intake {
     public static final double TRANSFER_PAUSE_BELOW = 0.50;
     public static final double TRANSFER_RESUME_ABOVE = 0.75;
     public static final double TRANSFER_PAUSE_DELAY_SEC = 0.12;
+    /**
+     * GATE BETWEEN SHOTS ({@link #holdFeed()}). While the flywheel recovers after a shot the windmill is stopped
+     * with BRAKE so the next ball cannot be pushed through. If balls still slip past a braked windmill, set this
+     * above 0 to turn the windmill slowly backwards while holding (the old behaviour used 750); it costs time
+     * because the next ball is pushed away from the shooter.
+     */
+    public static final double WINDMILL_HOLD_REVERSE_RPM = 300;
+    /**
+     * Transfer power (0..1, open loop) while the gate is closed between shots. 0 = stopped, so nothing pushes on
+     * the windmill. A small value keeps the next ball pressed against the windmill for a quicker follow-up shot;
+     * only raise it if the braked windmill reliably holds the ball back.
+     */
+    public static final double TRANSFER_HOLD_POWER = 0.0;
+    /**
+     * JAM RECOVERY. If the transfer has been waiting for a bogged-down windmill for this long, the windmill and
+     * transfer run in reverse for {@link #UNJAM_REVERSE_SEC} and then feed again. After {@link #UNJAM_MAX_TRIES}
+     * tries in a row without the windmill recovering it stops trying ({@link #isJammed()}). 0 turns it off.
+     */
+    public static final double UNJAM_AFTER_SEC = 0.30;
+    public static final double UNJAM_REVERSE_SEC = 0.10;
+    public static final int UNJAM_MAX_TRIES = 3;
+    /** Battery voltage the open-loop windmill feed power is referenced to (see {@link #setBatteryVoltage}). */
+    public static final double REFERENCE_VOLTAGE = 12.0;
     /** Motor currents are read this often (each read costs a hub round trip). */
     private static final double CURRENT_READ_SEC = 0.05;
 
@@ -114,7 +142,7 @@ public class Intake {
     private double transferIntakePower = TRANSFER_INTAKE_POWER;
 
     // ---------------------- State ----------------------
-    private enum WindmillState { OFF, INTAKE_REVERSE, CLEAR_REVERSE, FEED, EJECT }
+    private enum WindmillState { OFF, INTAKE_REVERSE, CLEAR_REVERSE, FEED, EJECT, HOLD }
     private enum TransferState { STOPPED, GENTLE, FEED, REVERSE }
     private WindmillState windmillState = WindmillState.OFF;
     private TransferState transferState = TransferState.STOPPED;
@@ -123,6 +151,10 @@ public class Intake {
     private double windmillTargetPower = 0, windmillPower = 0;
     private double transferTarget = 0, transferCommand = 0;
     private boolean transferPaused = false;
+    private boolean windmillBraking = false;
+    private double batteryVoltage = REFERENCE_VOLTAGE;
+    private double pausedSeconds = 0, unjamRemaining = 0;
+    private int unjamTries = 0, unjamCount = 0;
     private double slowSeconds = 0, overCurrentSeconds = 0, cooldownRemaining = 0, sinceCurrentRead = 0;
     private double windmillAmps = 0, transferAmps = 0, windmillPeakAmps = 0, transferPeakAmps = 0;
     private long lastUpdateNanos = 0;
@@ -221,6 +253,38 @@ public class Intake {
         transferAtVelocity(transferFeedVelocity, TransferState.FEED);
     }
 
+    /**
+     * Closes the gate between shots: the windmill stops and BRAKES (or turns slowly backwards if
+     * {@link #WINDMILL_HOLD_REVERSE_RPM} is set) and the transfer stops, so the next ball stays where it is until
+     * the flywheel is back at speed. The roller is left as it was. Reopen with {@link #resumeWindmill()}.
+     */
+    public void holdFeed() {
+        intakeStatus = "Holding (flywheel recovering)";
+        setWindmill(WindmillState.HOLD);
+        if (TRANSFER_HOLD_POWER > 0) transferGentle(TRANSFER_HOLD_POWER);
+        else stopTransfer();
+    }
+
+    /**
+     * Reopens the gate after {@link #holdFeed()}: the windmill goes straight to its feed power (no soft start, it
+     * was only stopped for a moment) and the transfer soft-starts behind it. Call {@link #start()} afterwards to
+     * bring the roller back in.
+     */
+    public void resumeWindmill() {
+        setWindmill(WindmillState.FEED);
+        if (unjamRemaining <= 0) {
+            windmillPower = windmillTargetPower;
+            windmill.setPower(windmillPower);
+        }
+        transferAtVelocity(transferFeedVelocity, TransferState.FEED);
+    }
+
+    /** @return true while the gate is closed by {@link #holdFeed()}. */
+    public boolean isHoldingFeed() { return windmillState == WindmillState.HOLD; }
+
+    /** @return true while the roller is running inward (intaking or feeding). */
+    public boolean isRollerIn() { return rollerIn; }
+
     /** Shooting step 2: windmill forward at the feed speed only; roller and transfer stay off. */
     public void startWindmillOnly() {
         intakeStatus = "Windmill only";
@@ -261,6 +325,7 @@ public class Intake {
         cooldownRemaining = overCurrentSeconds = 0;
         transferPaused = false;
         slowSeconds = 0;
+        pausedSeconds = 0;
     }
 
     /** @deprecated the transfer is a motor now; use {@link #startTransfer()}. */
@@ -320,6 +385,17 @@ public class Intake {
         if (windmillState == WindmillState.FEED) windmillTargetPower = windmillPowerFor(WindmillState.FEED);
     }
 
+    /**
+     * Tells the intake the battery voltage (Shooter passes its cached reading every loop). The windmill is open
+     * loop, so its feed power is scaled by {@link #REFERENCE_VOLTAGE} / voltage to keep the same speed as the
+     * battery drains. Never called = no scaling.
+     */
+    public void setBatteryVoltage(double volts) {
+        if (Double.isNaN(volts) || volts < 6 || volts > 15) return;
+        batteryVoltage = volts;
+        if (windmillState == WindmillState.FEED) windmillTargetPower = windmillPowerFor(WindmillState.FEED);
+    }
+
     // =====================================================================
     // Per-loop update
     // =====================================================================
@@ -335,7 +411,7 @@ public class Intake {
         if (windmill == null) return;
 
         // Windmill soft start (forward feeding only; reverse speeds are small and applied directly).
-        if (windmillPower != windmillTargetPower) {
+        if (unjamRemaining <= 0 && windmillPower != windmillTargetPower) {
             double step = WINDMILL_RAMP_POWER_PER_SEC * dt;
             double diff = windmillTargetPower - windmillPower;
             windmillPower = Math.abs(diff) <= step ? windmillTargetPower : windmillPower + Math.signum(diff) * step;
@@ -367,6 +443,12 @@ public class Intake {
     /** Windmill power currently applied (-1..1). */
     public double getWindmillPower() { return windmillPower; }
     public boolean isTransferPaused() { return transferPaused; }
+    /** @return true while the windmill and transfer are backing up to free a jam. */
+    public boolean isUnjamming() { return unjamRemaining > 0; }
+    /** @return true when jam recovery has given up; reverse the intake (eject) or stop to clear it. */
+    public boolean isJammed() { return transferPaused && unjamRemaining <= 0 && unjamTries >= UNJAM_MAX_TRIES; }
+    /** @return how many times jam recovery has run since init (for telemetry / tuning). */
+    public int getUnjamCount() { return unjamCount; }
     public boolean isTransferOvercurrentCooling() { return cooldownRemaining > 0; }
 
     // =====================================================================
@@ -378,12 +460,22 @@ public class Intake {
             case INTAKE_REVERSE: return -windmillIntakeReverseRpm / WINDMILL_FREE_RPM;
             case CLEAR_REVERSE:
             case EJECT:          return -WINDMILL_REVERSE_RPM / WINDMILL_FREE_RPM;
-            case FEED:           return Math.min(1.0, windmillFeedVelocity / WINDMILL_MAX_FEED_VELOCITY);
+            case FEED:           return 1.0;   // always full power while feeding
+            case HOLD:           return -WINDMILL_HOLD_REVERSE_RPM / WINDMILL_FREE_RPM;
             default:             return 0;
         }
     }
 
     private void setWindmill(WindmillState state) {
+        if (state == WindmillState.FEED && unjamRemaining > 0) return;   // jam recovery owns the windmill for a moment
+        unjamRemaining = 0;
+        // Brake only while holding the gate closed; everywhere else the windmill floats as before.
+        boolean brake = state == WindmillState.HOLD;
+        if (brake != windmillBraking) {
+            windmill.setZeroPowerBehavior(brake ? DcMotor.ZeroPowerBehavior.BRAKE : DcMotor.ZeroPowerBehavior.FLOAT);
+            windmillBraking = brake;
+        }
+        if (state != WindmillState.FEED && state != WindmillState.HOLD) unjamTries = 0;
         double target = windmillPowerFor(state);
         if (state == WindmillState.FEED) {
             // Soft start: from rest or reverse, begin at a fraction of the feed power and ramp up in update().
@@ -397,7 +489,7 @@ public class Intake {
         windmillState = state;
         windmillTargetPower = target;
         windmill.setPower(windmillPower);
-        if (state != WindmillState.FEED) { transferPaused = false; slowSeconds = 0; }
+        if (state != WindmillState.FEED) { transferPaused = false; slowSeconds = 0; pausedSeconds = 0; }
     }
 
     // =====================================================================
@@ -423,6 +515,7 @@ public class Intake {
 
     /** Closed-loop transfer velocity (ticks/sec) with soft start. */
     private void transferAtVelocity(double ticksPerSec, TransferState state) {
+        if (state == TransferState.FEED && unjamRemaining > 0) return;   // jam recovery owns the transfer for a moment
         if (transferOpenLoop) {
             transfer.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
             transferOpenLoop = false;
@@ -440,12 +533,14 @@ public class Intake {
      * Open-loop low power inward. Open loop on purpose: a velocity PID would ramp to full power when a ball
      * stalls against the windmill.
      */
-    private void transferGentle() {
+    private void transferGentle() { transferGentle(transferIntakePower); }
+
+    private void transferGentle(double power) {
         if (!transferOpenLoop) {
             transfer.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             transferOpenLoop = true;
         }
-        transfer.setPower(Math.signum(TRANSFER_VELOCITY) * transferIntakePower);
+        transfer.setPower(Math.signum(TRANSFER_VELOCITY) * power);
         transferState = TransferState.GENTLE;
         transferCommand = transferTarget = 0;
         cooldownRemaining = overCurrentSeconds = 0;
@@ -483,30 +578,67 @@ public class Intake {
         }
     }
 
-    /** Pauses the transfer while a feeding windmill is bogged down. */
+    /** Pauses the transfer while a feeding windmill is bogged down, and backs both up if it stays bogged down. */
     private void updateTransferGate(double dt) {
+        if (unjamRemaining > 0) {
+            unjamRemaining -= dt;
+            if (unjamRemaining <= 0) endUnjam();
+            return;
+        }
         boolean active = TRANSFER_PAUSE_BELOW > 0 && windmillState == WindmillState.FEED
                 && transferState == TransferState.FEED && windmillTargetPower > 0
                 && windmillPower >= 0.95 * windmillTargetPower;   // ignore the soft-start ramp
         if (!active) {
             slowSeconds = 0;
+            pausedSeconds = 0;
             if (transferPaused) { transferPaused = false; restartTransferSoft(); }
             return;
         }
-        double expected = windmillPower * WINDMILL_MAX_FEED_VELOCITY;
+        // Expected speed follows the battery: the same power turns the windmill slower on a low battery.
+        double expected = windmillPower * WINDMILL_MAX_FEED_VELOCITY * batteryVoltage / REFERENCE_VOLTAGE;
         double ratio = windmill.getVelocity() / expected;
         if (!transferPaused) {
             slowSeconds = ratio < TRANSFER_PAUSE_BELOW ? slowSeconds + dt : 0;
             if (slowSeconds >= TRANSFER_PAUSE_DELAY_SEC) {
                 transferPaused = true;
+                pausedSeconds = 0;
                 transferCommand = 0;
                 transfer.setVelocity(0);
             }
         } else if (ratio > TRANSFER_RESUME_ABOVE) {
             transferPaused = false;
             slowSeconds = 0;
+            pausedSeconds = 0;
+            unjamTries = 0;
             restartTransferSoft();
+        } else {
+            pausedSeconds += dt;
+            if (UNJAM_AFTER_SEC > 0 && pausedSeconds >= UNJAM_AFTER_SEC && unjamTries < UNJAM_MAX_TRIES) startUnjam();
         }
+    }
+
+    /** Backs the windmill and transfer up for a moment to free a ball wedged at the windmill. */
+    private void startUnjam() {
+        unjamTries++;
+        unjamCount++;
+        unjamRemaining = UNJAM_REVERSE_SEC;
+        pausedSeconds = 0;
+        windmillPower = -WINDMILL_REVERSE_RPM / WINDMILL_FREE_RPM;
+        windmill.setPower(windmillPower);
+        transferCommand = 0;
+        transfer.setVelocity(-transferFeedVelocity);
+    }
+
+    /** After the back-up: soft-start the windmill forward again and let the transfer follow. */
+    private void endUnjam() {
+        unjamRemaining = 0;
+        if (windmillState != WindmillState.FEED) return;
+        windmillPower = WINDMILL_START_FRACTION * windmillTargetPower;
+        windmill.setPower(windmillPower);
+        transferPaused = false;
+        slowSeconds = 0;
+        pausedSeconds = 0;
+        if (transferState == TransferState.FEED) restartTransferSoft(); else transfer.setVelocity(0);
     }
 
     private void restartTransferSoft() {

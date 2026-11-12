@@ -30,6 +30,36 @@ public class Limelight {
 
     public static final String TAG = "Limelight";
 
+    private boolean available = false;
+    private LLResult lastResult;
+
+    /**
+     * Same as {@link #init(HardwareMap)} but never throws: if the camera is missing from the robot configuration
+     * or does not answer, this returns false and every other method becomes a harmless no-op.
+     *
+     * @param pipeline Limelight pipeline index to run
+     * @return true if the camera was found
+     */
+    public boolean initSafely(HardwareMap hwMap, int pipeline) {
+        try {
+            limelight = hwMap.get(Limelight3A.class, "limelight");
+            limelight.pipelineSwitch(pipeline);
+            limelight.setPollRateHz(100);
+            available = limelight != null;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Limelight unavailable: " + e);
+            limelight = null;
+            available = false;
+        }
+        return available;
+    }
+
+    /** @return true once the camera has been found by init. */
+    public boolean isAvailable() { return available; }
+
+    /** @return the frame read by the most recent {@link #update()} (may be null). */
+    public LLResult getLastResult() { return lastResult; }
+
     /**
      * Initializes Limelight 3A camera and REV Hub IMU orientation.
      * Configures default pipeline index 0.
@@ -51,12 +81,14 @@ public class Limelight {
 //        }
         limelight.pipelineSwitch(0);
         limelight.pipelineSwitch(0);
+        available = true;
     }
 
     /**
      * Starts camera polling and processing on the Limelight.
      */
     public void start() {
+        if (limelight == null) return;
         limelight.start();
     }
 
@@ -64,6 +96,7 @@ public class Limelight {
      * Stops camera polling and processing.
      */
     public void stop() {
+        if (limelight == null) return;
         limelight.stop();
     }
 
@@ -71,7 +104,9 @@ public class Limelight {
      * Updates IMU orientation feed and processes latest Limelight vision result.
      */
     public void update() {
-        handlePosition(getLimelightResult());
+        if (limelight == null) return;
+        lastResult = getLimelightResult();
+        handlePosition(lastResult);
     }
 
     /**
