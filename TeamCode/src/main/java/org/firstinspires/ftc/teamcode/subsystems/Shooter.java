@@ -90,10 +90,10 @@ public class Shooter {
     private boolean voltageRead = false;
 
     // ---------------------- PIDF Coefficients ----------------------
-    public double kP = 0.0015;
-    public double kI = 0.0001;
-    public double kD = 0.00005;
-    public double kF = 0.00035;
+    public double kP = 0.01;
+    public double kI = 0.000667;
+    public double kD = 0.000333;
+    public double kF = 0.000438;
     /**
      * Recovery boost: while the flywheel is more than this many ticks/sec BELOW target it gets full power, then
      * the PIDF takes over for the last part. Shortens spin-up and the recovery after each shot. Lower it for a
@@ -129,9 +129,9 @@ public class Shooter {
      * balls' weight off the windmill. It runs while the flywheel is still spinning up when possible, and only
      * when the intake has run (or the shooter was started) since the last volley.
      */
-    public static final double CLEAR_REVERSE_SEC = 0.15;
+    public static final double CLEAR_REVERSE_SEC = 0.0;
     /** First feed of a volley: how long the windmill runs forward alone before the roller and transfer come on. */
-    public static final double WINDMILL_SPINUP_SEC = 0.10;
+    public static final double WINDMILL_SPINUP_SEC = 0.0;
     /**
      * Same head start for the windmill when feeding resumes BETWEEN shots. 0 = none: the windmill goes straight
      * to feed power and the transfer soft-starts behind it. Raise it a little (0.03) only if the windmill stalls

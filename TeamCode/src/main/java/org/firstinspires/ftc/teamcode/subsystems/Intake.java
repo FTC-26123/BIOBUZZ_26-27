@@ -87,7 +87,7 @@ public class Intake {
      * Open-loop power (0..1) for the transfer while intaking with the windmill not feeding. Raise it if balls do
      * not climb the transfer; set 0 to keep the transfer off while intaking.
      */
-    public static final double TRANSFER_INTAKE_POWER = 0.25;
+    public static final double TRANSFER_INTAKE_POWER = 0.35;
     /** Soft start for the transfer velocity (ticks/sec per second) and its starting fraction. */
     public static final double TRANSFER_RAMP_TICKS_PER_SEC2 = 6000;
     public static final double TRANSFER_START_FRACTION = 0.40;
@@ -113,7 +113,7 @@ public class Intake {
      * above 0 to turn the windmill slowly backwards while holding (the old behaviour used 750); it costs time
      * because the next ball is pushed away from the shooter.
      */
-    public static final double WINDMILL_HOLD_REVERSE_RPM = 0.0;
+    public static final double WINDMILL_HOLD_REVERSE_RPM = 300;
     /**
      * Transfer power (0..1, open loop) while the gate is closed between shots. 0 = stopped, so nothing pushes on
      * the windmill. A small value keeps the next ball pressed against the windmill for a quicker follow-up shot;
@@ -460,8 +460,7 @@ public class Intake {
             case INTAKE_REVERSE: return -windmillIntakeReverseRpm / WINDMILL_FREE_RPM;
             case CLEAR_REVERSE:
             case EJECT:          return -WINDMILL_REVERSE_RPM / WINDMILL_FREE_RPM;
-            case FEED:           return Math.min(1.0, windmillFeedVelocity / WINDMILL_MAX_FEED_VELOCITY
-                                         * REFERENCE_VOLTAGE / batteryVoltage);
+            case FEED:           return 1.0;   // always full power while feeding
             case HOLD:           return -WINDMILL_HOLD_REVERSE_RPM / WINDMILL_FREE_RPM;
             default:             return 0;
         }
