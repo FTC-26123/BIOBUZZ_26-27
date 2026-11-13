@@ -22,7 +22,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
     public static double FLOWER_COLLECT_SECONDS=2.0;
     public static double SHOT_BATCH_TIMEOUT_SECONDS=8.0;
     public static double MAX_READY_FEED_SECONDS=2.0;
-    public static final String EXPORT_VERSION="RAMP15_V2";
+    public static final String EXPORT_VERSION="RAMP15_V2_ARRIVAL_FIX";
     private enum State { DRIVE, SHOOT, COLLECT, FALLBACK, DONE }
     private State state=State.DONE;
     private final ElapsedTime clock=new ElapsedTime();
@@ -138,6 +138,13 @@ public abstract class TrainedFlowerAuto extends OpMode {
             &&Math.abs(Math.atan2(Math.sin(h),Math.cos(h)))<Math.toRadians(degrees)
             &&Math.hypot(follower.velocity().vx,follower.velocity().vy)<speed;
     }
+    private boolean driveArrived(){
+        // Keep the accurate wall-contact stop. Staging is still 12 inches inboard,
+        // so it need not meet the contact tolerance before starting the approach.
+        if(contactPot()>=0)return at(.25,1.0,1.5);
+        if(leg==2||leg==8)return at(.75,2.0,2.5);
+        return at(1.0,3.0,4.5);
+    }
     private void collect(){intake.start();intake.stopWindmill();}
     private void arrived(){
         follower.hold(target);stable=-1;began=clock.seconds();
@@ -153,7 +160,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
         }return seconds;
     }
     private void park(String reason){
-        abortDetails="curve="+(leg+1)+", batches="+batches+", releases="+batchReleases+", feed="+readyFeedSeconds+", speed="+shooter.getCurrentSpeed();
+        abortDetails="curve="+(leg+1)+", batches="+batches+", releases="+batchReleases+", feed="+readyFeedSeconds+", speed="+shooter.getCurrentSpeed()+", "+targetErrors();
         shooter.stop();intake.stop();parkingReason=reason;result=reason;
         fallback.clear();Pose from=follower.pose();int pot=contactPot();
         emergencyPot=pot;
@@ -183,9 +190,10 @@ public abstract class TrainedFlowerAuto extends OpMode {
             case DRIVE:
                 if(leg==3||leg==9)collect();else intake.stop();
                 shooter.update(); // Includes Intake.update(): transfer ramping and jam protection.
+                // Let path following finish the approach. Switching to hold 1.2 inches
+                // early can leave the ramp short of the .25-inch contact tolerance.
+                if(driveArrived()){arrived();break;}
                 if(now-began>6){park("Drive timeout");break;}
-                if(Math.hypot(follower.pose().x()-target.x(),follower.pose().y()-target.y())<1.2&&!follower.holding())follower.hold(target);
-                if(at(contactPot()>=0||leg==2||leg==8?.25:1.0,contactPot()>=0||leg==2||leg==8?1.0:3.0,contactPot()>=0||leg==2||leg==8?1.5:4.5))arrived();
                 break;
             case COLLECT:
                 collect();shooter.update();
@@ -213,10 +221,18 @@ public abstract class TrainedFlowerAuto extends OpMode {
             default: break;
         }report();
     }
+    private String targetErrors(){
+        if(target==null||follower==null)return "No target";
+        Pose p=follower.pose();double h=p.heading()-target.heading();
+        return "position error (in)="+Math.hypot(p.x()-target.x(),p.y()-target.y())
+            +", heading error (deg)="+Math.toDegrees(Math.atan2(Math.sin(h),Math.cos(h)))
+            +", drive speed (in/s)="+Math.hypot(follower.velocity().vx,follower.velocity().vy);
+    }
     private void report(){
         telemetry.addData("Export version",EXPORT_VERSION);telemetry.addData("Abort details",abortDetails);
         telemetry.addData("Last batch completion",lastBatchMode);telemetry.addData("Ready feed seconds",readyFeedSeconds);telemetry.addData("Auto stage",state);telemetry.addData("Curve",leg+1);
         telemetry.addData("Auto result",result);telemetry.addData("Parking reason",parkingReason);
+        telemetry.addData("Target errors",targetErrors());
         telemetry.addData("Elapsed (s)",clock.seconds());telemetry.addData("Completed shot batches",batches);
         telemetry.addData("Estimated releases",totalReleases+(state==State.SHOOT?batchReleases:0));
         telemetry.addLine("No basket-tip or ball-count sensor. Flower pickup is timed; tips are not confirmed.");
