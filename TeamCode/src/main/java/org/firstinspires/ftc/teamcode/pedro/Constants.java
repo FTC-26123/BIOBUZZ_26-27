@@ -46,7 +46,7 @@ public class Constants {
      * raise it to resist pushes harder, lower it if the robot shakes while holding. Autonomous never uses this
      * config, so its path endings and holds keep their tuning.
      */
-    public static final double TELEOP_HOLD_STIFFNESS = 2.5;
+    public static double TELEOP_HOLD_STIFFNESS = 2.5;
 
     /** Same tuning as {@link #foresightConfig} plus a hold-point stiffness multiplier. */
     public static ForesightConfig holdConfig(double translationalScaling) {

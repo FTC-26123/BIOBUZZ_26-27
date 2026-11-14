@@ -14,7 +14,6 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
  *
  * Features:
  *  - Software PIDF velocity control (derivative on filtered measurement, no kick on target change)
- *  - Full-power recovery boost when the flywheel is far below target (spin-up and after each shot)
  *  - Battery voltage compensation of the feedforward term
  *  - One ball at a time: feeding only happens while the flywheel is inside its speed window. The moment a shot
  *    pulls the speed down, the gate closes (windmill braked, transfer stopped) and reopens as soon as the speed
@@ -37,10 +36,11 @@ public class Shooter {
     private VoltageSensor voltageSensor;
 
     // ---------------------- Speed Presets & Limits (ticks/sec) ----------------------
-    private static final double[] LAUNCHING_POWERS = {1500, 1600, 1700, 1900};
+    /** Preset speeds. Editable on the robot (Robot Settings OpMode), so the contents can change at run time. */
+    public static final double[] LAUNCHING_POWERS = {1500, 1600, 1700, 1900};
     private static final double MAX_TARGET_VELOCITY = 2400; // set to your motor's real limit
     /** One press of a driver trim button changes the current preset by this much (ticks/sec). */
-    public static final double TRIM_STEP = 25;
+    public static double TRIM_STEP = 25;
     /** Driver trim added to each preset; kept per preset so a correction made at one spot is still there later. */
     private final double[] presetTrim = new double[LAUNCHING_POWERS.length];
     private int launchingIndex = 0;
@@ -65,11 +65,18 @@ public class Shooter {
      * by {@link #SHOT_DROP}. (The older, now hidden autonomous programs count shots with PreloadShotCounter,
      * which expects to see the drop before the gate closes; BioBuzzAuto uses getShotCount() instead.)
      */
-    private static final double PAUSE_BELOW_TARGET = 100;
-    private static final double RESUME_BELOW_TARGET = 40;  // gate may reopen when speed >= target - this ...
-    private static final double RESUME_ABOVE_TARGET = 80;  // ... and speed <= target + this (no over-speed shots)
-    private static final double PAUSE_ABOVE_TARGET = 150;  // gate closes when speed > target + this (target lowered)
+    public static double PAUSE_BELOW_TARGET = 100;
+    public static double RESUME_BELOW_TARGET = 40;  // gate may reopen when speed >= target - this ...
+    public static double RESUME_ABOVE_TARGET = 80;  // ... and speed <= target + this (no over-speed shots)
+    public static double PAUSE_ABOVE_TARGET = 150;  // gate closes when speed > target + this (target lowered)
     private static final double MIN_PAUSE_SEC = 0.05;      // minimum time feeding stays paused
+    /**
+     * Extra wait between balls: after a ball goes through, the feed reopens only once the flywheel has been back
+     * at speed for this long (seconds). 0 = reopen the moment the speed is back. Robot Settings > Shooter gate.
+     */
+    public static double BETWEEN_BALLS_SEC = 0.1;
+    private final ElapsedTime inWindowTimer = new ElapsedTime();
+    private boolean wasInWindow = false, afterShot = false;
     /**
      * A ball going through shows as a sudden drop in flywheel speed. While feeding, a drop of at least this many
      * ticks/sec below the steady feeding speed counts as one shot and closes the gate until the speed is back,
@@ -77,7 +84,7 @@ public class Shooter {
      * (the autonomous then waits for its "no more balls" timeout); raise it if the gate closes with no ball
      * (speed ripple). The hub reports speed in steps of about 20, so keep it above 40.
      */
-    public static final double SHOT_DROP = 45;
+    public static double SHOT_DROP = 45;
     private static final double STOPPED_VELOCITY = 20;     // below this the flywheel counts as stopped
 
     // ---------------------- Voltage Compensation ----------------------
@@ -90,17 +97,27 @@ public class Shooter {
     private boolean voltageRead = false;
 
     // ---------------------- PIDF Coefficients ----------------------
-    public double kP = 0.01;
-    public double kI = 0.000667;
-    public double kD = 0.000333;
-    public double kF = 0.000438;
-    /**
-     * Recovery boost: while the flywheel is more than this many ticks/sec BELOW target it gets full power, then
-     * the PIDF takes over for the last part. Shortens spin-up and the recovery after each shot. Lower it for a
-     * faster recovery; raise it (or set 0 to turn it off) if the speed overshoots the target after a shot.
-     * It is ignored while kP is 0 so the tuning OpMode's pure-feedforward calibration is not disturbed.
-     */
-    public double recoveryBoostError = 120;
+    // Code defaults only. The values used are the ones saved on the robot (Robot Settings OpMode or the
+    // "Shooter PIDF Manual" tuning OpMode), so changing them never needs a rebuild.
+    // Flywheel control as in "PID Control Full Course: Flywheels" (B. Pratt): power = kS + kV x target + kP x error.
+    // kS = power that just starts the wheel turning, kV (field name kF) = power per tick/sec, kP = correction.
+    // Integral and derivative are not used on a flywheel (leave kI and kD at 0).
+    public static double kS = 0.18;
+    public static double kP = 0.0045;
+    public static double kI = 0.0;
+    public static double kD = 0.0;
+    /** kV: feedforward power per tick/sec of target (called kF in older code). */
+    public static double kF = 0.000480;
+
+    /** Tuning only: NORMAL = full controller, KS_ONLY = power is just kS, FEEDFORWARD_ONLY = kS + kV, no kP. */
+    public enum TuneMode { NORMAL, KS_ONLY, FEEDFORWARD_ONLY }
+    private TuneMode tuneMode = TuneMode.NORMAL;
+
+    /** Tuning OpModes only. Every other OpMode leaves this at NORMAL. */
+    public void setTuneMode(TuneMode mode) {
+        tuneMode = mode == null ? TuneMode.NORMAL : mode;
+        integralSum = 0;
+    }
 
     private static final double VELOCITY_FILTER_ALPHA = 0.4; // 1.0 = no filtering
     private static final double INTEGRAL_ZONE = 100;         // integrate only within this error
@@ -129,15 +146,15 @@ public class Shooter {
      * balls' weight off the windmill. It runs while the flywheel is still spinning up when possible, and only
      * when the intake has run (or the shooter was started) since the last volley.
      */
-    public static final double CLEAR_REVERSE_SEC = 0.0;
+    public static double CLEAR_REVERSE_SEC = 0.0;
     /** First feed of a volley: how long the windmill runs forward alone before the roller and transfer come on. */
-    public static final double WINDMILL_SPINUP_SEC = 0.0;
+    public static double WINDMILL_SPINUP_SEC = 0.0;
     /**
      * Same head start for the windmill when feeding resumes BETWEEN shots. 0 = none: the windmill goes straight
      * to feed power and the transfer soft-starts behind it. Raise it a little (0.03) only if the windmill stalls
      * on the second and later balls.
      */
-    public static final double WINDMILL_RESUME_SEC = 0.0;
+    public static double WINDMILL_RESUME_SEC = 0.0;
 
     /** NONE = shooter is not driving the intake; HOLD = gate closed, waiting for flywheel speed. */
     private enum FeedStage { NONE, CLEAR, HOLD, WINDMILL, FEED }
@@ -157,6 +174,7 @@ public class Shooter {
      * Initializes flywheel motor and voltage sensor from the hardware map.
      */
     public void init(HardwareMap hwMap, Intake intake) {
+        RobotSettings.ensureLoaded();
         BulkReads.enable(hwMap);
         this.intake = intake;
 
@@ -200,6 +218,7 @@ public class Shooter {
         }
         if (feedRequested && (STARTING.equals(shooterStatus) || SHOOTING.equals(shooterStatus))) return;
         feedRequested = true;
+        afterShot = false;   // the first ball of a volley does not wait
         if (SPINNING.equals(shooterStatus) || STARTING.equals(shooterStatus) || SHOOTING.equals(shooterStatus)) {
             // Flywheel already running: keep its PID state, the gate opens as soon as the speed is in the window.
             shooterStatus = STARTING;
@@ -505,6 +524,11 @@ public class Shooter {
         }
     }
 
+    /** Clears the integral term (tuning: call after changing gains so old windup does not carry over). */
+    public void resetIntegral() {
+        integralSum = 0;
+    }
+
     private void resetPID() {
         integralSum = 0;
         pidTimer.reset();
@@ -512,7 +536,7 @@ public class Shooter {
     }
 
     /**
-     * PIDF with voltage-scaled feedforward and a full-power recovery boost. The derivative acts on the low-pass
+     * Plain PIDF with voltage-scaled feedforward. The derivative acts on the low-pass
      * filtered measurement (not the error), so changing the target does not cause a derivative spike.
      */
     private void updatePIDF() {
@@ -547,12 +571,19 @@ public class Shooter {
         }
 
         double voltageScale = REFERENCE_VOLTAGE / getBatteryVoltage();
-        double ff = kF * target * voltageScale;
+        double ff = (kS + kF * target) * voltageScale;
+        if (tuneMode == TuneMode.KS_ONLY) {
+            lastPower = Math.max(0.0, Math.min(1.0, kS * voltageScale));
+            if (shooter != null) shooter.setPower(lastPower);
+            return;
+        }
+        if (tuneMode == TuneMode.FEEDFORWARD_ONLY) {
+            lastPower = Math.max(0.0, Math.min(1.0, ff));
+            if (shooter != null) shooter.setPower(lastPower);
+            return;
+        }
 
         double calculatedPower = ff + (kP * error) + (kI * integralSum) + (kD * derivative);
-        if (recoveryBoostError > 0 && kP > 0 && error > recoveryBoostError) {
-            calculatedPower = 1.0;   // far below target: recover as fast as the motor allows
-        }
         lastPower = Math.max(0.0, Math.min(1.0, calculatedPower));
 
         if (shooter != null) {
@@ -593,6 +624,7 @@ public class Shooter {
                 feedReferenceValid = false;
             }
             if (shot || speed < target - PAUSE_BELOW_TARGET || speed > target + PAUSE_ABOVE_TARGET || targetMoved) {
+                if (shot) afterShot = true;
                 shooterStatus = STARTING;
                 pauseTimer.reset();
                 feedReferenceValid = false;
@@ -600,10 +632,15 @@ public class Shooter {
         } else {
             feedReferenceValid = false;
             shooterStatus = STARTING;
-            if (pauseTimer.seconds() >= MIN_PAUSE_SEC && inWindow) {
+            if (inWindow && !wasInWindow) inWindowTimer.reset();
+            // Between balls, the speed must have been back for BETWEEN_BALLS_SEC before the next ball goes.
+            boolean settled = !afterShot || inWindowTimer.seconds() >= BETWEEN_BALLS_SEC;
+            if (pauseTimer.seconds() >= MIN_PAUSE_SEC && inWindow && settled) {
                 shooterStatus = SHOOTING;
+                afterShot = false;
             }
         }
+        wasInWindow = inWindow;
         advanceFeed(SHOOTING.equals(shooterStatus) && feedPermit);
     }
 
@@ -627,7 +664,9 @@ public class Shooter {
             // Taking the intake over from the driver: remember whether it was running so it can be restored.
             driverIntakeWasOn = intake.isRollerIn();
             if (driverIntakeWasOn) needsClear = true;
-            if (needsClear) {
+            // The reverse clear only runs if it has a time set. At 0 it is skipped completely (it used to reverse
+            // the windmill and transfer for one loop anyway, pushing balls back out when firing started).
+            if (needsClear && CLEAR_REVERSE_SEC > 0) {
                 needsClear = false;
                 firstFeed = true;
                 feedStage = FeedStage.CLEAR;

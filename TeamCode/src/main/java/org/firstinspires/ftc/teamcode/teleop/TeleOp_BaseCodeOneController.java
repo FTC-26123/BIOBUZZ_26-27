@@ -1,7 +1,6 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -9,6 +8,8 @@ import org.firstinspires.ftc.teamcode.subsystems.AprilTagAlignment;
 import org.firstinspires.ftc.teamcode.subsystems.AutoShot;
 import org.firstinspires.ftc.teamcode.subsystems.FlowerArm;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
+import org.firstinspires.ftc.teamcode.subsystems.Leds;
+import org.firstinspires.ftc.teamcode.subsystems.MatchTime;
 import org.firstinspires.ftc.teamcode.subsystems.Limelight;
 import org.firstinspires.ftc.teamcode.subsystems.MecanumDrive;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
@@ -16,9 +17,13 @@ import org.firstinspires.ftc.teamcode.subsystems.Shooter;
 /**
  * Single-controller TeleOp OpMode for solo driver operation.
  * Maps driving, speed switching, intake, shooter flywheel, gate servo, and vision alignment onto Gamepad 1.
+ *
+ * <p>Shared code only: run the Blue or Red version (TeleOp_Blue_* / TeleOp_Red_*), which fixes the alliance.
  */
-@TeleOp
-public class TeleOp_BaseCodeOneController extends OpMode {
+public abstract class TeleOp_BaseCodeOneController extends OpMode {
+
+    /** true = blue alliance, false = red. Set by the Blue / Red TeleOp files. */
+    protected abstract boolean blueAlliance();
 
     // ---------------------- Subsystems & Hardware Objects ----------------------
     public Shooter shooter = new Shooter();
@@ -31,6 +36,8 @@ public class TeleOp_BaseCodeOneController extends OpMode {
     public AutoShot autoShot = new AutoShot();
     /** Servo arm for the flower bed. Does nothing until FlowerArm.ENABLED is true. */
     public FlowerArm flowerArm = new FlowerArm();
+    /** Blinkin status lights ("led"). Colour meanings are listed in Leds.java. */
+    public Leds leds = new Leds();
 
     /**
      * Initializes hardware mapping and subsystem dependencies.
@@ -39,9 +46,11 @@ public class TeleOp_BaseCodeOneController extends OpMode {
     public void init() {
         aprilTagAlignment.init(limelight, TeleOpRuntime);
         autoShot.init(hardwareMap, limelight, aprilTagAlignment, shooter, TeleOpRuntime);
+        autoShot.lockAlliance(blueAlliance());
         driveTrain.init(hardwareMap, aprilTagAlignment);
         intake.init(hardwareMap);
         flowerArm.init(hardwareMap);   // does not move the arm
+        leds.init(hardwareMap);        // does nothing if the Blinkin is missing
         shooter.init(hardwareMap, intake);
         driveTrain.enablePositionHold(hardwareMap);
     }
@@ -52,6 +61,8 @@ public class TeleOp_BaseCodeOneController extends OpMode {
     @Override
     public void init_loop() {
         autoShot.selectAlliance(gamepad1, telemetry);
+        leds.showInit(autoShot, flowerArm, TeleOpRuntime.seconds());
+        leds.addTelemetry(telemetry);
         telemetry.update();
     }
 
@@ -69,6 +80,12 @@ public class TeleOp_BaseCodeOneController extends OpMode {
      */
     @Override
     public void loop() {
+        // AUTO END: TeleOp is over at MatchTime.TELEOP_SEC (120 s) - stop everything and end the program.
+        if (MatchTime.over(TeleOpRuntime.seconds(), MatchTime.TELEOP_SEC)) {
+            stop();
+            requestOpModeStop();
+            return;
+        }
         // Limelight vision & AprilTag alignment updates
         boolean aim = aimButton();
         autoShot.update(aim);
@@ -79,7 +96,7 @@ public class TeleOp_BaseCodeOneController extends OpMode {
         // Gamepad 1 Mecanum Drivetrain Control
         handleDrivetrainDpadSpeedSwitching(gamepad1);
         driveTrain.driveWithPositionHold(gamepad1.left_stick_y, gamepad1.left_stick_x,
-                gamepad1.right_stick_x, aim || gamepad1.right_stick_button);
+                gamepad1.right_stick_x, gamepad1.right_stick_button, aim);
 
         // Gamepad 1 Intake Control
         handleManualIntakeControl(gamepad1);
@@ -89,6 +106,8 @@ public class TeleOp_BaseCodeOneController extends OpMode {
         handleShooterSpeedControl();
         shooter.update();
         handleFlowerArm();
+        flowerArm.update();   // stops the arm at its touch sensors (must run every loop)
+        leds.showTeleOp(autoShot, shooter, intake, flowerArm, aim, TeleOpRuntime.seconds());
 
         // ---------------- Telemetry Status Output ----------------
         telemetry.addData("Robot Speed Multiplier G1 Dpad Right", driveTrain.getSpeedMultiplier());
@@ -112,6 +131,7 @@ public class TeleOp_BaseCodeOneController extends OpMode {
     @Override
     public void stop() {
         driveTrain.stop();
+        flowerArm.stop();
         autoShot.stop();
     }
 

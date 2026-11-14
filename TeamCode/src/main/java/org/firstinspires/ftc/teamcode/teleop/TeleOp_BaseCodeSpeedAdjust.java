@@ -1,7 +1,6 @@
 package org.firstinspires.ftc.teamcode.teleop;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
-import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -9,6 +8,8 @@ import org.firstinspires.ftc.teamcode.subsystems.AprilTagAlignment;
 import org.firstinspires.ftc.teamcode.subsystems.AutoShot;
 import org.firstinspires.ftc.teamcode.subsystems.FlowerArm;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
+import org.firstinspires.ftc.teamcode.subsystems.Leds;
+import org.firstinspires.ftc.teamcode.subsystems.MatchTime;
 import org.firstinspires.ftc.teamcode.subsystems.Limelight;
 import org.firstinspires.ftc.teamcode.subsystems.MecanumDrive;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
@@ -18,9 +19,13 @@ import org.firstinspires.ftc.teamcode.subsystems.Shooter;
  * Driver 1 controls Mecanum driving, drive speed switching, and AprilTag alignment.
  * Driver 2 controls intake, shooter, servo gate, preset speed switching,
  * and trimming the shot speed of each preset.
+ *
+ * <p>Shared code only: run the Blue or Red version (TeleOp_Blue_* / TeleOp_Red_*), which fixes the alliance.
  */
-@TeleOp
-public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
+public abstract class TeleOp_BaseCodeSpeedAdjust extends OpMode {
+
+    /** true = blue alliance, false = red. Set by the Blue / Red TeleOp files. */
+    protected abstract boolean blueAlliance();
 
     // ---------------------- Subsystems & Hardware Objects ----------------------
     public Shooter shooter = new Shooter();
@@ -33,14 +38,18 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
     public AutoShot autoShot = new AutoShot();
     /** Servo arm for the flower bed. Does nothing until FlowerArm.ENABLED is true. */
     public FlowerArm flowerArm = new FlowerArm();
+    /** Blinkin status lights ("led"). Colour meanings are listed in Leds.java. */
+    public Leds leds = new Leds();
 
     @Override
     public void init() {
         aprilTagAlignment.init(limelight, TeleOpRuntime);
         autoShot.init(hardwareMap, limelight, aprilTagAlignment, shooter, TeleOpRuntime);
+        autoShot.lockAlliance(blueAlliance());
         driveTrain.init(hardwareMap, aprilTagAlignment);
         intake.init(hardwareMap);
         flowerArm.init(hardwareMap);   // does not move the arm
+        leds.init(hardwareMap);        // does nothing if the Blinkin is missing
         shooter.init(hardwareMap, intake);
         driveTrain.enablePositionHold(hardwareMap);
     }
@@ -51,6 +60,8 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
     @Override
     public void init_loop() {
         autoShot.selectAlliance(gamepad1, telemetry);
+        leds.showInit(autoShot, flowerArm, TeleOpRuntime.seconds());
+        leds.addTelemetry(telemetry);
         telemetry.update();
     }
 
@@ -62,6 +73,12 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
 
     @Override
     public void loop() {
+        // AUTO END: TeleOp is over at MatchTime.TELEOP_SEC (120 s) - stop everything and end the program.
+        if (MatchTime.over(TeleOpRuntime.seconds(), MatchTime.TELEOP_SEC)) {
+            stop();
+            requestOpModeStop();
+            return;
+        }
         // Vision alignment & auto rotation
         boolean aim = aimButton();
         autoShot.update(aim);
@@ -71,7 +88,7 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
         // Driver 1 Drivetrain Control
         handleDrivetrainDpadSpeedSwitching(gamepad1);
         driveTrain.driveWithPositionHold(gamepad1.left_stick_y, gamepad1.left_stick_x,
-                gamepad1.right_stick_x, aim || gamepad1.right_stick_button);
+                gamepad1.right_stick_x, gamepad1.right_stick_button, aim);
 
         // Driver 2 Intake Control
         handleManualIntakeControl(gamepad2);
@@ -81,6 +98,8 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
         handleShooterSpeedControl(gamepad2);
         shooter.update();
         handleFlowerArm();
+        flowerArm.update();   // stops the arm at its touch sensors (must run every loop)
+        leds.showTeleOp(autoShot, shooter, intake, flowerArm, aim, TeleOpRuntime.seconds());
 
         // ---------------- Telemetry Status Output ----------------
         telemetry.addData("Drive Speed Multiplier (G1 Dpad Right)", driveTrain.getSpeedMultiplier());
@@ -92,7 +111,7 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
         telemetry.addData("Flywheel", "%.0f of %.0f ticks/s  %s", shooter.getLastSpeed(),
                 shooter.getTargetLaunchPower(), shooter.isReady() ? "READY" : shooter.isRunning() ? "..." : "off");
         if (intake.isJammed()) telemetry.addLine("!! FEED JAMMED - eject with Back, then fire again !!");
-        flowerArm.addTelemetry(telemetry, "G2 A down / B up");
+        flowerArm.addTelemetry(telemetry, "G2 A toggles down / up");
         autoShot.addTelemetry(telemetry);
         telemetry.addData("Runtime (s)", "%.2f", TeleOpRuntime.seconds());
         telemetry.setMsTransmissionInterval(30);
@@ -103,6 +122,7 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
     @Override
     public void stop() {
         driveTrain.stop();
+        flowerArm.stop();
         autoShot.stop();
     }
 
@@ -166,17 +186,15 @@ public class TeleOp_BaseCodeSpeedAdjust extends OpMode {
     }
 
     /**
-     * FLOWER ARM. A = arm DOWN (then drive into the flower bed with the intake running), B = arm UP.
+     * FLOWER ARM. A toggles: first press = arm DOWN (then drive into the flower bed with the intake running),
+     * next press = arm UP, and so on.
      *
-     * TO CHANGE THE BUTTONS: edit the two lines below, e.g. gamepad2.guideWasPressed(),
-     * and the label in the telemetry line.
+     * TO CHANGE THE BUTTON: edit the line below, e.g. gamepad2.guideWasPressed(), and the label in the
+     * telemetry line.
      */
     private void handleFlowerArm() {
         if (gamepad2.aWasPressed()) {
-            flowerArm.down();
-        }
-        if (gamepad2.bWasPressed()) {
-            flowerArm.up();
+            flowerArm.toggle();
         }
     }
 

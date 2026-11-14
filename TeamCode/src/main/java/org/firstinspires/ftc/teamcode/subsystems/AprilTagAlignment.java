@@ -25,7 +25,7 @@ public class AprilTagAlignment {
     // --------------------- Target Grace & Stall Protection ---------------------
     private final ElapsedTime targetLostTimer = new ElapsedTime();
     private static final double TARGET_LOST_TIMEOUT = 0.25; // 250ms grace period for frame drops
-    private static final double MIN_ROTATION_OUTPUT = 0.08; // Minimum anti-stall power floor
+    private double minRotationOutput = 0.0; // Anti-stall power floor (ShotConfig.AIM_MIN_POWER)
     private static final double MIN_STRAFE_OUTPUT = 0.08;   // Minimum anti-stall power floor
 
     // --------------------- Strafe Control Variables ---------------------
@@ -49,7 +49,7 @@ public class AprilTagAlignment {
     double rawRotError = 0;
     double lastRotError = 0;
     double rotOutput = 0;
-    private static final double MAX_ROTATION_OUTPUT = 1.0;
+    private double maxRotationOutput = 0.4; // Output clamp (ShotConfig.AIM_MAX_POWER)
     double angleTolerance = 0.2;  // Deadband tolerance (degrees)
 
     // --------------------- Shared State Variables ---------------------
@@ -112,6 +112,27 @@ public class AprilTagAlignment {
     public void useTargetTracker(TargetTracker tracker) {
         this.tracker = tracker;
     }
+
+    /** @return true when camera aiming is set up (a TargetTracker is in use). */
+    public boolean hasTargetTracker() { return tracker != null; }
+
+    /**
+     * Turn still needed to face our aim point, degrees, positive = right (Aim direction applied), or NaN when no
+     * target is in view this loop. Used by the position hold while AIM is held.
+     */
+    public double getAimTurnDeg() {
+        if (tracker == null || !tracker.isVisible()) return Double.NaN;
+        return aimDirection * tracker.getAimErrorDeg();
+    }
+
+    /** Turn power limits for auto-rotate: floor outside the tolerance (0 = none) and clamp. */
+    public void setRotationLimits(double minPower, double maxPower) {
+        minRotationOutput = Math.max(0, minPower);
+        maxRotationOutput = Math.max(0.05, Math.min(1, maxPower));
+    }
+
+    /** Turn power auto-rotate wants this loop (positive = clockwise / right, Aim direction applied). */
+    public double getAddedRotationPower() { return addedRotation; }
 
     /** Sets the rotation gains (turn power per degree, and damping). */
     public void setRotationGains(double kP, double kD) {
@@ -239,15 +260,15 @@ public class AprilTagAlignment {
             strafeOutput = (kP_strafe * rawStrafeError) + (kD_strafe * strafeDerivative);
 
             // Anti-stall power floor when outside tolerance
-            if (Math.abs(rawRotError) > angleTolerance && Math.abs(rotOutput) < MIN_ROTATION_OUTPUT) {
-                rotOutput = MIN_ROTATION_OUTPUT * Math.signum(rotOutput);
+            if (Math.abs(rawRotError) > angleTolerance && Math.abs(rotOutput) < minRotationOutput) {
+                rotOutput = minRotationOutput * Math.signum(rotOutput);
             }
             if (Math.abs(rawStrafeError) > strafeTolerance && Math.abs(strafeOutput) < MIN_STRAFE_OUTPUT) {
                 strafeOutput = MIN_STRAFE_OUTPUT * Math.signum(strafeOutput);
             }
 
             // Clamp power output to safe maximums
-            rotOutput = clamp(rotOutput, -MAX_ROTATION_OUTPUT, MAX_ROTATION_OUTPUT);
+            rotOutput = clamp(rotOutput, -maxRotationOutput, maxRotationOutput);
             strafeOutput = clamp(strafeOutput, -MAX_STRAFE_OUTPUT, MAX_STRAFE_OUTPUT);
         } else if (targetLostTimer.seconds() >= TARGET_LOST_TIMEOUT) {
             // Target lost for longer than grace period: clear error accumulation and outputs

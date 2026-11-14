@@ -32,6 +32,13 @@ public class Limelight {
 
     private boolean available = false;
     private LLResult lastResult;
+    private int pipeline = -1;
+
+    /**
+     * Pipeline slots on the Limelight. Only AprilTags is used for now; add more here (and in Robot Settings)
+     * when other pipelines are made, then call {@link #setPipeline(int)}.
+     */
+    public static int aprilTagPipeline() { return ShotConfig.APRILTAG_PIPELINE; }
 
     /**
      * Same as {@link #init(HardwareMap)} but never throws: if the camera is missing from the robot configuration
@@ -43,15 +50,36 @@ public class Limelight {
     public boolean initSafely(HardwareMap hwMap, int pipeline) {
         try {
             limelight = hwMap.get(Limelight3A.class, "limelight");
-            limelight.pipelineSwitch(pipeline);
             limelight.setPollRateHz(100);
             available = limelight != null;
+            this.pipeline = -1;
+            setPipeline(pipeline);
         } catch (RuntimeException e) {
             Log.w(TAG, "Limelight unavailable: " + e);
             limelight = null;
             available = false;
         }
         return available;
+    }
+
+    /**
+     * Switches the Limelight to this pipeline slot (does nothing if it is already on it).
+     * @return true if the camera accepted it
+     */
+    public boolean setPipeline(int index) {
+        if (limelight == null) return false;
+        if (index == pipeline) return true;
+        boolean ok = limelight.pipelineSwitch(index);
+        if (ok) pipeline = index;
+        return ok;
+    }
+
+    /** Pipeline last switched to (-1 if none). */
+    public int getPipeline() { return pipeline; }
+
+    /** @return true when the newest frame was made by the pipeline we asked for (false right after a switch). */
+    public boolean frameFromCurrentPipeline() {
+        return lastResult != null && lastResult.getPipelineIndex() == pipeline;
     }
 
     /** @return true once the camera has been found by init. */

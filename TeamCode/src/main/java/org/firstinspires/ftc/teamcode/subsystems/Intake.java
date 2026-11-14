@@ -10,9 +10,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 /**
  * Subsystem controlling the intake roller motor, windmill feeder, and transfer motor.
  *
- * <p>WINDMILL: plain open-loop power (no velocity PID) and FLOAT at zero power (no brake, no position hold).
- * Speeds below are given in motor RPM and converted to power as RPM / {@link #WINDMILL_FREE_RPM}, so the real speed
- * under load is somewhat lower. While the intake runs and the windmill is not feeding, the windmill turns slowly in
+ * <p>WINDMILL: a goBILDA 312 RPM motor, plain open-loop power (no velocity PID), FLOAT at zero power. While
+ * feeding it always runs at FULL power. The reverse speeds below are in windmill motor RPM (0 to 312) and are
+ * turned into power as RPM / {@link #WINDMILL_FREE_RPM}, so the real speed under load is somewhat lower. While the intake runs and the windmill is not feeding, the windmill turns slowly in
  * reverse ({@link #WINDMILL_INTAKE_REVERSE_RPM}) so balls pushed up by the transfer cannot drive it forward.
  *
  * <p>TRANSFER: closed-loop velocity while feeding or ejecting (with soft start, overcurrent back-off and a pause
@@ -48,19 +48,15 @@ public class Intake {
     public static final double FEED_TICKS_PER_SEC = FEED_RPM * MOTOR_TICKS_PER_REV / 60.0;
 
     // ---------------------- Windmill (open loop, no brake) ----------------------
-    /** No-load speed of the windmill motor at full power; RPM settings are turned into power with this. */
-    public static final double WINDMILL_FREE_RPM = 6000.0;
-    /** Reverse speed while intaking (windmill not feeding), so the transfer cannot push it forward. */
-    public static final double WINDMILL_INTAKE_REVERSE_RPM = 750.0;
-    /** Reverse speed for the short clear before shooting, and for ejecting. */
-    public static final double WINDMILL_REVERSE_RPM = FEED_RPM;
-    /**
-     * While feeding, the windmill runs at this fraction of the flywheel's target speed (both in ticks/sec) unless a
-     * fixed feed speed was set. Lower it if balls still pile up.
-     */
-    public static final double WINDMILL_FEED_RATIO = 0.90;
-    /** Highest windmill feed speed, ticks/sec (= full power). */
-    public static final double WINDMILL_MAX_FEED_VELOCITY = WINDMILL_FREE_RPM * MOTOR_TICKS_PER_REV / 60.0;
+    /** Windmill motor: goBILDA 312 RPM (19.2:1), its no-load speed and encoder ticks per output revolution. */
+    public static final double WINDMILL_FREE_RPM = 312.0;
+    public static final double WINDMILL_TICKS_PER_REV = 537.7;
+    /** Reverse speed while intaking (windmill not feeding), so the transfer cannot push it forward. Windmill RPM. */
+    public static double WINDMILL_INTAKE_REVERSE_RPM = 39.0;   // same power as the old "750 of 6000" (12.5 %)
+    /** Reverse speed for the short clear before shooting, and for ejecting. Windmill RPM. */
+    public static final double WINDMILL_REVERSE_RPM = 104.0;   // same power as before (33 %)
+    /** Windmill speed at full power, ticks/sec (used to tell when a feeding windmill is bogged down). */
+    public static final double WINDMILL_MAX_FEED_VELOCITY = WINDMILL_FREE_RPM * WINDMILL_TICKS_PER_REV / 60.0;
     /**
      * Soft start for forward feeding: power rises at most this much per second, starting from
      * {@link #WINDMILL_START_FRACTION} of the target. Needs {@link #update()} each loop (Shooter and the autonomous
@@ -87,7 +83,7 @@ public class Intake {
      * Open-loop power (0..1) for the transfer while intaking with the windmill not feeding. Raise it if balls do
      * not climb the transfer; set 0 to keep the transfer off while intaking.
      */
-    public static final double TRANSFER_INTAKE_POWER = 0.35;
+    public static double TRANSFER_INTAKE_POWER = 0.35;
     /** Soft start for the transfer velocity (ticks/sec per second) and its starting fraction. */
     public static final double TRANSFER_RAMP_TICKS_PER_SEC2 = 6000;
     public static final double TRANSFER_START_FRACTION = 0.40;
@@ -96,7 +92,7 @@ public class Intake {
      * ejecting, it stops for {@link #TRANSFER_COOLDOWN_SEC}, then soft-starts again. Read the real stall number from
      * the test TeleOp's peak current before trusting this value; 0 turns it off.
      */
-    public static final double TRANSFER_CURRENT_LIMIT_AMPS = 6.0;
+    public static double TRANSFER_CURRENT_LIMIT_AMPS = 6.0;
     public static final double TRANSFER_OVERCURRENT_DELAY_SEC = 0.25;
     public static final double TRANSFER_COOLDOWN_SEC = 0.40;
     /**
@@ -104,8 +100,8 @@ public class Intake {
      * {@link #TRANSFER_PAUSE_DELAY_SEC}, the transfer stops pushing balls in until the windmill is back above
      * {@link #TRANSFER_RESUME_ABOVE}. 0 turns it off. (Expected speed = power x free speed, so it is approximate.)
      */
-    public static final double TRANSFER_PAUSE_BELOW = 0.50;
-    public static final double TRANSFER_RESUME_ABOVE = 0.75;
+    public static double TRANSFER_PAUSE_BELOW = 0.50;
+    public static double TRANSFER_RESUME_ABOVE = 0.75;
     public static final double TRANSFER_PAUSE_DELAY_SEC = 0.12;
     /**
      * GATE BETWEEN SHOTS ({@link #holdFeed()}). While the flywheel recovers after a shot the windmill is stopped
@@ -113,21 +109,21 @@ public class Intake {
      * above 0 to turn the windmill slowly backwards while holding (the old behaviour used 750); it costs time
      * because the next ball is pushed away from the shooter.
      */
-    public static final double WINDMILL_HOLD_REVERSE_RPM = 300;
+    public static double WINDMILL_HOLD_REVERSE_RPM = 0;   // windmill RPM; 0 = brake only (reversing pushed balls out)
     /**
      * Transfer power (0..1, open loop) while the gate is closed between shots. 0 = stopped, so nothing pushes on
      * the windmill. A small value keeps the next ball pressed against the windmill for a quicker follow-up shot;
      * only raise it if the braked windmill reliably holds the ball back.
      */
-    public static final double TRANSFER_HOLD_POWER = 0.0;
+    public static double TRANSFER_HOLD_POWER = 0.0;
     /**
      * JAM RECOVERY. If the transfer has been waiting for a bogged-down windmill for this long, the windmill and
      * transfer run in reverse for {@link #UNJAM_REVERSE_SEC} and then feed again. After {@link #UNJAM_MAX_TRIES}
      * tries in a row without the windmill recovering it stops trying ({@link #isJammed()}). 0 turns it off.
      */
-    public static final double UNJAM_AFTER_SEC = 0.30;
-    public static final double UNJAM_REVERSE_SEC = 0.10;
-    public static final int UNJAM_MAX_TRIES = 3;
+    public static double UNJAM_AFTER_SEC = 0.30;
+    public static double UNJAM_REVERSE_SEC = 0.10;
+    public static int UNJAM_MAX_TRIES = 3;
     /** Battery voltage the open-loop windmill feed power is referenced to (see {@link #setBatteryVoltage}). */
     public static final double REFERENCE_VOLTAGE = 12.0;
     /** Motor currents are read this often (each read costs a hub round trip). */
@@ -135,8 +131,6 @@ public class Intake {
 
     // ---------------------- Live settings (the tuning TeleOp changes these) ----------------------
     private double intakePower = INTAKE_POWER;
-    private double windmillFeedVelocity = FEED_TICKS_PER_SEC;          // ticks/sec, open-loop equivalent
-    private double windmillOverrideVelocity = Double.NaN;              // NaN = follow the flywheel
     private double windmillIntakeReverseRpm = WINDMILL_INTAKE_REVERSE_RPM;
     private double transferFeedVelocity = TRANSFER_VELOCITY;
     private double transferIntakePower = TRANSFER_INTAKE_POWER;
@@ -164,7 +158,17 @@ public class Intake {
      * Initializes the roller, windmill and transfer motors. The windmill is open loop and floats; the transfer
      * starts stopped with BRAKE.
      */
+    /** Re-reads the intake settings that are copied into this object (after they were changed). */
+    public void applySettings() {
+        windmillIntakeReverseRpm = WINDMILL_INTAKE_REVERSE_RPM;
+        transferIntakePower = TRANSFER_INTAKE_POWER;
+    }
+
     public void init(HardwareMap hwMap) {
+        RobotSettings.ensureLoaded();
+        // Pick up the saved settings (the fields above were set when this object was created).
+        windmillIntakeReverseRpm = WINDMILL_INTAKE_REVERSE_RPM;
+        transferIntakePower = TRANSFER_INTAKE_POWER;
         BulkReads.enable(hwMap);
         intake = hwMap.get(DcMotor.class, "intake");
         intake.setDirection(DcMotorSimple.Direction.REVERSE);
@@ -346,15 +350,6 @@ public class Intake {
     public void setIntakePower(double power) { intakePower = Math.max(0, Math.min(1, power)); }
     public double getIntakePower() { return intakePower; }
 
-    /** Fixed windmill feed speed in motor RPM (open loop). Pass NaN to go back to following the flywheel. */
-    public void setWindmillFeedRpm(double rpm) {
-        if (Double.isNaN(rpm)) { windmillOverrideVelocity = Double.NaN; return; }
-        windmillOverrideVelocity = Math.max(0, Math.min(WINDMILL_MAX_FEED_VELOCITY, rpm * MOTOR_TICKS_PER_REV / 60.0));
-        windmillFeedVelocity = windmillOverrideVelocity;
-    }
-    public boolean isWindmillFollowingFlywheel() { return Double.isNaN(windmillOverrideVelocity); }
-    public double getWindmillFeedRpm() { return windmillFeedVelocity * 60.0 / MOTOR_TICKS_PER_REV; }
-
     /** Windmill reverse speed while intaking, motor RPM (open loop). */
     public void setWindmillIntakeReverseRpm(double rpm) {
         windmillIntakeReverseRpm = Math.max(0, Math.min(WINDMILL_FREE_RPM, rpm));
@@ -374,14 +369,10 @@ public class Intake {
     public double getTransferIntakePower() { return transferIntakePower; }
 
     /**
-     * Sets the windmill feed speed from the flywheel target (ticks/sec): {@link #WINDMILL_FEED_RATIO} times the
-     * target, unless a fixed feed speed was set.
+     * Kept for Shooter: the windmill feeds at FULL power whatever the flywheel speed (a 312 RPM windmill cannot
+     * keep up with the flywheel anyway), so this only re-asserts the feed power.
      */
     public void setWindmillFeedFromFlywheel(double flywheelTargetTicksPerSec) {
-        if (!Double.isNaN(windmillOverrideVelocity)) return;
-        windmillFeedVelocity = flywheelTargetTicksPerSec > 0
-                ? Math.min(WINDMILL_MAX_FEED_VELOCITY, WINDMILL_FEED_RATIO * flywheelTargetTicksPerSec)
-                : FEED_TICKS_PER_SEC;
         if (windmillState == WindmillState.FEED) windmillTargetPower = windmillPowerFor(WindmillState.FEED);
     }
 
@@ -439,7 +430,7 @@ public class Intake {
     public double getTransferPeakCurrentAmps() { return transferPeakAmps; }
     public void resetPeakCurrent() { windmillPeakAmps = 0; transferPeakAmps = 0; }
     /** Windmill measured speed in motor RPM (encoder), negative when reversing. */
-    public double getWindmillMeasuredRpm() { return windmill == null ? 0 : windmill.getVelocity() * 60.0 / MOTOR_TICKS_PER_REV; }
+    public double getWindmillMeasuredRpm() { return windmill == null ? 0 : windmill.getVelocity() * 60.0 / WINDMILL_TICKS_PER_REV; }
     /** Windmill power currently applied (-1..1). */
     public double getWindmillPower() { return windmillPower; }
     public boolean isTransferPaused() { return transferPaused; }
