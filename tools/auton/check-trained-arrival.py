@@ -37,8 +37,13 @@ write('com.qualcomm.robotcore.util', 'ElapsedTime', 'public class ElapsedTime {p
 write('com.qualcomm.hardware.gobilda', 'GoBildaPinpointDriver', 'public class GoBildaPinpointDriver {public enum DeviceStatus{READY}public DeviceStatus getDeviceStatus(){return DeviceStatus.READY;}}')
 write('com.qualcomm.robotcore.hardware', 'CRServo', 'public interface CRServo {void setPower(double p);}')
 write('com.qualcomm.robotcore.hardware', 'TouchSensor', 'public interface TouchSensor {boolean isPressed();}')
+write('com.qualcomm.robotcore.hardware', 'VoltageSensor', 'public interface VoltageSensor {double getVoltage();}')
+write('com.qualcomm.robotcore.hardware', 'DcMotorSimple', 'public interface DcMotorSimple {enum Direction{FORWARD,REVERSE}void setDirection(Direction d);}')
+write('com.qualcomm.robotcore.hardware', 'DcMotor', 'public interface DcMotor extends DcMotorSimple {enum RunMode{RUN_WITHOUT_ENCODER}enum ZeroPowerBehavior{FLOAT,BRAKE}void setMode(RunMode m);void setZeroPowerBehavior(ZeroPowerBehavior b);void setPower(double p);}')
+write('com.qualcomm.robotcore.hardware', 'DcMotorEx', 'public interface DcMotorEx extends DcMotor {double getVelocity();}')
 write('com.qualcomm.robotcore.hardware', 'HardwareMap', '''public class HardwareMap {
 public java.util.Map<String,Object> devices=new java.util.HashMap<>();
+public java.util.List<VoltageSensor> voltageSensor=new java.util.ArrayList<>();
 public <T>T get(Class<T> c,String n){T t=tryGet(c,n);if(t==null)throw new RuntimeException("Missing "+n);return t;}
 public <T>T tryGet(Class<T> c,String n){return c.cast(devices.get(n));}}''')
 write('org.firstinspires.ftc.robotcore.external', 'Telemetry', 'public class Telemetry {public void addLine(String s){}public void addData(String k,Object v){}public void addData(String k,String f,Object... a){}public void update(){}}')
@@ -47,10 +52,17 @@ public com.qualcomm.robotcore.hardware.HardwareMap hardwareMap=new com.qualcomm.
 public org.firstinspires.ftc.robotcore.external.Telemetry telemetry=new org.firstinspires.ftc.robotcore.external.Telemetry();
 public abstract void init();public void start(){}public abstract void loop();public void stop(){} }''')
 write('org.firstinspires.ftc.teamcode.subsystems', 'RobotSettings', 'public class RobotSettings {public static void ensureLoaded(){}}')
+write('org.firstinspires.ftc.teamcode.subsystems', 'BulkReads', 'public class BulkReads {public static void enable(Object h){}}')
 write('org.firstinspires.ftc.teamcode.pedro', 'Constants', 'public class Constants {public static com.pedropathing.follower.Follower create(Object h){return null;}}')
-write('org.firstinspires.ftc.teamcode.subsystems', 'Intake', 'public class Intake {public void init(Object h){}public void stop(){}public void start(){}public void stopWindmill(){}}')
+write('org.firstinspires.ftc.teamcode.subsystems', 'Intake', '''public class Intake {
+private boolean roller,holding;public void init(Object h){}public void stop(){roller=false;}public void start(){roller=true;holding=false;}public void stopWindmill(){}
+public void update(){}public void setBatteryVoltage(double v){}public boolean isRollerIn(){return roller;}public void setWindmillFeedFromFlywheel(double v){}
+public void clearReverse(){}public boolean isHoldingFeed(){return holding;}public void holdFeed(){holding=true;roller=false;}
+public void resumeWindmill(){}public void startWindmillOnly(){}public void startWindmill(){}
+}''')
 write('org.firstinspires.ftc.teamcode.subsystems', 'Shooter', '''public class Shooter {
 private double target=1900,trim=25;public double spinTarget;
+public double recoveryWait;public void setMinimumBetweenBallsSeconds(double seconds){recoveryWait=seconds;}
 public void setAutoTarget(double t){target=t;}public void resetTrim(){trim=0;}public double getTargetLaunchPower(){return target+trim;}
 public void init(Object h,Intake i){}public void stop(){}public void start(){}public void spinUp(){spinTarget=getTargetLaunchPower();}public void update(){}public void holdFire(){}
 public void resetShotCount(){}public int getShotCount(){return 0;}public double getCurrentSpeed(){return 0;}public void setFeedPermit(boolean b){}
@@ -93,7 +105,7 @@ for(boolean blue:new boolean[]{false,true}){
   Pose original=(Pose)call(geometry,"transform",new Class[]{double.class,double.class,double.class},curves[i][6],curves[i][7],curves[i][9]);
   Pose shifted=(Pose)call(geometry,"nominalEnd",new Class[]{int.class},i);
   double h=(i<8?Math.PI:Math.PI/2)+(blue?Math.PI:0),dx=shifted.x()-original.x(),dy=shifted.y()-original.y();
-  check(Math.abs(-Math.sin(h)*dx+Math.cos(h)*dy-3)<1e-6,"lineup must move three inches toward robot-left on each alliance");
+  check(Math.abs(Math.sin(h)*dx-Math.cos(h)*dy-3)<1e-6,"lineup must move three inches toward robot-right on each alliance");
   check(Math.abs(Math.cos(h)*dx+Math.sin(h)*dy)<1e-6,"lineup offset must not move closer to wall");
  }
  for(int i=1;i<curves.length;i++){
@@ -118,7 +130,8 @@ for(boolean blue:new boolean[]{false,true}){
  startup.start();check(get(startup,"state").toString().equals("LOWER_RAMP")&&arm.isDown(),"START must command ramp down first");
  check(FlowerArm.DIRECTION==1,"auton must use requested direction even after old settings load");
  check(servo.power<0&&sf.follows==0,"direction 1 must drive down with negative servo power before travel");
- check(((org.firstinspires.ftc.teamcode.subsystems.Shooter)get(startup,"shooter")).spinTarget==1500,"spin-up must use exactly 1500 with old trim removed");
+ check(((org.firstinspires.ftc.teamcode.subsystems.Shooter)get(startup,"shooter")).spinTarget==1450,"spin-up must use exactly 1450 with old trim removed");
+ check(((org.firstinspires.ftc.teamcode.subsystems.Shooter)get(startup,"shooter")).recoveryWait==.25,"trained auton must request a quarter-second recovery wait");
  up.pressed=false;ElapsedTime.now=1.5;startup.loop();check(sf.follows==0,"robot must wait for touchDown");
  down.pressed=true;ElapsedTime.now=1.6;startup.loop();
  check(servo.power==0&&arm.isAtDown(),"touchDown must stop the actual arm servo");
@@ -205,6 +218,14 @@ actual=repo/'TeamCode/src/main/java/org/firstinspires/ftc/teamcode/Auton'
 files=list(src.rglob('*.java'))+[Path(sys.argv[1]) if len(sys.argv)>1 else actual/'TrainedFlowerAuto.java',actual/'cycles/FrameClearance.java',actual.parent/'subsystems/FlowerArm.java',actual.parent/'subsystems/InSimulator.java']
 subprocess.run([str(java/('javac'+exe)),'-d',str(classes),*map(str,files)],check=True)
 subprocess.run([str(java/('java'+exe)),'-cp',str(classes),pkg+'.ArrivalChecks'],check=True)
+
+# Compile the real shooter separately from the state-machine substitute.
+shooter_classes=root/'real-shooter-classes'
+shooter_classes.mkdir(exist_ok=True)
+shooter_files=[p for p in src.rglob('*.java') if 'com/qualcomm/robotcore/hardware/' in p.as_posix() or p.name in ('ElapsedTime.java','Telemetry.java','RobotSettings.java','BulkReads.java','Intake.java')]
+shooter_files += [actual.parent/'subsystems/Shooter.java',repo/'tools/auton/ShooterCadenceChecks.java']
+subprocess.run([str(java/('javac'+exe)),'-d',str(shooter_classes),*map(str,shooter_files)],check=True)
+subprocess.run([str(java/('java'+exe)),'-cp',str(shooter_classes),'org.firstinspires.ftc.teamcode.subsystems.ShooterCadenceChecks'],check=True)
 
 # Optional nominal-route geometry check against the installed Pedro implementation.
 pedro_jar=os.environ.get('PEDRO_CORE_JAR')

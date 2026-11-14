@@ -75,6 +75,7 @@ public class Shooter {
      * at speed for this long (seconds). 0 = reopen the moment the speed is back. Robot Settings > Shooter gate.
      */
     public static double BETWEEN_BALLS_SEC = 0.1;
+    private double betweenBallsOverride = Double.NaN;
     private final ElapsedTime inWindowTimer = new ElapsedTime();
     private boolean wasInWindow = false, afterShot = false;
     /**
@@ -313,6 +314,12 @@ public class Shooter {
         if (Double.isNaN(ticksPerSec) || ticksPerSec <= 0) return;
         autoBase = Math.min(MAX_TARGET_VELOCITY, ticksPerSec);
         autoActive = true;
+    }
+
+    /** Per-OpMode recovery wait; leaves Robot Settings and other shooter instances unchanged. */
+    public void setMinimumBetweenBallsSeconds(double seconds) {
+        if (!Double.isFinite(seconds) || seconds < 0) throw new IllegalArgumentException("Invalid between-ball delay");
+        betweenBallsOverride = seconds;
     }
 
     /** Back to the manual presets. */
@@ -624,7 +631,12 @@ public class Shooter {
                 feedReferenceValid = false;
             }
             if (shot || speed < target - PAUSE_BELOW_TARGET || speed > target + PAUSE_ABOVE_TARGET || targetMoved) {
-                if (shot) afterShot = true;
+                if (shot) {
+                    afterShot = true;
+                    // A counted load drop can stay inside the speed window. Start
+                    // the next-ball wait now instead of reusing an old window timer.
+                    inWindowTimer.reset();
+                }
                 shooterStatus = STARTING;
                 pauseTimer.reset();
                 feedReferenceValid = false;
@@ -634,7 +646,8 @@ public class Shooter {
             shooterStatus = STARTING;
             if (inWindow && !wasInWindow) inWindowTimer.reset();
             // Between balls, the speed must have been back for BETWEEN_BALLS_SEC before the next ball goes.
-            boolean settled = !afterShot || inWindowTimer.seconds() >= BETWEEN_BALLS_SEC;
+            double recoveryWait = Double.isNaN(betweenBallsOverride) ? BETWEEN_BALLS_SEC : betweenBallsOverride;
+            boolean settled = !afterShot || inWindowTimer.seconds() >= recoveryWait;
             if (pauseTimer.seconds() >= MIN_PAUSE_SEC && inWindow && settled) {
                 shooterStatus = SHOOTING;
                 afterShot = false;

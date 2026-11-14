@@ -26,9 +26,10 @@ public abstract class TrainedFlowerAuto extends OpMode {
     public static double SHOT_BATCH_TIMEOUT_SECONDS=8.0;
     public static double MAX_READY_FEED_SECONDS=2.0;
     public static final double NORMAL_TRAVEL_TOLERANCE_INCHES=3.0;
-    public static final double SHOOTER_TARGET_TICKS_PER_SECOND=1500;
-    public static final double FLOWER_LINEUP_LEFT_INCHES=3.0;
-    public static final String EXPORT_VERSION="RAMP15_V3_TIMED_PUSH_3IN_ARM_LEFT3";
+    public static final double SHOOTER_TARGET_TICKS_PER_SECOND=1450;
+    public static final double SHOT_RECOVERY_WAIT_SECONDS=.25;
+    public static final double FLOWER_LINEUP_RIGHT_INCHES=3.0;
+    public static final String EXPORT_VERSION="RAMP15_V3_TIMED_PUSH_3IN_ARM_RIGHT3";
     private enum State { LOWER_RAMP, DRIVE, SHOOT, PUSH, COLLECT, FALLBACK, DONE }
     private State state=State.DONE;
     private final ElapsedTime clock=new ElapsedTime();
@@ -84,11 +85,11 @@ public abstract class TrainedFlowerAuto extends OpMode {
     }
     private Pose curvePoint(int i,int xy,double heading){
         double[] c=CURVES[i];double x=c[xy],y=c[xy+1];
-        // In the canonical red frame, left is -Y at the side-wall flower
-        // and -X at the end-wall flower. transform() rotates this for blue.
+        // In the canonical red frame, right is +Y at the side-wall flower
+        // and +X at the end-wall flower. transform() rotates this for blue.
         // Shift entry/exit controls too so adjacent curve endpoints still join.
-        if((i==2&&xy>=4)||i==3||i==4||(i==5&&xy<=2))y-=FLOWER_LINEUP_LEFT_INCHES;
-        if((i==8&&xy>=4)||i==9||i==10||(i==11&&xy<=2))x-=FLOWER_LINEUP_LEFT_INCHES;
+        if((i==2&&xy>=4)||i==3||i==4||(i==5&&xy<=2))y+=FLOWER_LINEUP_RIGHT_INCHES;
+        if((i==8&&xy>=4)||i==9||i==10||(i==11&&xy<=2))x+=FLOWER_LINEUP_RIGHT_INCHES;
         return transform(x,y,heading);
     }
     private Pose nominalEnd(int i){return curvePoint(i,6,CURVES[i][9]);}
@@ -116,6 +117,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
         // Apply the requested direction after saved Robot Settings have loaded.
         FlowerArm.DIRECTION=1;
         shooter.resetShotCount();shooter.setAutoTarget(SHOOTER_TARGET_TICKS_PER_SECOND);
+        shooter.setMinimumBetweenBallsSeconds(SHOT_RECOVERY_WAIT_SECONDS);
         shooter.resetTrim();shooter.spinUp();
         state=State.LOWER_RAMP;result="Lowering ramp to touchDown";
         flowerArm.down();flowerArm.update();report();
@@ -136,7 +138,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
         double headingError=Math.atan2(Math.sin(h-expected),Math.cos(h-expected));
         double forward=pot==3?-x:y,side=pot==3?y:x;
         // Only the selected flower's straight approach corridor permits ramp contact.
-        return forward>=42.3&&forward<=56.085&&Math.abs(side+23.393700787+FLOWER_LINEUP_LEFT_INCHES)<=1.25
+        return forward>=42.3&&forward<=56.085&&Math.abs(side+23.393700787-FLOWER_LINEUP_RIGHT_INCHES)<=1.25
             &&Math.abs(headingError)<=Math.toRadians(3);
     }
     private double flowerForward(Pose world){
@@ -319,7 +321,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
         telemetry.addData("Ramp switches",flowerArm.switchText());
         telemetry.addData("Flower arm direction",FlowerArm.DIRECTION);
         telemetry.addData("Flower push power / seconds","%.2f / %.2f",FLOWER_PUSH_POWER,FLOWER_PUSH_SECONDS);
-        telemetry.addData("Flower lineup left (in)",FLOWER_LINEUP_LEFT_INCHES);
+        telemetry.addData("Flower lineup right (in)",FLOWER_LINEUP_RIGHT_INCHES);
         telemetry.addData("Elapsed (s)",clock.seconds());telemetry.addData("Completed shot batches",batches);
         telemetry.addData("Estimated releases",totalReleases+(state==State.SHOOT?batchReleases:0));
         telemetry.addLine("No basket-tip or ball-count sensor. Flower pickup is timed; tips are not confirmed.");
