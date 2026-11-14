@@ -87,6 +87,25 @@ static Auto setup(boolean blue,int leg,double error,double degrees,double speed)
 }
 public static void main(String[] args)throws Exception{
 for(boolean blue:new boolean[]{false,true}){
+ Auto geometry=setup(blue,0,0,0,0);
+ double[][] curves=(double[][])get(geometry,"CURVES");
+ for(int i:new int[]{2,3,4,8,9,10}){
+  Pose original=(Pose)call(geometry,"transform",new Class[]{double.class,double.class,double.class},curves[i][6],curves[i][7],curves[i][9]);
+  Pose shifted=(Pose)call(geometry,"nominalEnd",new Class[]{int.class},i);
+  double h=(i<8?Math.PI:Math.PI/2)+(blue?Math.PI:0),dx=shifted.x()-original.x(),dy=shifted.y()-original.y();
+  check(Math.abs(-Math.sin(h)*dx+Math.cos(h)*dy-3)<1e-6,"lineup must move three inches toward robot-left on each alliance");
+  check(Math.abs(Math.cos(h)*dx+Math.sin(h)*dy)<1e-6,"lineup offset must not move closer to wall");
+ }
+ for(int i=1;i<curves.length;i++){
+  Pose previous=(Pose)call(geometry,"nominalEnd",new Class[]{int.class},i-1);
+  Pose next=(Pose)call(geometry,"curvePoint",new Class[]{int.class,int.class,double.class},i,0,curves[i][8]);
+  check(Math.hypot(previous.x()-next.x(),previous.y()-next.y())<1e-5,"shifted route endpoints must stay connected");
+ }
+ for(int i:new int[]{0,6,12}){
+  Pose p=(Pose)call(geometry,"nominalEnd",new Class[]{int.class},i);
+  Pose original=(Pose)call(geometry,"transform",new Class[]{double.class,double.class,double.class},curves[i][6],curves[i][7],curves[i][9]);
+  check(Math.hypot(p.x()-original.x(),p.y()-original.y())<1e-6,"flower offset must not shift shooting marks");
+ }
  // Exercise the real CR-servo arm and limit-switch code during startup.
  Auto startup=setup(blue,0,0,0,0);Follower sf=(Follower)get(startup,"follower");
  sf.p=(Pose)call(startup,"transform",new Class[]{double.class,double.class,double.class},-13.606197,-61.569252,Math.PI/2);
@@ -142,13 +161,14 @@ for(boolean blue:new boolean[]{false,true}){
   check(get(a,"state").toString().equals("PUSH"),"must enter push from measured staging pose");
   ElapsedTime.now=1.1;a.loop();check(f.raw.forward()==.30&&f.raw.strafe()==0&&f.raw.turn()==0,"both alliances must command robot-forward power");
   check(f.follows==0,"manual push must not use an endpoint path");
+  ElapsedTime.now=2.3;a.loop();check(get(a,"state").toString().equals("PUSH")&&f.raw!=null,"push must continue beyond the old 1.25-second duration");
   // The timed push ends even if localization is still three inches short.
-  f.p=shift(t,blue,3,0);ElapsedTime.now=2.25;a.loop();
+  f.p=shift(t,blue,3,0);ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS;a.loop();
   check(get(a,"state").toString().equals("COLLECT"),"elapsed time must end push without precision arrival");
   check(f.raw==null,"collection must cancel manual drive");
   Field base=f.drivetrain.getClass().getDeclaredField("base");base.setAccessible(true);Drive d=(Drive)base.get(f.drivetrain);
   check(d.last.forward()==0,"drive must stop immediately when push ends");
-  ElapsedTime.now=4.26;a.loop();check((Integer)get(a,"leg")==leg+1,"collection must advance to retreat");
+  ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS+TrainedFlowerAuto.FLOWER_COLLECT_SECONDS+.01;a.loop();check((Integer)get(a,"leg")==leg+1,"collection must advance to retreat");
   check(f.follows==1&&get(a,"state").toString().equals("DRIVE"),"retreat must start from measured pose despite missing old endpoint");
   f.p=shift((Pose)get(a,"target"),blue,.5,1.5);a.loop();check((Integer)get(a,"leg")==leg+2,"retreat must accept staging tolerance");
   // Intentional contact must not trip the old quarter-inch wall/pot checks.
@@ -171,7 +191,7 @@ for(boolean blue:new boolean[]{false,true}){
   TrainedFlowerAuto.FLOWER_PUSH_SECONDS=2.1;
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   check(get(a,"state").toString().equals("DONE")&&f.raw==null,"invalid duration must not start push");
-  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=1.25;
+  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=2.0;
  }
  Auto a=setup(blue,2,1,0,0);ElapsedTime.now=6.1;a.loop();check(get(a,"parkingReason").equals("Drive timeout"),"travel timeout must remain enabled");
  check(get(a,"abortDetails").toString().contains("position error (in)="),"abort must retain original target error");
@@ -185,3 +205,13 @@ actual=repo/'TeamCode/src/main/java/org/firstinspires/ftc/teamcode/Auton'
 files=list(src.rglob('*.java'))+[Path(sys.argv[1]) if len(sys.argv)>1 else actual/'TrainedFlowerAuto.java',actual/'cycles/FrameClearance.java',actual.parent/'subsystems/FlowerArm.java',actual.parent/'subsystems/InSimulator.java']
 subprocess.run([str(java/('javac'+exe)),'-d',str(classes),*map(str,files)],check=True)
 subprocess.run([str(java/('java'+exe)),'-cp',str(classes),pkg+'.ArrivalChecks'],check=True)
+
+# Optional nominal-route geometry check against the installed Pedro implementation.
+pedro_jar=os.environ.get('PEDRO_CORE_JAR')
+if pedro_jar:
+    real_classes=root/'real-pedro-classes'
+    real_classes.mkdir(exist_ok=True)
+    real_files=[p for p in files if not str(p.relative_to(src) if p.is_relative_to(src) else p).replace('\\','/').startswith('com/pedropathing/') and p.name!='ArrivalChecks.java']
+    real_files.append(repo/'tools/auton/ShiftedRouteChecks.java')
+    subprocess.run([str(java/('javac'+exe)),'-cp',pedro_jar,'-d',str(real_classes),*map(str,real_files)],check=True)
+    subprocess.run([str(java/('java'+exe)),'-cp',str(real_classes)+os.pathsep+pedro_jar,pkg+'.ShiftedRouteChecks'],check=True)
