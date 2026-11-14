@@ -24,7 +24,8 @@ public abstract class TrainedFlowerAuto extends OpMode {
     public static double FLOWER_PUSH_SECONDS=1.25;
     public static double SHOT_BATCH_TIMEOUT_SECONDS=8.0;
     public static double MAX_READY_FEED_SECONDS=2.0;
-    public static final String EXPORT_VERSION="RAMP15_V3_TIMED_PUSH";
+    public static final double NORMAL_TRAVEL_TOLERANCE_INCHES=3.0;
+    public static final String EXPORT_VERSION="RAMP15_V3_TIMED_PUSH_3IN";
     private enum State { DRIVE, SHOOT, PUSH, COLLECT, FALLBACK, DONE }
     private State state=State.DONE;
     private final ElapsedTime clock=new ElapsedTime();
@@ -148,7 +149,10 @@ public abstract class TrainedFlowerAuto extends OpMode {
         double[] c=CURVES[leg];Pose expected=transform(c[0],c[1],c[8]);
         Pose from=follower.pose();target=nominalEnd(leg);
         boolean retreat=leg==4||leg==10;
-        if(!retreat&&Math.hypot(from.x()-expected.x(),from.y()-expected.y())>1.1){park("Missed curve start");return;}
+        // A normal leg can finish three inches from its nominal endpoint. Join
+        // the next path from that measured pose; flower staging stays tighter.
+        double startTolerance=leg==3||leg==9?1.1:NORMAL_TRAVEL_TOLERANCE_INCHES+.1;
+        if(!retreat&&Math.hypot(from.x()-expected.x(),from.y()-expected.y())>startTolerance){park("Missed curve start");return;}
         if(leg==3||leg==9){
             if(!Double.isFinite(FLOWER_PUSH_POWER)||FLOWER_PUSH_POWER<=0||FLOWER_PUSH_POWER>.45
                 ||!Double.isFinite(FLOWER_PUSH_SECONDS)||FLOWER_PUSH_SECONDS<=0||FLOWER_PUSH_SECONDS>2){
@@ -182,7 +186,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
     }
     private boolean driveArrived(){
         if(leg==2||leg==4||leg==8||leg==10)return at(.75,2.0,2.5);
-        return at(1.0,3.0,4.5);
+        return at(NORMAL_TRAVEL_TOLERANCE_INCHES,3.0,4.5);
     }
     private void collect(){intake.start();intake.stopWindmill();}
     private void arrived(){
@@ -265,7 +269,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
                 if(now-began>SHOT_BATCH_TIMEOUT_SECONDS){park("Shooter readiness/feed timeout: "+batchReleases+" estimated releases");break;}
                 result=permit?"Shooting; four releases requested":"Reacquiring shooting aim";break;
             case FALLBACK:
-                if(at(emergencyPot>=0?.25:1.0,3,3)){emergencyPot=-1;nextFallback();}break;
+                if(at(emergencyPot>=0?.25:NORMAL_TRAVEL_TOLERANCE_INCHES,3,3)){emergencyPot=-1;nextFallback();}break;
             default: break;
         }report();
     }

@@ -70,6 +70,24 @@ static Auto setup(boolean blue,int leg,double error,double degrees,double speed)
 }
 public static void main(String[] args)throws Exception{
 for(boolean blue:new boolean[]{false,true}){
+ // Normal travel accepts a three-inch radius and rejoins from measured pose.
+ Auto normal=setup(blue,1,2.9,0,0);
+ check((Boolean)call(normal,"driveArrived",new Class[]{}),"normal travel must accept 2.9 inches");
+ normal.loop();check((Integer)get(normal,"leg")==2,"normal arrival must advance to next path");
+ check(get(normal,"parkingReason").equals("None"),"old 1.1-inch join gate must not reject accepted travel error");
+ check(((Follower)get(normal,"follower")).follows==1&&get(normal,"state").toString().equals("DRIVE"),"next path must start from measured position");
+ normal=setup(blue,1,3.01,0,0);
+ check(!(Boolean)call(normal,"driveArrived",new Class[]{}),"normal travel must reject errors above three inches");
+ normal=setup(blue,2,2.9,0,0);
+ check(!(Boolean)call(normal,"driveArrived",new Class[]{}),"flower alignment must retain tighter tolerance");
+ normal=setup(blue,1,2.9,3.1,0);
+ check(!(Boolean)call(normal,"driveArrived",new Class[]{}),"normal heading limit must remain active");
+ normal=setup(blue,1,2.9,0,4.6);
+ check(!(Boolean)call(normal,"driveArrived",new Class[]{}),"normal speed limit must remain active");
+ normal=setup(blue,0,2.9,0,0);normal.loop();
+ check(get(normal,"state").toString().equals("SHOOT"),"travel can settle into shooting hold within three inches");
+ ElapsedTime.now=1.4;normal.loop();
+ check(get(normal,"result").equals("Reacquiring shooting aim"),"shooting must still require precise aim");
  for(int leg:new int[]{2,8}){
   Auto a=setup(blue,leg,.5,1.5,1);
   a.loop();check((Integer)get(a,"leg")==leg+1,"must advance into approach");check(get(a,"state").toString().equals("PUSH"),"staging must start timed push");
