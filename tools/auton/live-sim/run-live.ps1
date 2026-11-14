@@ -1,0 +1,8 @@
+param([Parameter(Mandatory=$true)][string]$SimulatorRoot,[string]$ResultsDirectory,[string]$RunTag,[double]$Power=.65,[double]$Seconds=.9,[int]$Port=8784,[string]$Scenario="nominal")
+$sim=(Resolve-Path -LiteralPath $SimulatorRoot).Path;if(!$ResultsDirectory){$ResultsDirectory=Join-Path $PSScriptRoot '../../../build/live-sim-results'};New-Item -ItemType Directory -Force $ResultsDirectory | Out-Null;$base=(Resolve-Path -LiteralPath $ResultsDirectory).Path;$active=(Get-Content "$sim/build/active-build.txt" -Raw).Trim();$cp="$active;$sim/Controller/src;$sim/TeamCode/src;$sim/lib/*";$proc=$null;$case=if($RunTag){$RunTag}else{(Get-Date -Format yyyyMMddHHmmss)+"-p$Power-t$Seconds-$Scenario"};$env:TEST_OUTPUT=$base;$env:TEST_PORT="$Port";$env:TEST_CASE=$case;$env:TEST_PROFILE=if($Scenario -eq "lowgrip12v"){'{"batteryVoltage":12,"gripForward":0.8,"gripStrafe":0.6}'}elseif($Scenario -eq "lowvoltage10v5"){'{"batteryVoltage":10.5}'}else{'{}'}
+try{
+$proc=Start-Process -FilePath (Join-Path $env:JAVA_HOME 'bin/java.exe') -WorkingDirectory $sim -WindowStyle Hidden -PassThru -ArgumentList @("-Dbiobuzz.port=$Port","-Dtest.push.power=$Power","-Dtest.push.seconds=$Seconds",'--module-path',('"'+$sim+'/vendor/javafx"'),'--add-modules','javafx.controls,javafx.fxml,javafx.swing,jdk.httpserver','-cp',('"'+$cp+'"'),'virtual_robot.controller.CurrentAutonFixture','--studio','--no-browser','--hidden') -RedirectStandardOutput "$base/$case-server.log" -RedirectStandardError "$base/$case-server-error.log"
+Push-Location $sim;node (Join-Path $PSScriptRoot 'check-live.cjs');$testExit=$LASTEXITCODE;Pop-Location
+}finally{if($proc -and !$proc.HasExited){Stop-Process -Id $proc.Id}}
+
+if($testExit -ne 0){throw "Live autonomous checks failed; inspect JSON traces in $base"}
