@@ -32,7 +32,7 @@ public class AutoShot {
     private Shooter shooter;
     private ElapsedTime clock;
     private final TargetTracker tracker = new TargetTracker();
-    private final ShotTable table = new ShotTable(ShotConfig.SHOT_TABLE);
+    private ShotTable table = new ShotTable(ShotConfig.SHOT_TABLE);
 
     private boolean cameraReady = false;
     private boolean blue = ShotConfig.DEFAULT_ALLIANCE_BLUE;
@@ -42,6 +42,8 @@ public class AutoShot {
 
     public void init(HardwareMap hardwareMap, Limelight limelight, AprilTagAlignment alignment, Shooter shooter,
                      ElapsedTime clock) {
+        RobotSettings.ensureLoaded();
+        reloadTable();
         this.limelight = limelight;
         this.alignment = alignment;
         this.shooter = shooter;
@@ -58,19 +60,30 @@ public class AutoShot {
         alignment.setRotationGains(ShotConfig.AIM_KP, ShotConfig.AIM_KD);
         alignment.setAimDirection(ShotConfig.AIM_DIRECTION);
         alignment.setAngleTolerance(ShotConfig.AIM_STOP_DEG);
+        alignment.setRotationLimits(ShotConfig.AIM_MIN_POWER, ShotConfig.AIM_MAX_POWER);
     }
 
-    /** Call from init_loop(): gamepad 1 X = blue alliance, B = red alliance. */
+    private boolean allianceLocked = false;
+
+    /** Fixes the alliance (Blue/Red TeleOp files). The X/B buttons in selectAlliance() are then ignored. */
+    public void lockAlliance(boolean blueAlliance) {
+        blue = blueAlliance;
+        allianceLocked = true;
+    }
+
+    /** Call from init_loop(): gamepad 1 X = blue alliance, B = red alliance (unless the alliance is locked). */
     public void selectAlliance(Gamepad gamepad, Telemetry telemetry) {
-        if (gamepad.xWasPressed()) blue = true;
-        if (gamepad.bWasPressed()) blue = false;
+        if (!allianceLocked && gamepad.xWasPressed()) blue = true;
+        if (!allianceLocked && gamepad.bWasPressed()) blue = false;
         if (!ShotConfig.AUTO_SHOT_ENABLED) {
             telemetry.addLine("Camera aim/speed: OFF (ShotConfig.AUTO_SHOT_ENABLED)");
             return;
         }
-        telemetry.addData("ALLIANCE (G1 X = blue, B = red)", blue ? "BLUE" : "RED");
+        telemetry.addData(allianceLocked ? "ALLIANCE (set by this TeleOp)" : "ALLIANCE (G1 X = blue, B = red)",
+                blue ? "BLUE" : "RED");
         telemetry.addData("Camera", cameraReady ? "found" : cameraProblem);
-        telemetry.addData("Shot table", table.isReady() ? table.size() + " rows" : "EMPTY - manual presets only");
+        telemetry.addData("Auto speed", (ShotConfig.USE_SHOT_MODEL ? "model" : "table") + ", "
+                + table.size() + " table rows");
     }
 
     public void start() {
@@ -83,6 +96,20 @@ public class AutoShot {
 
     /** @return true when camera aiming is switched on and the camera was found. */
     public boolean isActive() { return cameraReady; }
+
+    /** Re-applies the aim settings (gains, direction, stop angle, pipeline) after they were changed. */
+    public void applySettings() {
+        reloadTable();
+        if (!cameraReady) return;
+        alignment.setRotationGains(ShotConfig.AIM_KP, ShotConfig.AIM_KD);
+        alignment.setAimDirection(ShotConfig.AIM_DIRECTION);
+        alignment.setAngleTolerance(ShotConfig.AIM_STOP_DEG);
+        alignment.setRotationLimits(ShotConfig.AIM_MIN_POWER, ShotConfig.AIM_MAX_POWER);
+        limelight.setPipeline(ShotConfig.APRILTAG_PIPELINE);
+    }
+
+    /** Re-reads ShotConfig.SHOT_TABLE (after the Shot Table Builder changed it). */
+    public void reloadTable() { table = new ShotTable(ShotConfig.SHOT_TABLE); }
 
     /**
      * Call once per loop, before aprilTagAlignment.update() and shooter.update().
@@ -100,12 +127,15 @@ public class AutoShot {
         tracker.update(limelight.getLastResult(), blue, clock.seconds());
 
         // ---- shot speed from distance
-        if (ShotConfig.AUTO_SPEED_ENABLED && table.isReady() && tracker.isVisible() && tracker.hasDistance()
-                && (aimHeld || shooter.isAutoTarget())) {
-            double step = Math.max(1, ShotConfig.AUTO_SPEED_STEP);
-            double speed = Math.round(table.speedFor(tracker.getDistanceInches()) / step) * step;
-            if (!shooter.isAutoTarget() || Math.abs(speed - shooter.getAutoBaseSpeed()) >= step) {
-                shooter.setAutoTarget(speed);
+        if (ShotConfig.AUTO_SPEED_ENABLED && ShotModel.available(table) && tracker.isVisible()
+                && tracker.hasDistance() && (aimHeld || shooter.isAutoTarget())) {
+            double raw = autoSpeed();
+            if (!Double.isNaN(raw)) {
+                double step = Math.max(1, ShotConfig.AUTO_SPEED_STEP);
+                double speed = Math.round(raw / step) * step;
+                if (!shooter.isAutoTarget() || Math.abs(speed - shooter.getAutoBaseSpeed()) >= step) {
+                    shooter.setAutoTarget(speed);
+                }
             }
         }
 
@@ -122,31 +152,56 @@ public class AutoShot {
                 && Math.abs(tracker.getAimErrorDeg()) <= ShotConfig.AIM_FIRE_TOLERANCE_DEG;
     }
 
+    /**
+     * @return true when our UP basket is in view and the robot is standing somewhere it can score from:
+     * between {@link ShotConfig#MIN_SHOT_DISTANCE_IN} and {@link ShotConfig#MAX_SHOT_DISTANCE_IN}, and (when a
+     * speed model/table exists) the shot is physically possible from here. Says nothing about aim or flywheel.
+     */
+    public boolean canShootFromHere() {
+        return inShootingRange(tracker, table);
+    }
+
+    /** Same check for any tracker (used by autonomous too). */
+    public static boolean inShootingRange(TargetTracker tracker, ShotTable table) {
+        if (!tracker.isCellUp() || !tracker.hasDistance()) return false;
+        double d = tracker.getDistanceInches();
+        if (d < ShotConfig.MIN_SHOT_DISTANCE_IN || d > ShotConfig.MAX_SHOT_DISTANCE_IN) return false;
+        if (!ShotModel.available(table)) return true;
+        return !Double.isNaN(ShotModel.speedFor(d, tracker.getAimHeightInches(), table));
+    }
+
+    /** @return true for the blue alliance (picked during INIT). */
+    public boolean isBlue() { return blue; }
+
     public TargetTracker getTracker() { return tracker; }
 
-    /** Driver Station lines. "Distance (in)" is the number to write down when measuring the shot table. */
+    /** Flywheel speed for the current distance and aim height (model + table), NaN if unknown. */
+    public double autoSpeed() {
+        return ShotModel.speedFor(tracker.getDistanceInches(), tracker.getAimHeightInches(), table);
+    }
+
+    /** The table this TeleOp uses (rebuilt by {@link #reloadTable()}). */
+    public ShotTable getTable() { return table; }
+
+    /** Two Driver Station lines at most. */
     public void addTelemetry(Telemetry telemetry) {
         if (!ShotConfig.AUTO_SHOT_ENABLED) return;
         if (!cameraReady) {
-            telemetry.addLine("Camera aim: " + cameraProblem);
+            telemetry.addLine("Camera: " + cameraProblem);
             return;
         }
-        telemetry.addLine("--------------- Camera aim (" + (blue ? "BLUE" : "RED") + ") ---------------");
         if (tracker.isVisible()) {
-            telemetry.addData("Basket", "tags %d-%d, %d in view", tracker.getBasketFirstTag(),
-                    tracker.getBasketFirstTag() + ShotConfig.TAGS_PER_BASKET - 1, tracker.getTagCount());
-            telemetry.addData("Aim error (deg)", "%+.1f  %s", tracker.getAimErrorDeg(), isAimed() ? "AIMED" : "");
+            telemetry.addLine(String.format(java.util.Locale.US, "Aim %d-%d %s  %d tags  err %+.1f%s",
+                    tracker.getBasketFirstTag(), tracker.getBasketFirstTag() + ShotConfig.TAGS_PER_BASKET - 1,
+                    tracker.isCellUp() ? "UP" : "down", tracker.getTagCount(), tracker.getAimErrorDeg(),
+                    isAimed() ? "  AIMED" : aimHeld && !permit ? "  (holding fire)" : ""));
         } else {
-            telemetry.addData("Basket", aimHeld ? "NO TARGET - release AIM to fire manually" : "not in view");
+            telemetry.addLine(aimHeld ? "Aim: NO TARGET - release AIM to fire manually" : "Aim: no target in view");
         }
-        if (tracker.hasDistance()) telemetry.addData("Distance (in)", "%.1f", tracker.getDistanceInches());
-        else telemetry.addData("Distance (in)", "unknown");
-        if (!table.isReady()) {
-            telemetry.addLine("Shot table EMPTY: speed stays on manual presets");
-        } else if (tracker.hasDistance()) {
-            telemetry.addData("Table speed", "%.0f ticks/s%s", table.speedFor(tracker.getDistanceInches()),
-                    table.inRange(tracker.getDistanceInches()) ? "" : "  !! OUTSIDE TABLE RANGE !!");
+        if (tracker.hasDistance()) {
+            double speed = autoSpeed();
+            telemetry.addLine(String.format(java.util.Locale.US, "Dist %.0f in  auto speed %s",
+                    tracker.getDistanceInches(), Double.isNaN(speed) ? "-" : String.format(java.util.Locale.US, "%.0f", speed)));
         }
-        if (aimHeld && !permit) telemetry.addLine("Holding fire until aimed");
     }
 }

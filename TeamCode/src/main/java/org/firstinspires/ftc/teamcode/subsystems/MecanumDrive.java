@@ -34,12 +34,44 @@ public class MecanumDrive {
     }
 
     public void driveWithPositionHold(double y, double x, double rx, boolean bypass) {
+        // Per-axis dead zone: a resting or drifting stick can never turn or creep the robot.
+        y = TeleOpPositionHold.deadband(y); x = TeleOpPositionHold.deadband(x); rx = TeleOpPositionHold.deadband(rx);
         if (positionHold != null && positionHold.update(y, x, rx, bypass, System.nanoTime() / 1e9)) return;
         if (!bypass && TeleOpPositionHold.sticksIdle(y, x, rx)) {
             y = 0; x = 0; rx = 0;
         }
         drive(y, x, rx);
     }
+
+    /**
+     * Same as {@link #driveWithPositionHold(double, double, double, boolean)}, plus AIM. While aiming with the
+     * left stick still, the robot's spot is locked (pushes are resisted) and the hold turns it to the camera's
+     * aim point. Moving the left stick drives normally, with the camera doing the turning.
+     *
+     * @param bypass hold off completely (right stick button)
+     * @param aiming AIM button held
+     */
+    public void driveWithPositionHold(double y, double x, double rx, boolean bypass, boolean aiming) {
+        y = TeleOpPositionHold.deadband(y); x = TeleOpPositionHold.deadband(x); rx = TeleOpPositionHold.deadband(rx);
+        if (aiming && !bypass && positionHold != null && aprilTagAlignment != null
+                && aprilTagAlignment.hasTargetTracker()) {
+            boolean target = !Double.isNaN(aprilTagAlignment.getAimTurnDeg());
+            if (!target && !TeleOpPositionHold.sticksIdle(0, 0, rx)) {
+                // No target in view and the driver is turning by hand: let them.
+                driveWithPositionHold(y, x, rx, true);
+                return;
+            }
+            // Same PD turn power as when driving (Aim kP / kD / max power), with the spot locked.
+            double turnPower = target ? aprilTagAlignment.getAddedRotationPower() : Double.NaN;
+            if (positionHold.updateAiming(y, x, turnPower, System.nanoTime() / 1e9)) return;
+            drive(y, x, rx);
+            return;
+        }
+        driveWithPositionHold(y, x, rx, bypass || aiming);
+    }
+
+    /** The TeleOp position hold, or null if it is not enabled / not available. */
+    public TeleOpPositionHold getPositionHold() { return positionHold; }
 
     public String getPositionHoldStatus() {
         return positionHold == null ? holdUnavailable : positionHold.getStatus();
@@ -158,7 +190,9 @@ public class MecanumDrive {
             // Apply AprilTag vision alignment multipliers and rotational offsets
             if (aprilTagAlignment != null) {
                 rx *= aprilTagAlignment.getRotationMultiplier();
-                rx += aprilTagAlignment.getAddedRotation();
+                // Auto-rotate power is absolute: undo the driver speed setting applied below, so aim tuning does
+                // not depend on the drive speed.
+                rx += aprilTagAlignment.getAddedRotation() / Math.max(0.05, speedMultiplier);
 
 //                x *= aprilTagAlignment.getStrafeMultiplier();
 //                x += aprilTagAlignment.getAddedStrafe();

@@ -88,10 +88,7 @@ public class TeleOp_TestBaseCodeSpeeds extends OpMode {
             new Setting("Intake roller power", "(0-1)", 2, POWER_INCREMENTS,
                 intake::getIntakePower, intake::setIntakePower,
                 () -> intake.setIntakePower(Intake.INTAKE_POWER)),
-            new Setting("Windmill feed speed", "RPM (open loop)", 0, RPM_INCREMENTS,
-                intake::getWindmillFeedRpm, intake::setWindmillFeedRpm,
-                () -> intake.setWindmillFeedRpm(Double.NaN)),
-            new Setting("Windmill reverse while intaking", "RPM (open loop)", 0, RPM_INCREMENTS,
+            new Setting("Windmill reverse while intaking", "windmill RPM (0-312)", 0, RPM_INCREMENTS,
                 intake::getWindmillIntakeReverseRpm, intake::setWindmillIntakeReverseRpm,
                 () -> intake.setWindmillIntakeReverseRpm(Intake.WINDMILL_INTAKE_REVERSE_RPM)),
             new Setting("Transfer feed speed", "RPM", 0, RPM_INCREMENTS,
@@ -210,7 +207,6 @@ public class TeleOp_TestBaseCodeSpeeds extends OpMode {
     private String valueText(Setting s, int index) {
         double v = s.getter.getAsDouble();
         String text = String.format(Locale.US, "%." + s.decimals + "f %s", v, s.unit);
-        if (index == 1 && intake.isWindmillFollowingFlywheel()) text += "  [AUTO: 90% of flywheel]";
         return text;
     }
 
