@@ -21,7 +21,7 @@ public class ShiftedRouteChecks {
     field("leg").set(a,leg);boolean push=leg==3||leg==9;
     state.set(a,Enum.valueOf((Class)state.getType(),push?"PUSH":"DRIVE"));
     Pose from=point(a,leg,0,curves[leg][8]),to=point(a,leg,6,curves[leg][9]);
-    double depth=.5+TrainedFlowerAuto.FLOWER_EXTRA_PUSH_INCHES;
+    double depth=2.5;
     if(push)to=new Pose(to.x()+depth*Math.cos(to.heading()),to.y()+depth*Math.sin(to.heading()),to.heading());
     if(leg==4||leg==10)from=new Pose(from.x()+depth*Math.cos(from.heading()),from.y()+depth*Math.sin(from.heading()),from.heading());
     Path path=(push||leg==4||leg==10)?Paths.line(from,to).linear(from,to)
@@ -35,10 +35,18 @@ public class ShiftedRouteChecks {
    for(int leg:new int[]{3,9}){
     field("leg").set(a,leg);state.set(a,Enum.valueOf((Class)state.getType(),"COLLECT"));
     Pose target=point(a,leg,6,curves[leg][9]);
-    for(double depth:new double[]{2.5,3.25})for(double side:new double[]{-1.75,1.75})for(double degrees:new double[]{-6,6}){
+    for(double depth:new double[]{2.5,3.065})for(double side:new double[]{-5,5})for(double degrees:new double[]{-15,15}){
      double h=target.heading();Pose contact=new Pose(target.x()+depth*Math.cos(h)-side*Math.sin(h),target.y()+depth*Math.sin(h)+side*Math.cos(h),h+Math.toRadians(degrees));
      if(!(Boolean)call(a,"clear",new Class[]{Pose.class},contact))throw new AssertionError("Deep-contact recovery envelope is not clear: "+contact);
      checks++;
+    }
+    for(double degrees:new double[]{-30,30}){
+     double h=target.heading();
+     Pose inboard=new Pose(target.x()+.165*Math.cos(h),target.y()+.165*Math.sin(h),h+Math.toRadians(degrees));
+     if(!(Boolean)call(a,"clear",new Class[]{Pose.class},inboard))throw new AssertionError("Inboard contact turn should permit recovery");
+     Pose nearWall=new Pose(target.x()+3.065*Math.cos(h),target.y()+3.065*Math.sin(h),h+Math.toRadians(degrees));
+     if((Boolean)call(a,"clear",new Class[]{Pose.class},nearWall))throw new AssertionError("Actual chassis wall envelope must still reject deeply rotated contact");
+     checks+=2;
     }
    }
    field("leg").set(a,0);state.set(a,Enum.valueOf((Class)state.getType(),"DRIVE"));

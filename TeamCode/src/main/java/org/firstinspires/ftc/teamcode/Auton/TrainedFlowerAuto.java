@@ -23,14 +23,9 @@ import java.util.List;
 public abstract class TrainedFlowerAuto extends OpMode {
     protected abstract boolean blueAlliance();
     public static double FLOWER_COLLECT_SECONDS=2.0;
-    public static double FLOWER_PUSH_POWER=.30;
-    public static double FLOWER_PUSH_SECONDS=2.5;
-    public static final double FLOWER_EXTRA_PUSH_INCHES=2.0;
-    private static final double FLOWER_REFERENCE_FORWARD=55.335;
-    private static final double FLOWER_PUSH_FORWARD_LIMIT=FLOWER_REFERENCE_FORWARD+.5+FLOWER_EXTRA_PUSH_INCHES;
-    private static final double FLOWER_PUSH_TRAVEL_LIMIT=13+FLOWER_EXTRA_PUSH_INCHES;
-    // Allow stopping/odometry margin past the commanded cutoff while backing out.
-    private static final double FLOWER_CONTACT_FORWARD_LIMIT=FLOWER_PUSH_FORWARD_LIMIT+.75;
+    public static double FLOWER_PUSH_POWER=.65;
+    public static double FLOWER_PUSH_SECONDS=.9;
+    private static final double FLOWER_CONTACT_FORWARD_LIMIT=58.5;
     private static final double STARTUP_READY_TIMEOUT_SECONDS=6.0;
     public static double SHOT_BATCH_TIMEOUT_SECONDS=8.0;
     public static double MAX_READY_FEED_SECONDS=2.0;
@@ -38,7 +33,8 @@ public abstract class TrainedFlowerAuto extends OpMode {
     public static final double SHOOTER_TARGET_TICKS_PER_SECOND=1450;
     public static final double SHOT_RECOVERY_WAIT_SECONDS=.25;
     public static final double FLOWER_LINEUP_RIGHT_INCHES=3.0;
-    public static final String EXPORT_VERSION="RAMP15_V4_DEEP_PUSH_CONTINUE";
+    public static final double SHOT_STANDOFF_EXTRA_INCHES=1.0;
+    public static final String EXPORT_VERSION="RAMP15_V5_FAST_TIMED_CONTACT";
     private enum State { LOWER_RAMP, DRIVE, SHOOT, PUSH, COLLECT, FALLBACK, DONE }
     private State state=State.DONE;
     private final ElapsedTime clock=new ElapsedTime();
@@ -49,7 +45,8 @@ public abstract class TrainedFlowerAuto extends OpMode {
     private GoBildaPinpointDriver pinpoint;
     private int batchStartShots,batchReleases;
     private Pose target;
-    private Pose pushStart;
+    private double rampWaitBegan;
+    private int armReseatLeg=-1;
     private int leg,totalReleases,batches,emergencyPot=-1;
     private double began,stable=-1,lastShotLoop,readyFeedSeconds;
     private LimitedDrive limitedDrive;
@@ -99,6 +96,10 @@ public abstract class TrainedFlowerAuto extends OpMode {
         // Shift entry/exit controls too so adjacent curve endpoints still join.
         if((i==2&&xy>=4)||i==3||i==4||(i==5&&xy<=2))y+=FLOWER_LINEUP_RIGHT_INCHES;
         if((i==8&&xy>=4)||i==9||i==10||(i==11&&xy<=2))x+=FLOWER_LINEUP_RIGHT_INCHES;
+        int shot=-1;
+        if((i==0&&xy>=4)||(i==1&&xy<=2))shot=0;
+        if((i==6&&xy>=4)||(i==7&&xy<=2)||(i==12&&xy>=4)||(i==13&&xy<=2))shot=6;
+        if(shot>=0){x-=SHOT_STANDOFF_EXTRA_INCHES*Math.cos(CURVES[shot][9]);y-=SHOT_STANDOFF_EXTRA_INCHES*Math.sin(CURVES[shot][9]);}
         return transform(x,y,heading);
     }
     private Pose nominalEnd(int i){return curvePoint(i,6,CURVES[i][9]);}
@@ -120,7 +121,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
         telemetry.addLine(EXPORT_VERSION+": ramp tip 15 inches from center; quarter-inch wall gap.");telemetry.update();
     }
     @Override public void start(){
-        clock.reset();leg=totalReleases=batches=0;emergencyPot=-1;parkingReason="None";stable=-1;
+        clock.reset();leg=totalReleases=batches=0;emergencyPot=-1;parkingReason="None";stable=-1;armReseatLeg=-1;rampWaitBegan=0;
         follower.stop();follower.drivetrain.stop();
         if(!flowerArm.isAvailable()){finish("Flower arm unavailable: "+flowerArm.getStatus());return;}
         // Apply the requested direction after saved Robot Settings have loaded.
@@ -148,12 +149,8 @@ public abstract class TrainedFlowerAuto extends OpMode {
         double forward=pot==3?-x:y,side=pot==3?y:x;
         // Only the selected flower's straight approach corridor permits ramp contact.
         return forward>=40.3-1e-6&&forward<=FLOWER_CONTACT_FORWARD_LIMIT+1e-6
-            &&Math.abs(side+23.393700787-FLOWER_LINEUP_RIGHT_INCHES)<=1.75+1e-6
-            &&Math.abs(headingError)<=Math.toRadians(6)+1e-9;
-    }
-    private double flowerForward(Pose world){
-        double sign=blueAlliance()?-1:1;
-        return contactPot()==3?-sign*world.x():sign*world.y();
+            &&Math.abs(side+23.393700787-FLOWER_LINEUP_RIGHT_INCHES)<=5.0+1e-6
+            &&Math.abs(headingError)<=Math.toRadians(30)+1e-9;
     }
     private boolean departureWallContactAllowed(Pose world){
         if(state!=State.DRIVE||leg!=0)return false;
@@ -168,19 +165,23 @@ public abstract class TrainedFlowerAuto extends OpMode {
         double sign=blueAlliance()?-1:1,x=sign*world.x()*.0254,y=sign*world.y()*.0254;
         double h=world.heading()-(blueAlliance()?Math.PI:0),c=Math.cos(h),s=Math.sin(h);
         if(!Double.isFinite(x+y+h))return false;
-        double minX=10,maxX=-10,minY=10,maxY=-10;
+        double minX=10,maxX=-10,minY=10,maxY=-10,bodyMinX=10,bodyMaxY=-10;
         for(double forward:new double[]{-.2286,.381})for(double right:new double[]{-.2286,.2286}){
             double xx=x+forward*c-right*s,yy=y+forward*s+right*c;
             minX=Math.min(minX,xx);maxX=Math.max(maxX,xx);minY=Math.min(minY,yy);maxY=Math.max(maxY,yy);
+            // Simulator chassis nose is 9.987 inches from origin. Use a
+            // conservative 10-inch nose and 18-inch width for contacted walls.
+            double bodyForward=Math.min(forward,.254);
+            bodyMinX=Math.min(bodyMinX,x+bodyForward*c-right*s);
+            bodyMaxY=Math.max(bodyMaxY,y+bodyForward*s+right*c);
         }
         boolean contact=flowerContactAllowed(world);
         // Requested deeper contact applies only to the selected flower corridor.
         // Include bounded stopping margin; other walls and the hive stay unchanged.
-        double tipContactMargin=(2+FLOWER_EXTRA_PUSH_INCHES)*.0254;
-        double minWallX= -1.792859-(contact&&contactPot()==3?tipContactMargin:0);
-        double maxWallY=1.792859+(contact&&contactPot()==0?tipContactMargin:0);
+        double wallMinX=contact&&contactPot()==3?bodyMinX:minX;
+        double wallMaxY=contact&&contactPot()==0?bodyMaxY:maxY;
         double minWallY= -1.792859-(departureWallContactAllowed(world)?.01905:0);
-        if(maxX>-.005||minX<minWallX||maxY>maxWallY||minY<minWallY)return false;
+        if(maxX>-.005||wallMinX< -1.792859||wallMaxY>1.792859||minY<minWallY)return false;
         if(maxX>=-.695&&minX<=.695&&maxY>=-.545&&minY<=.545)return false;
         double[][] pots={{-.5942,1.7283},{1.7283,.5942},{.5942,-1.7283},{-1.7283,-.5942}};
         for(int i=0;i<4;i++){
@@ -200,13 +201,19 @@ public abstract class TrainedFlowerAuto extends OpMode {
         double startTolerance=leg==3||leg==9?1.1:NORMAL_TRAVEL_TOLERANCE_INCHES+.1;
         if(!retreat&&Math.hypot(from.x()-expected.x(),from.y()-expected.y())>startTolerance){park("Missed curve start");return;}
         if(leg==3||leg==9){
-            if(!flowerArm.isAtDown()){finish("Flower push blocked: ramp is not down");return;}
-            if(!Double.isFinite(FLOWER_PUSH_POWER)||FLOWER_PUSH_POWER<=0||FLOWER_PUSH_POWER>.45
-                ||!Double.isFinite(FLOWER_PUSH_SECONDS)||FLOWER_PUSH_SECONDS<=0||FLOWER_PUSH_SECONDS>3){
+            if(!flowerArm.isAtDown()){
+                if(armReseatLeg==leg){finish("Flower ramp did not stay down after reseat");return;}
+                armReseatLeg=leg;follower.stop();follower.drivetrain.stop();
+                flowerArm.down();state=State.LOWER_RAMP;stable=-1;rampWaitBegan=clock.seconds();
+                result="Reseating ramp before flower push";return;
+            }
+            if(!Double.isFinite(FLOWER_PUSH_POWER)||FLOWER_PUSH_POWER<=0||FLOWER_PUSH_POWER>.8
+                ||!Double.isFinite(FLOWER_PUSH_SECONDS)||FLOWER_PUSH_SECONDS<=0||FLOWER_PUSH_SECONDS>1.5){
                 finish("Invalid flower push power/time");return;
             }
+            if(clock.seconds()+FLOWER_PUSH_SECONDS+FLOWER_COLLECT_SECONDS+1.25+reserve()>=29.2){park("Insufficient time for full flower push and collection");return;}
             follower.stop();follower.drivetrain.stop();
-            state=State.PUSH;began=clock.seconds();pushStart=from;
+            state=State.PUSH;began=clock.seconds();
             follower.manual(new DrivePowers(FLOWER_PUSH_POWER,0,0));
             collect();result="Timed forward flower push";return;
         }
@@ -293,14 +300,16 @@ public abstract class TrainedFlowerAuto extends OpMode {
                 &&pinpoint.getDeviceStatus()==GoBildaPinpointDriver.DeviceStatus.READY;
             if(!readyToDrive)stable=-1;else if(stable<0)stable=now;
             if(readyToDrive&&now-stable>=.15){result="Ramp and odometry ready; starting route";driveLeg();}
-            else if(now>=STARTUP_READY_TIMEOUT_SECONDS){finish("Startup timeout: "+flowerArm.getStatus()+", Pinpoint="+pinpoint.getDeviceStatus());return;}
+            else if(now-rampWaitBegan>=Math.max(STARTUP_READY_TIMEOUT_SECONDS,FlowerArm.MAX_TRAVEL_SEC+3)){finish("Startup timeout: "+flowerArm.getStatus()+", Pinpoint="+pinpoint.getDeviceStatus());return;}
             else result=flowerArm.isAtDown()?"Ramp down; waiting for stable odometry":"Lowering ramp to touchDown";
             report();return;
         }
-        limitedDrive.cap=state==State.PUSH?FLOWER_PUSH_POWER:1;
+        limitedDrive.cap=state==State.PUSH?Math.min(1,FLOWER_PUSH_POWER+.25):1;
         follower.update();
-        if(pinpoint.getDeviceStatus()!=GoBildaPinpointDriver.DeviceStatus.READY||!clear(follower.pose())){finish("Pose / clearance interlock");return;}
-        if(state!=State.FALLBACK&&now+reserve()>=29.2){park("Time reserved for parking");report();return;}
+        if(pinpoint.getDeviceStatus()!=GoBildaPinpointDriver.DeviceStatus.READY){finish("Odometry not ready: "+pinpoint.getDeviceStatus());return;}
+        if(!Double.isFinite(follower.velocity().vx)||!Double.isFinite(follower.velocity().vy)){finish("Invalid odometry velocity");return;}
+        if(!clear(follower.pose())){finish("Geometry clearance interlock");return;}
+        if(state!=State.FALLBACK&&state!=State.PUSH&&state!=State.COLLECT&&now+reserve()>=29.2){park("Time reserved for parking");report();return;}
         switch(state){
             case DRIVE:
                 intake.stop();
@@ -311,20 +320,12 @@ public abstract class TrainedFlowerAuto extends OpMode {
                 break;
             case PUSH:
                 collect();shooter.update();
-                double pushHeading=follower.pose().heading()-target.heading();
-                if(Math.abs(Math.atan2(Math.sin(pushHeading),Math.cos(pushHeading)))>Math.toRadians(3)){
-                    // Contact can nudge the chassis. Stop pushing and finish the
-                    // pickup/retreat instead of ending the entire autonomous.
-                    finishPush("Flower contact turned chassis; collect then retreat");break;
-                }
-                // Time ends the push; odometry supplies maximum-travel guards,
-                // never a precision-arrival requirement or confirmation of pickup.
+                // The short impact entry ends by time, not the nominal flower
+                // coordinate, travel distance, or small contact-induced yaw.
                 if(now-began>=FLOWER_PUSH_SECONDS){finishPush("Timed flower push complete");break;}
-                if(flowerForward(follower.pose())>=FLOWER_PUSH_FORWARD_LIMIT
-                    ||Math.hypot(follower.pose().x()-pushStart.x(),follower.pose().y()-pushStart.y())>=FLOWER_PUSH_TRAVEL_LIMIT){
-                    finishPush("Flower push travel limit");break;
-                }
-                follower.manual(new DrivePowers(FLOWER_PUSH_POWER,0,0));
+                double headingError=target.heading()-follower.pose().heading();
+                double steer=Math.max(-.25,Math.min(.25,1.5*Math.atan2(Math.sin(headingError),Math.cos(headingError))));
+                follower.manual(new DrivePowers(FLOWER_PUSH_POWER,0,steer));
                 break;
             case COLLECT:
                 collect();shooter.update();
@@ -379,7 +380,6 @@ public abstract class TrainedFlowerAuto extends OpMode {
         telemetry.addData("Pinpoint status",pinpoint==null?"Not initialized":pinpoint.getDeviceStatus());
         telemetry.addData("Flower arm direction",FlowerArm.DIRECTION);
         telemetry.addData("Flower push power / seconds","%.2f / %.2f",FLOWER_PUSH_POWER,FLOWER_PUSH_SECONDS);
-        telemetry.addData("Extra flower push (in)",FLOWER_EXTRA_PUSH_INCHES);
         telemetry.addData("Flower lineup right (in)",FLOWER_LINEUP_RIGHT_INCHES);
         telemetry.addData("Elapsed (s)",clock.seconds());telemetry.addData("Completed shot batches",batches);
         telemetry.addData("Estimated releases",totalReleases+(state==State.SHOOT?batchReleases:0));

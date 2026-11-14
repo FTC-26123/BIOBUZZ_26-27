@@ -1,7 +1,6 @@
-# Trained Flowers Ramp15 v2
+# Trained Flowers Ramp15
 
-Select `Red Trained Flowers Ramp15 v2` or `Blue Trained Flowers Ramp15 v2`.
-These are fixed Pedro routes exported from the trained flower policy, not live neural inference.
+Select `Red Trained Flowers Ramp15 v2` or `Blue Trained Flowers Ramp15 v2`. Telemetry identifies this revision as `RAMP15_V5_FAST_TIMED_CONTACT`. The menu names stay compatible. These are fixed Pedro routes, not live neural inference.
 
 ## Setup
 
@@ -10,42 +9,52 @@ These are fixed Pedro routes exported from the trained flower policy, not live n
 | Red | (57.143803, 9.180748) | 90 degrees | (11.694882, 95.946850) |
 | Blue | (84.356197, 132.319252) | 270 degrees | (129.805118, 45.553150) |
 
-Use the existing Pinpoint pose origin and tuned Pedro Constants. The ramp tip extends 15 inches forward of that origin; modeled width is 18 inches and rear extent is nine inches. Load four pollen and provide four pollen in each own-side flower. No teammate or camera is required.
+Use the team's Pinpoint origin. Load four pollen and supply four in each own-side flower. Required hardware includes `flowerArm` (CR servo), `touchUp`, `touchDown`, `pinpoint`, and the existing intake/shooter/transfer motors. Missing hardware is reported, not silently skipped.
 
-## Routine
+## Route and shooting
 
-Shoot four at Basket 1, approach the side-wall flower straight, collect for two seconds, back out, shoot at Basket 2, approach the end-wall flower straight, collect for two seconds, back out, shoot at Basket 2 again, and park. Both shooting marks are two inches closer along the existing aim direction. Blue is a 180-degree mirror. The route stays on the alliance half and goes around the hive frame.
+Lower the ramp, shoot four, visit the side-wall flower, collect, retreat, shoot four at Basket 2, visit the end-wall flower, collect, retreat, shoot four again, and park. Blue rotates the route 180 degrees. Both flower lineups remain three inches toward the robot's right while facing the flower.
 
-Pedro lines up at a staging point about 12 inches before each flower. Both flower lineups are shifted 3 inches toward the robot's right while facing that flower, mirrored for blue. `FLOWER_LINEUP_RIGHT_INCHES=3.0` adjusts staging, push references, retreat endpoints and adjoining curve controls together. The contact corridor follows the offset; flower locations, shooting marks, starting placement and parking coordinates stay fixed. The final approach is a timed robot-forward motor command, not a Pedro endpoint. The nominal reference point still places the modeled ramp tip a quarter inch from the wall. The drivetrain wrapper preserves Pedro's motor cache. Pose/clearance checks, timeouts and parking reserve can stop or shorten the routine; inspect `Parking reason` and `Abort details` if it parks early.
+Each shooting mark is one inch farther from its basket than V4, backward along the existing aim heading. Incoming endpoint/control and outgoing start/control move together. This does not shift the robot's initial placement or parking slot. Shooter speed remains **1450 ticks/second**, trim is cleared, recovery wait remains **0.25 seconds**, and arm direction remains **1**.
 
-### Timed flower push
+## Fast timed flower entry
 
-Telemetry identifies the updated build as `RAMP15_V4_DEEP_PUSH_CONTINUE`; the red and blue menu names stay the same. Normal travel, flower retreat and fallback travel accept position error below 3 inches. Normal arrival still needs heading error below 3 degrees and speed below 4.5 inches/second; fallback uses a 3-inch/3-degree/3-inches-per-second arrival check and a six-second waypoint timeout. The next normal path permits a 3.1-inch starting offset and joins from measured pose. Path and pose clearance checks still apply to every join.
+`FLOWER_PUSH_POWER=0.65` and `FLOWER_PUSH_SECONDS=0.9`. After alignment the drivetrain receives robot-forward power, with bounded heading correction (gain 1.5, maximum turn 0.25) to resist the twist caused by off-center flower contact. Power validation permits up to 0.8 and duration up to 1.5 seconds. This is manual timed entry, not a Pedro translation endpoint or a distance-controlled approach.
 
-Flower staging keeps position error below 0.75 inches, heading error below 2 degrees and speed below 2.5 inches/second. Retreat does not demand that pickup-level precision. The shooting feed gate still requires position error below 1 inch, heading error below 3 degrees, speed below 4.5 inches/second and settled aim; entering the shooting state from 3 inches away starts position hold, not immediate feeding. Once lined up at a flower, both alliances command positive robot-forward power, with the intake running and the windmill stopped. There is no quarter-inch endpoint test or position hold during the push.
+Normal completion is **only the 0.9-second timer**. The old forward-coordinate limit, 15-inch travel cutoff, and 3-degree yaw completion have been removed. The motors stop, the intake collects for two seconds, and a straight Pedro retreat starts from measured pose. There is no requirement to hit the former flower endpoint before retreating.
 
-The current settings are `FLOWER_PUSH_POWER=0.30`, `FLOWER_PUSH_SECONDS=2.5` and `FLOWER_EXTRA_PUSH_INCHES=2.0`. The forward cutoff and maximum travel each allow two inches more than the previous version: canonical forward 57.835 inches, or 15 inches of measured travel from staging. Power must be in (0, 0.45] and duration in (0, 3] seconds. These are bounded contact settings, not a guarantee of distance. The first time/depth/travel limit stops the motors, collects for two seconds and starts a straight retreat from measured pose. A contact-induced heading error above 3 degrees also stops the push and proceeds through collection and retreat, rather than ending the entire auton.
+Before entry, admission reserves push + collection + 1.25 seconds for the future retreat + the current parking estimate. If insufficient time remains it parks before starting the impact. Once admitted, the soft parking-reserve check cannot cancel PUSH/COLLECT halfway through. Hardware/geometry faults and the 29.7-second hard deadline still stop motion.
 
-Intentional selected-flower contact/recovery is confined to canonical forward coordinates 40.3 through 58.585 inches, sideways error up to 1.75 inches relative to the shifted lineup and heading error up to 6 degrees. This includes stopping margin beyond the commanded cutoff. The selected wall alone permits four inches of modeled ramp-tip overlap: the old tip geometry plus the requested deeper contact and recovery margin. The physical ramp dimensions still need verification. Other walls, the hive frame and other flowers retain their checks. Pose readiness, finite coordinates, parking reserve and the autonomous deadline remain active.
+## Tolerances and legitimate stops
 
-`Target errors` shows position error, signed heading error and translation speed. `Abort details` saves those values before a parking target replaces the pickup target. If the robot still stops short, record these fields, `Curve` and `Parking reason` to distinguish alignment, tracking and time-budget problems. This update does not change the assumed 15-inch ramp-tip offset or prove physical flower contact.
+| Condition | Behavior |
+| --- | --- |
+| Ramp lowering / Pinpoint calibration | Stay stopped, update arm and odometry, require down + READY continuously for 0.15 s. |
+| Readiness timeout | Stop after max(6 s, configured arm travel timeout + 3 s), measured from the current lower/reseat request. |
+| Ramp down switch opens before a flower | One bounded down/reseat attempt at that staging point, then resume the same leg; repeated failure stops visibly. |
+| Normal travel / retreat | Position below 3 in, heading below 3 degrees, speed below 4.5 in/s. |
+| Flower staging | Position below 0.75 in, heading below 2 degrees, speed below 2.5 in/s. |
+| Shooting feed permission | Position below 1 in, heading below 3 degrees, speed below 4.5 in/s, aim settled for 0.25 s. |
+| Curve handoff | Within 3.1 in of the next nominal start, or 1.1 in at a flower entry; retreats join from measured pose. |
+| Travel timeout | Six seconds, then planned parking. |
+| Parking waypoint | Position below 3 in, heading below 3 degrees, speed below 3 in/s; six-second timeout reports failure. |
+| Shooting completion / timeout | Four estimated releases or two accumulated FEED seconds; eight-second batch timeout parks. Counts remain estimates. |
+| Invalid push parameters, missing hardware, arm fault, lost localization, nonfinite pose/velocity | Stop and report reason. |
+| Actual chassis / frame / unrelated wall or flower violation | Stop and report geometry fault. |
+| Autonomous deadline | Stop all motors at 29.7 s. |
 
-## Current robot integration
+The selected flower corridor is bounded to canonical forward 40.3–58.5 in, lateral error within 5 in of its offset lineup, and heading within 30 degrees. That is a contact/recovery envelope, not an arrival tolerance. A separate contacted-wall check uses a conservative **10-inch chassis nose and 18-inch width**, derived from the simulator's 9.987-inch nose and 15.771-inch width. The full 15-inch ramp envelope still protects the hive/frame and other walls. Broad corridor angles do not waive the physical chassis-wall check.
 
-The trained auton initializes a required `FlowerArm` instance using the current continuous-rotation servo `flowerArm` and limit switches `touchUp` and `touchDown`. INIT does not move the arm. At START it commands `down()` and services `update()` each loop; the chassis waits until `touchDown` confirms the ramp is down before beginning the route. Arm power and travel timeout still come from Robot Settings. The code default arm direction is 1, and the trained auton explicitly applies direction 1 at START after saved settings load. This required instance can run when the optional global arm enable is off, without changing saved settings or other OpModes. Both switches and the servo must exist. Missing hardware, contradictory switches or an arm fault stop this auton visibly; each flower push also requires the down switch. STOP turns off the arm servo. Telemetry includes arm status and both switch readings.
+The starting pose originally had only 0.016 inches of modeled rear-wall clearance. Departure-only rear contact allowance remains bounded to 0.75 inches in the initial corridor; no global wall checks are disabled. A valid pose inside the parking planner's larger circular margin receives a straight outboard escape before planning, and emergency retreat replans from measured pose.
 
-Startup also updates odometry while lowering the ramp and waits for both touchDown and Pinpoint READY continuously for 0.15 seconds. It reports a startup timeout after six seconds if readiness never arrives. The original starting geometry had only 0.016 inches of rear-wall clearance; a departure-only corridor now permits up to 0.75 inches of modeled rear contact during leg 1, keeping other walls and the hive frame unchanged. The parking planner uses a larger circular margin than the live rectangle check, so a valid retreat pose inside that margin first gets a straight outboard escape. Emergency retreat replans from measured pose after the staging handoff.
+`Auto result`, `Parking reason`, `Abort details`, `Target errors`, ramp switch readings and `Pinpoint status` distinguish waits from faults. INIT does not move the arm. Every active loop services its real limit-switch controller; STOP cuts arm and drivetrain power.
 
-Explicitly selects a shooter target of 1450 ticks/second at START and clears trim before spin-up, using the native shot estimate and feed-permit controls. The trained auton requests a 0.25-second continuous speed-recovery wait after each detected shot (up from the default 0.1 seconds), without changing saved settings or other shooter instances. A detected shot resets that wait even if its speed drop stays inside the allowed window. Its latest PIDF tuning is preserved. Intake uses `intake`, `windmill`, and the current **motor** named `transfer`. Shooter.update() services Intake.update() every travel, pickup and shooting loop so transfer ramping and jam protection remain active. Feeding is requested only in the three shooting states, after settled aim. Pickup runs the intake without feeding the flywheel. All mechanisms stop for parking, stop, and faults.
+## Verification
 
-A batch ends at four estimated flywheel-load events or two accumulated seconds of permitted FEED state. This timed fallback is not confirmation that four balls were released. An eight-second batch timeout preserves a parking opportunity. Flower pickup is timed; neither inventory nor completed hive tips are sensed.
+Run `python tools/auton/check-trained-arrival.py` with a JDK on JAVA_HOME/PATH. Set `PEDRO_CORE_JAR` to the installed Pedro core 3.0.1 JAR for the actual-curve geometry checks. Current coverage: **290 route/startup assertions**, **13 real-shooter cadence assertions**, and **82,092 actual-Pedro geometry samples**. Android `:TeamCode:assembleDebug` passes.
 
-## Validation
+Independent agents reviewed stop/cancel conditions, geometry/tolerances, and live simulation separately. The exact requested simulator is `d-mankotia/BIOBUZZ-sim`, commit `0d6d1c5bf563799652e7aeb30ab9a9092761d233`. Live tests load the actual team OpModes, Pedro follower, Shooter, Intake, FlowerArm and Constants. A documented hardware adapter supplies the current transfer motor and CR arm/limit switches; it does not inject balls, teleport poses or change collision/pickup physics. Saved on-robot Robot Settings are not available, so the fixture uses source defaults.
 
-Android `:TeamCode:assembleDebug` passes against current main's Shooter, Intake and Constants. The arrival update changes the shared trained auton used by both alliances; no TeleOp, subsystem or Constants tuning is changed.
+Both nominal live runs at 65%/0.9 s finish at about 22.7 s, with 12 launches, 11 simulated hits, eight flower balls collected and two hive tips. The earlier fast-push run reproduced the reported first-pot stop at 15-degree contact yaw; the corrected steering/contact checks remove that cancellation. Twelve live runs, including exact-final-source smoke tests and scenarios covering both alliances at 55%, 65%, and 75% push power, reduced grip, and a 10.5 V physical supply all finish with the same pickup/tip/launch counts; parking takes about 22.65–24.18 s. The simulator SDK voltage sensor reports 14 V even when physical supply is lower, so these runs do not verify realistic voltage compensation. See the live harness and independent stop/geometry reviews for complete results and remaining coverage gaps.
 
-With a JDK on `JAVA_HOME` or `PATH`, run `python tools/auton/check-trained-arrival.py`. It runs 246 route/startup assertions plus 13 real-shooter cadence assertions across both alliances. Regressions cover delayed/never-ready odometry, startup pose noise, deeper contact, contact turns, collection-to-retreat continuation, three-inch retreat error, the parking-planner margin, emergency retreat and waypoint timeout. Full scripted routes complete both flower visits, all three shot batches and park. Shooting settings remain 1450 ticks/second and 0.25-second recovery. These checks exercise state transitions, not drivetrain physics or actual ball pickup.
-
-Earlier desktop trials of these route coordinates with the previous subsystem revision achieved two simulated tips on each alliance. Those trials do not validate the current motor-transfer mechanism or current Shooter tuning. Real-field pickup, contact, feeder timing and shooting accuracy still require calibration. This routine attempts two tips; it cannot guarantee or measure them.
-
-Optionally set `PEDRO_CORE_JAR` to the installed Pedro core 3.0.1 JAR before running the Python check. `ShiftedRouteChecks.java` samples actual Pedro curves, deeper push/retreat segments, contact recovery extremes, perturbed startup departures and measured-pose parking escapes. All 82,076 samples pass with the 3-inch right offset. This verifies modeled geometry, not real contact dynamics or completed flower tips.
+The simulator models chassis/flower collisions and pickup, but not the exact physical long ramp extension. These are closed-loop simulator results, not proof of real-field impact, tracking or mechanism calibration.

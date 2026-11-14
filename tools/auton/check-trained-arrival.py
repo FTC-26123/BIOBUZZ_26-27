@@ -100,6 +100,8 @@ static Auto setup(boolean blue,int leg,double error,double degrees,double speed)
 }
 public static void main(String[] args)throws Exception{
 for(boolean blue:new boolean[]{false,true}){
+ Auto invalidMotion=setup(blue,1,0,0,0);((Follower)get(invalidMotion,"follower")).v.vx=Double.NaN;
+ invalidMotion.loop();check(get(invalidMotion,"result").equals("Invalid odometry velocity"),"invalid velocity must stop visibly instead of waiting for tolerance timeout");
  Auto geometry=setup(blue,0,0,0,0);
  double[][] curves=(double[][])get(geometry,"CURVES");
  for(int i:new int[]{2,3,4,8,9,10}){
@@ -117,7 +119,9 @@ for(boolean blue:new boolean[]{false,true}){
  for(int i:new int[]{0,6,12}){
   Pose p=(Pose)call(geometry,"nominalEnd",new Class[]{int.class},i);
   Pose original=(Pose)call(geometry,"transform",new Class[]{double.class,double.class,double.class},curves[i][6],curves[i][7],curves[i][9]);
-  check(Math.hypot(p.x()-original.x(),p.y()-original.y())<1e-6,"flower offset must not shift shooting marks");
+  double dx=p.x()-original.x(),dy=p.y()-original.y();
+  check(Math.abs(dx*Math.cos(original.heading())+dy*Math.sin(original.heading())+1)<1e-6,"shooting mark must move one inch backward along aim");
+  check(Math.abs(-dx*Math.sin(original.heading())+dy*Math.cos(original.heading()))<1e-6,"shooting shift must preserve lateral aim line");
  }
  // Exercise the real CR-servo arm and limit-switch code during startup.
  Auto startup=setup(blue,0,0,0,0);Follower sf=(Follower)get(startup,"follower");
@@ -149,7 +153,7 @@ for(boolean blue:new boolean[]{false,true}){
  check(get(startup,"state").toString().equals("DRIVE")&&sf.follows==1,"ready odometry and small rear-wall pose error must start departure");
  ElapsedTime.now=1.6;startup.loop();check(get(startup,"state").toString().equals("DRIVE"),"initial half-degree pose noise must not trip rear-wall clearance");
  startup=setup(blue,0,0,0,0);odometry=(GoBildaPinpointDriver)get(startup,"pinpoint");odometry.status=GoBildaPinpointDriver.DeviceStatus.CALIBRATING;
- startup.start();ElapsedTime.now=7.1;startup.loop();check(get(startup,"state").toString().equals("DONE")&&get(startup,"result").toString().startsWith("Startup timeout"),"never-ready odometry must end with an explicit startup reason");
+ startup.start();ElapsedTime.now=1+Math.max(6,FlowerArm.MAX_TRAVEL_SEC+3)+.1;startup.loop();check(get(startup,"state").toString().equals("DONE")&&get(startup,"result").toString().startsWith("Startup timeout"),"never-ready odometry must end with an explicit startup reason");
  startup=setup(blue,0,0,0,0);arm=(FlowerArm)get(startup,"flowerArm");down=(Touch)startup.hardwareMap.devices.get("touchDown");
  down.pressed=false;startup.start();ElapsedTime.now=1.4;startup.loop();startup.stop();
  check(((Servo)startup.hardwareMap.devices.get("flowerArm")).power==0,"STOP must turn off a moving ramp servo");
@@ -186,11 +190,11 @@ for(boolean blue:new boolean[]{false,true}){
   Auto a=setup(blue,leg,0,0,0);Follower f=(Follower)get(a,"follower");Pose t=(Pose)get(a,"target");
   f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   check(get(a,"state").toString().equals("PUSH"),"must enter push from measured staging pose");
-  ElapsedTime.now=1.1;a.loop();check(f.raw.forward()==.30&&f.raw.strafe()==0&&f.raw.turn()==0,"both alliances must command robot-forward power");
+  ElapsedTime.now=1.1;a.loop();check(f.raw.forward()==.65&&f.raw.strafe()==0&&f.raw.turn()==0,"both alliances must command fast robot-forward power");
   check(f.follows==0,"manual push must not use an endpoint path");
-  ElapsedTime.now=2.3;a.loop();check(get(a,"state").toString().equals("PUSH")&&f.raw!=null,"push must continue beyond the old 1.25-second duration");
+  ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS-.01;a.loop();check(get(a,"state").toString().equals("PUSH")&&f.raw!=null,"stalled contact must retain forward command until timer expiry");
   // The timed push ends even if localization is still three inches short.
-  f.p=shift(t,blue,3,0);ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS;a.loop();
+  f.p=shift(t,blue,3,0);ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS+.001;a.loop();
   check(get(a,"state").toString().equals("COLLECT"),"elapsed time must end push without precision arrival");
   check(f.raw==null,"collection must cancel manual drive");
   Field base=f.drivetrain.getClass().getDeclaredField("base");base.setAccessible(true);Drive d=(Drive)base.get(f.drivetrain);
@@ -204,10 +208,12 @@ for(boolean blue:new boolean[]{false,true}){
   ElapsedTime.now=1.2;a.loop();check(get(a,"state").toString().equals("PUSH"),"selected-flower contact must remain allowed");
   f.p=new Pose(t.x()+.6*Math.cos(t.heading()),t.y()+.6*Math.sin(t.heading()),t.heading());a.loop();
   check(get(a,"state").toString().equals("PUSH")&&f.raw!=null,"old half-inch cutoff must no longer stop the deeper approach");
-  double deep=TrainedFlowerAuto.FLOWER_EXTRA_PUSH_INCHES+.6;
+  double deep=2.6;
   f.p=new Pose(t.x()+deep*Math.cos(t.heading()),t.y()+deep*Math.sin(t.heading()),t.heading());a.loop();
-  check(get(a,"state").toString().equals("COLLECT")&&f.raw==null,"overtravel guard must stop power and collect");
-  ElapsedTime.now=1.2+TrainedFlowerAuto.FLOWER_COLLECT_SECONDS+.01;a.loop();
+  check(get(a,"state").toString().equals("PUSH")&&f.raw!=null,"normal displacement must not replace timed impact with a distance cutoff");
+  ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS+.001;a.loop();
+  check(get(a,"state").toString().equals("COLLECT")&&f.raw==null,"timer expiry must stop motor power at deep stalled contact");
+  ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS+TrainedFlowerAuto.FLOWER_COLLECT_SECONDS+.01;a.loop();
   check(get(a,"state").toString().equals("DRIVE")&&(Integer)get(a,"leg")==leg+1,"deep contact must collect then start retreat without interlock");
   Pose stage=(Pose)get(a,"target");double sign=blue?-1:1;
   // Finish retreat 2.9 inches inboard: accepted travel, but inside FrameClearance's conservative halo at pot 1.
@@ -216,27 +222,42 @@ for(boolean blue:new boolean[]{false,true}){
   a.loop();check(get(a,"state").toString().equals("DRIVE"),"parking reserve must not throw from a valid pose inside planner margin");
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   f.p=new Pose(t.x(),t.y(),t.heading()+Math.toRadians(4));ElapsedTime.now=1.1;a.loop();
-  check(get(a,"state").toString().equals("COLLECT")&&f.raw==null,"small contact turn must stop push and continue pickup instead of ending auton");
-  ElapsedTime.now=1.1+TrainedFlowerAuto.FLOWER_COLLECT_SECONDS+.01;a.loop();
+  check(get(a,"state").toString().equals("PUSH")&&f.raw!=null,"small contact turn must not shorten the timed impact");
+  check(f.raw.forward()==.65&&f.raw.turn()<0&&Math.abs(f.raw.turn())<=.25,"timed impact must retain forward power and steer back toward the flower heading");
+  ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS+.001;a.loop();
+  check(get(a,"state").toString().equals("COLLECT")&&f.raw==null,"contact turn must still stop at timer expiry");
+  ElapsedTime.now=1+TrainedFlowerAuto.FLOWER_PUSH_SECONDS+TrainedFlowerAuto.FLOWER_COLLECT_SECONDS+.01;a.loop();
   check(get(a,"state").toString().equals("DRIVE")&&(Integer)get(a,"leg")==leg+1,"contact turn must still permit a measured-pose retreat");
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
-  f.p=new Pose(t.x(),t.y(),t.heading()+Math.toRadians(6.5));ElapsedTime.now=1.1;a.loop();
+  f.p=new Pose(t.x(),t.y(),t.heading()+Math.toRadians(30.5));ElapsedTime.now=1.1;a.loop();
   check(get(a,"state").toString().equals("DONE")&&f.raw==null,"large alignment error outside recovery corridor must still stop");
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   ElapsedTime.now=29.7;a.loop();check(get(a,"state").toString().equals("DONE")&&f.raw==null,"deadline must cancel push");
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   a.stop();check(f.raw==null,"external stop must cancel manual power");
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
-  ElapsedTime.now=28;a.loop();check(get(a,"parkingReason").equals("Time reserved for parking"),"parking reserve must interrupt push");
+  ElapsedTime.now=28;a.loop();check(get(a,"state").toString().equals("COLLECT"),"admitted timed push must finish into collection instead of soft-reserve cancellation");
   base=f.drivetrain.getClass().getDeclaredField("base");base.setAccessible(true);d=(Drive)base.get(f.drivetrain);
-  check(d.last.forward()==0,"parking must stop manual motor power immediately");
+  check(d.last.forward()==0,"expired admitted push must stop manual motor power immediately");
+  ElapsedTime.now=28.1;a.loop();check(get(a,"state").toString().equals("COLLECT"),"soft parking reserve must not cancel admitted collection");
+  a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);
+  ElapsedTime.now=28;call(a,"driveLeg",new Class[]{});
+  check(get(a,"parkingReason").equals("Insufficient time for full flower push and collection")&&f.raw==null,"late flower arrival must park before starting impact");
   Pose retreatTarget=(Pose)get(a,"target");f.p=shift(retreatTarget,blue,.6,0);a.loop();
   check((Integer)get(a,"emergencyPot")==-1,"emergency retreat must advance with .6-inch error instead of waiting for .25");
   check(!get(a,"state").toString().equals("DONE"),"emergency retreat handoff must continue parking");
-  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=3.1;
+  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=1.6;
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   check(get(a,"state").toString().equals("DONE")&&f.raw==null,"invalid duration must not start push");
-  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=2.5;
+  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=.9;
+  a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);
+  Touch rampDown=(Touch)a.hardwareMap.devices.get("touchDown");rampDown.pressed=false;ElapsedTime.now=10;call(a,"driveLeg",new Class[]{});
+  check(get(a,"state").toString().equals("LOWER_RAMP")&&f.raw==null,"lost down switch at flower must enter bounded reseat");
+  ElapsedTime.now=10.1;a.loop();check(get(a,"state").toString().equals("LOWER_RAMP"),"reseat timeout must be relative to reseat entry, not autonomous start");
+  rampDown.pressed=true;ElapsedTime.now=10.2;a.loop();ElapsedTime.now=10.36;a.loop();
+  check(get(a,"state").toString().equals("PUSH")&&f.raw!=null,"confirmed ramp reseat must resume the flower push");
+  rampDown.pressed=false;call(a,"driveLeg",new Class[]{});
+  check(get(a,"state").toString().equals("DONE")&&f.raw==null,"repeated lost down switch must stop instead of infinitely reseating");
  }
  Auto a=setup(blue,2,1,0,0);ElapsedTime.now=6.1;a.loop();check(get(a,"parkingReason").equals("Drive timeout"),"travel timeout must remain enabled");
  check(get(a,"abortDetails").toString().contains("position error (in)="),"abort must retain original target error");
@@ -252,7 +273,7 @@ for(boolean blue:new boolean[]{false,true}){
    routeFollower.p=routeTarget;if(routeLeg==4)retreatMask|=1;if(routeLeg==10)retreatMask|=2;
   }else if(phase.equals("PUSH")){
    if(routeLeg==3)pushMask|=1;if(routeLeg==9)pushMask|=2;
-   double extra=TrainedFlowerAuto.FLOWER_EXTRA_PUSH_INCHES+.6;
+   double extra=2.6;
    routeFollower.p=new Pose(routeTarget.x()+extra*Math.cos(routeTarget.heading()),routeTarget.y()+extra*Math.sin(routeTarget.heading()),routeTarget.heading());
   }else if(phase.equals("SHOOT")&&ElapsedTime.now-(Double)get(a,"began")>.4){
    routeShooter.shots=(Integer)get(a,"batchStartShots")+4;
