@@ -50,6 +50,10 @@ public final class PositionHoldChecks {
     }
     private static TeleOpPositionHold arm(Backend b) {
         TeleOpPositionHold h = new TeleOpPositionHold(b);
+        // Nothing moves the robot right after Play: the hold waits until the driver has driven once.
+        check(!h.update(0, 0, 0, false, -.2), "no hold before the first drive");
+        check(b.holds == 0, "no correction before the first drive");
+        check(!h.update(.5, 0, 0, false, -.1), "driver drives");
         check(h.update(0, 0, 0, false, 0), "idle owns motors during delay");
         check(b.holds == 0, "no correction before delay");
         h.update(0, 0, 0, false, .16);
@@ -105,13 +109,29 @@ public final class PositionHoldChecks {
             check(b.target.x() == 0, "never gives up the original target while pushed");
         }
         check(h.getStatus().equals("Resisting push"), "telemetry reports an active push");
-        // Being spun by contact is resisted too.
+        // Being spun by contact is resisted too (up to MAX_HOLD_HEADING, 30 degrees).
         b = new Backend(); h = arm(b); clock = .16;
-        for (int step = 1; step <= 20; step++) {
+        for (int step = 1; step <= 7; step++) {
             clock += .02; b.pose = new Pose(0, 0, Math.toRadians(4 * step));
             h.update(0, 0, 0, false, clock);
             check(b.powers.turn() < 0, "keeps turning back at " + 4 * step + " degrees");
         }
+        // RUNAWAY SPIN: the robot keeps turning although the hold pushes back (heading direction reversed).
+        // It must stop turning by 30 degrees, and after the second runaway switch the hold off for good.
+        b = new Backend(); h = arm(b); clock = .16;
+        for (int step = 1; step <= 12; step++) { clock += .02; b.pose = new Pose(0, 0, Math.toRadians(4 * step)); h.update(0, 0, 0, false, clock); }
+        zero(b);
+        check(h.getStatus().startsWith("Turned"), "runaway spin stopped within 30 degrees: " + h.getStatus());
+        h.update(.5, 0, 0, false, clock += .02);                 // driver re-arms
+        b.pose = new Pose(0, 0, Math.toRadians(48));
+        h.update(0, 0, 0, false, clock += .02);
+        h.update(0, 0, 0, false, clock += .2);                    // engaged again at 48 deg
+        for (int step = 1; step <= 12; step++) { clock += .02; b.pose = new Pose(0, 0, Math.toRadians(48 + 4 * step)); h.update(0, 0, 0, false, clock); }
+        zero(b);
+        check(h.getStatus().startsWith("OFF"), "second runaway switches the hold off: " + h.getStatus());
+        int holdsWhenOff = b.holds;
+        h.update(.5, 0, 0, false, clock += .02);
+        check(!h.update(0, 0, 0, false, clock += .5) && b.holds == holdsWhenOff, "hold stays off for the rest of the OpMode");
         // Carried past the hold range: stop rather than drive back across the field.
         b = new Backend(); h = arm(b); clock = .16;
         for (int step = 1; step <= 40; step++) { clock += .02; b.pose = new Pose(step, 0, 0); h.update(0, 0, 0, false, clock); }
