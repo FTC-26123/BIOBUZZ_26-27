@@ -26,6 +26,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
     public static double SHOT_BATCH_TIMEOUT_SECONDS=8.0;
     public static double MAX_READY_FEED_SECONDS=2.0;
     public static final double NORMAL_TRAVEL_TOLERANCE_INCHES=3.0;
+    public static final double SHOOTER_TARGET_TICKS_PER_SECOND=1500;
     public static final String EXPORT_VERSION="RAMP15_V3_TIMED_PUSH_3IN_ARM";
     private enum State { LOWER_RAMP, DRIVE, SHOOT, PUSH, COLLECT, FALLBACK, DONE }
     private State state=State.DONE;
@@ -102,7 +103,10 @@ public abstract class TrainedFlowerAuto extends OpMode {
         clock.reset();leg=totalReleases=batches=0;emergencyPot=-1;parkingReason="None";
         follower.stop();follower.drivetrain.stop();
         if(!flowerArm.isAvailable()){finish("Flower arm unavailable: "+flowerArm.getStatus());return;}
-        shooter.resetShotCount();shooter.spinUp();
+        // Apply the requested direction after saved Robot Settings have loaded.
+        FlowerArm.DIRECTION=1;
+        shooter.resetShotCount();shooter.setAutoTarget(SHOOTER_TARGET_TICKS_PER_SECOND);
+        shooter.resetTrim();shooter.spinUp();
         state=State.LOWER_RAMP;result="Lowering ramp to touchDown";
         flowerArm.down();flowerArm.update();report();
     }
@@ -303,6 +307,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
         telemetry.addData("Target errors",targetErrors());
         telemetry.addData("Flower arm",flowerArm.getStatus());
         telemetry.addData("Ramp switches",flowerArm.switchText());
+        telemetry.addData("Flower arm direction",FlowerArm.DIRECTION);
         telemetry.addData("Flower push power / seconds","%.2f / %.2f",FLOWER_PUSH_POWER,FLOWER_PUSH_SECONDS);
         telemetry.addData("Elapsed (s)",clock.seconds());telemetry.addData("Completed shot batches",batches);
         telemetry.addData("Estimated releases",totalReleases+(state==State.SHOOT?batchReleases:0));

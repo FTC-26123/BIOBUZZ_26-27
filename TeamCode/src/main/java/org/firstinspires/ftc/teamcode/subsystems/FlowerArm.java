@@ -39,7 +39,7 @@ public class FlowerArm {
     public static final String SERVO_NAME = "flowerArm", TOUCH_UP = "touchUp", TOUCH_DOWN = "touchDown";
 
     /** +1 or -1: which servo direction moves the arm UP. Flip it in the test OpMode if "up" goes down. */
-    public static double DIRECTION = -1;   // reversed on the real robot
+    public static double DIRECTION = 1;
     /**
      * HARD SPEED LIMIT: the servo is never driven faster than this (0..1), whatever the settings say. 1.0 = Robot
      * Settings may run it at full speed; the touch sensors still stop it at each end.
