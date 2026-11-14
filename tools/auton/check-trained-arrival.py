@@ -27,14 +27,14 @@ public Pose get(double t){return new Pose(a.x()+(b.x()-a.x())*t,a.y()+(b.y()-a.y
 write('com.pedropathing.api', 'Paths', '''import com.pedropathing.math.Pose;import com.pedropathing.paths.Path;
 public class Paths {public static Path line(Pose a,Pose b){return new Path(a,b);}public static Path curve(Pose a,Pose b,Pose c,Pose d){return new Path(a,d);}}''')
 write('com.pedropathing.follower', 'Follower', '''import com.pedropathing.math.Pose;import com.pedropathing.paths.Path;import com.pedropathing.drivetrain.*;
-public class Follower {public Object localizer;public Drivetrain drivetrain;public Pose p;public boolean held;public int holds,follows;public DrivePowers raw;
+public class Follower {public Object localizer;public Drivetrain drivetrain;public Pose p;public boolean held;public int holds,follows,updates;public DrivePowers raw;
 public static class Velocity{public double vx,vy;}public Velocity v=new Velocity();
 public Follower(Object l,Drivetrain d,Object a){drivetrain=d;}public Object algorithm(){return null;}public Pose pose(){return p;}
-public void setPose(Pose p){this.p=p;}public Velocity velocity(){return v;}public void update(){if(drivetrain!=null){if(raw!=null)drivetrain.drive(raw,true);else if(!held)drivetrain.stop();}} public void stop(){raw=null;held=false;}
+public void setPose(Pose p){this.p=p;}public Velocity velocity(){return v;}public void update(){updates++;if(drivetrain!=null){if(raw!=null)drivetrain.drive(raw,true);else if(!held)drivetrain.stop();}} public void stop(){raw=null;held=false;}
 public void manual(DrivePowers p){raw=p;held=false;}
 public void follow(Path p){follows++;held=false;}public void hold(Pose p){holds++;held=true;}public boolean holding(){return held;}}''')
 write('com.qualcomm.robotcore.util', 'ElapsedTime', 'public class ElapsedTime {public static double now;private double origin;public ElapsedTime(){reset();}public void reset(){origin=now;} public double seconds(){return now-origin;}}')
-write('com.qualcomm.hardware.gobilda', 'GoBildaPinpointDriver', 'public class GoBildaPinpointDriver {public enum DeviceStatus{READY}public DeviceStatus getDeviceStatus(){return DeviceStatus.READY;}}')
+write('com.qualcomm.hardware.gobilda', 'GoBildaPinpointDriver', 'public class GoBildaPinpointDriver {public enum DeviceStatus{READY,CALIBRATING}public DeviceStatus status=DeviceStatus.READY;public DeviceStatus getDeviceStatus(){return status;}}')
 write('com.qualcomm.robotcore.hardware', 'CRServo', 'public interface CRServo {void setPower(double p);}')
 write('com.qualcomm.robotcore.hardware', 'TouchSensor', 'public interface TouchSensor {boolean isPressed();}')
 write('com.qualcomm.robotcore.hardware', 'VoltageSensor', 'public interface VoltageSensor {double getVoltage();}')
@@ -62,11 +62,12 @@ public void resumeWindmill(){}public void startWindmillOnly(){}public void start
 }''')
 write('org.firstinspires.ftc.teamcode.subsystems', 'Shooter', '''public class Shooter {
 private double target=1900,trim=25;public double spinTarget;
+public int shots;public String feedStage="WAIT";
 public double recoveryWait;public void setMinimumBetweenBallsSeconds(double seconds){recoveryWait=seconds;}
 public void setAutoTarget(double t){target=t;}public void resetTrim(){trim=0;}public double getTargetLaunchPower(){return target+trim;}
 public void init(Object h,Intake i){}public void stop(){}public void start(){}public void spinUp(){spinTarget=getTargetLaunchPower();}public void update(){}public void holdFire(){}
-public void resetShotCount(){}public int getShotCount(){return 0;}public double getCurrentSpeed(){return 0;}public void setFeedPermit(boolean b){}
-public String getFeedStage(){return "WAIT";}public void addTelemetry(Object t){} }''')
+public void resetShotCount(){shots=0;}public int getShotCount(){return shots;}public double getCurrentSpeed(){return 0;}public void setFeedPermit(boolean b){}
+public String getFeedStage(){return feedStage;}public void addTelemetry(Object t){} }''')
 pkg='org.firstinspires.ftc.teamcode.Auton'
 write(pkg, 'ArrivalChecks', '''import java.lang.reflect.*;import com.pedropathing.follower.Follower;import com.pedropathing.math.Pose;import com.pedropathing.drivetrain.*;
 import com.qualcomm.robotcore.util.ElapsedTime;import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
@@ -135,7 +136,20 @@ for(boolean blue:new boolean[]{false,true}){
  up.pressed=false;ElapsedTime.now=1.5;startup.loop();check(sf.follows==0,"robot must wait for touchDown");
  down.pressed=true;ElapsedTime.now=1.6;startup.loop();
  check(servo.power==0&&arm.isAtDown(),"touchDown must stop the actual arm servo");
+ check(sf.follows==0,"startup must wait for stable ramp/odometry readiness");
+ ElapsedTime.now=1.76;startup.loop();
  check(sf.follows==1&&get(startup,"state").toString().equals("DRIVE"),"confirmed down must start the route");
+ startup=setup(blue,0,0,0,0);sf=(Follower)get(startup,"follower");
+ sf.p=(Pose)call(startup,"transform",new Class[]{double.class,double.class,double.class},-13.606197,-61.569252,Math.PI/2+Math.toRadians(.5));
+ GoBildaPinpointDriver odometry=(GoBildaPinpointDriver)get(startup,"pinpoint");odometry.status=GoBildaPinpointDriver.DeviceStatus.CALIBRATING;
+ startup.start();ElapsedTime.now=1.2;startup.loop();
+ check(get(startup,"state").toString().equals("LOWER_RAMP")&&sf.follows==0,"calibrating Pinpoint must wait instead of killing auton");
+ check(sf.updates>0,"startup waiting must continue updating odometry");
+ odometry.status=GoBildaPinpointDriver.DeviceStatus.READY;ElapsedTime.now=1.4;startup.loop();ElapsedTime.now=1.56;startup.loop();
+ check(get(startup,"state").toString().equals("DRIVE")&&sf.follows==1,"ready odometry and small rear-wall pose error must start departure");
+ ElapsedTime.now=1.6;startup.loop();check(get(startup,"state").toString().equals("DRIVE"),"initial half-degree pose noise must not trip rear-wall clearance");
+ startup=setup(blue,0,0,0,0);odometry=(GoBildaPinpointDriver)get(startup,"pinpoint");odometry.status=GoBildaPinpointDriver.DeviceStatus.CALIBRATING;
+ startup.start();ElapsedTime.now=7.1;startup.loop();check(get(startup,"state").toString().equals("DONE")&&get(startup,"result").toString().startsWith("Startup timeout"),"never-ready odometry must end with an explicit startup reason");
  startup=setup(blue,0,0,0,0);arm=(FlowerArm)get(startup,"flowerArm");down=(Touch)startup.hardwareMap.devices.get("touchDown");
  down.pressed=false;startup.start();ElapsedTime.now=1.4;startup.loop();startup.stop();
  check(((Servo)startup.hardwareMap.devices.get("flowerArm")).power==0,"STOP must turn off a moving ramp servo");
@@ -189,10 +203,25 @@ for(boolean blue:new boolean[]{false,true}){
   f.p=new Pose(t.x()+.1*Math.cos(t.heading()),t.y()+.1*Math.sin(t.heading()),t.heading()+Math.toRadians(.99));
   ElapsedTime.now=1.2;a.loop();check(get(a,"state").toString().equals("PUSH"),"selected-flower contact must remain allowed");
   f.p=new Pose(t.x()+.6*Math.cos(t.heading()),t.y()+.6*Math.sin(t.heading()),t.heading());a.loop();
+  check(get(a,"state").toString().equals("PUSH")&&f.raw!=null,"old half-inch cutoff must no longer stop the deeper approach");
+  double deep=TrainedFlowerAuto.FLOWER_EXTRA_PUSH_INCHES+.6;
+  f.p=new Pose(t.x()+deep*Math.cos(t.heading()),t.y()+deep*Math.sin(t.heading()),t.heading());a.loop();
   check(get(a,"state").toString().equals("COLLECT")&&f.raw==null,"overtravel guard must stop power and collect");
+  ElapsedTime.now=1.2+TrainedFlowerAuto.FLOWER_COLLECT_SECONDS+.01;a.loop();
+  check(get(a,"state").toString().equals("DRIVE")&&(Integer)get(a,"leg")==leg+1,"deep contact must collect then start retreat without interlock");
+  Pose stage=(Pose)get(a,"target");double sign=blue?-1:1;
+  // Finish retreat 2.9 inches inboard: accepted travel, but inside FrameClearance's conservative halo at pot 1.
+  f.p=leg==3?new Pose(stage.x()+sign*2.9,stage.y(),stage.heading()):new Pose(stage.x(),stage.y()-sign*2.9,stage.heading());
+  a.loop();check(get(a,"state").toString().equals("DRIVE")&&(Integer)get(a,"leg")==leg+2,"retreat must continue within normal three-inch tolerance");
+  a.loop();check(get(a,"state").toString().equals("DRIVE"),"parking reserve must not throw from a valid pose inside planner margin");
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   f.p=new Pose(t.x(),t.y(),t.heading()+Math.toRadians(4));ElapsedTime.now=1.1;a.loop();
-  check(get(a,"state").toString().equals("DONE")&&f.raw==null,"bad alignment outside contact corridor must stop");
+  check(get(a,"state").toString().equals("COLLECT")&&f.raw==null,"small contact turn must stop push and continue pickup instead of ending auton");
+  ElapsedTime.now=1.1+TrainedFlowerAuto.FLOWER_COLLECT_SECONDS+.01;a.loop();
+  check(get(a,"state").toString().equals("DRIVE")&&(Integer)get(a,"leg")==leg+1,"contact turn must still permit a measured-pose retreat");
+  a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
+  f.p=new Pose(t.x(),t.y(),t.heading()+Math.toRadians(6.5));ElapsedTime.now=1.1;a.loop();
+  check(get(a,"state").toString().equals("DONE")&&f.raw==null,"large alignment error outside recovery corridor must still stop");
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   ElapsedTime.now=29.7;a.loop();check(get(a,"state").toString().equals("DONE")&&f.raw==null,"deadline must cancel push");
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
@@ -201,13 +230,38 @@ for(boolean blue:new boolean[]{false,true}){
   ElapsedTime.now=28;a.loop();check(get(a,"parkingReason").equals("Time reserved for parking"),"parking reserve must interrupt push");
   base=f.drivetrain.getClass().getDeclaredField("base");base.setAccessible(true);d=(Drive)base.get(f.drivetrain);
   check(d.last.forward()==0,"parking must stop manual motor power immediately");
-  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=2.1;
+  Pose retreatTarget=(Pose)get(a,"target");f.p=shift(retreatTarget,blue,.6,0);a.loop();
+  check((Integer)get(a,"emergencyPot")==-1,"emergency retreat must advance with .6-inch error instead of waiting for .25");
+  check(!get(a,"state").toString().equals("DONE"),"emergency retreat handoff must continue parking");
+  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=3.1;
   a=setup(blue,leg,0,0,0);f=(Follower)get(a,"follower");f.p=(Pose)call(a,"nominalEnd",new Class[]{int.class},leg-1);call(a,"driveLeg",new Class[]{});
   check(get(a,"state").toString().equals("DONE")&&f.raw==null,"invalid duration must not start push");
-  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=2.0;
+  TrainedFlowerAuto.FLOWER_PUSH_SECONDS=2.5;
  }
  Auto a=setup(blue,2,1,0,0);ElapsedTime.now=6.1;a.loop();check(get(a,"parkingReason").equals("Drive timeout"),"travel timeout must remain enabled");
  check(get(a,"abortDetails").toString().contains("position error (in)="),"abort must retain original target error");
+ a=setup(blue,0,4,0,0);Field fallbackState=field("state");fallbackState.set(a,Enum.valueOf((Class)fallbackState.getType(),"FALLBACK"));set(a,"began",1.0);
+ ElapsedTime.now=8;a.loop();check(get(a,"result").equals("Parking waypoint timeout"),"unreachable parking waypoint must report timeout instead of standing indefinitely");
+ // Complete the whole state machine with scripted localization and release events.
+ a=setup(blue,0,0,0,0);Follower routeFollower=(Follower)get(a,"follower");
+ org.firstinspires.ftc.teamcode.subsystems.Shooter routeShooter=(org.firstinspires.ftc.teamcode.subsystems.Shooter)get(a,"shooter");
+ int pushMask=0,retreatMask=0;
+ for(int tick=0;tick<250&&!get(a,"state").toString().equals("DONE");tick++){
+  ElapsedTime.now=1+tick*.1;String phase=get(a,"state").toString();int routeLeg=(Integer)get(a,"leg");Pose routeTarget=(Pose)get(a,"target");
+  if(phase.equals("DRIVE")){
+   routeFollower.p=routeTarget;if(routeLeg==4)retreatMask|=1;if(routeLeg==10)retreatMask|=2;
+  }else if(phase.equals("PUSH")){
+   if(routeLeg==3)pushMask|=1;if(routeLeg==9)pushMask|=2;
+   double extra=TrainedFlowerAuto.FLOWER_EXTRA_PUSH_INCHES+.6;
+   routeFollower.p=new Pose(routeTarget.x()+extra*Math.cos(routeTarget.heading()),routeTarget.y()+extra*Math.sin(routeTarget.heading()),routeTarget.heading());
+  }else if(phase.equals("SHOOT")&&ElapsedTime.now-(Double)get(a,"began")>.4){
+   routeShooter.shots=(Integer)get(a,"batchStartShots")+4;
+  }
+  a.loop();
+ }
+ check(get(a,"state").toString().equals("DONE")&&get(a,"result").equals("Parked"),"full route must reach park without an unexpected stop");
+ check(pushMask==3&&retreatMask==3,"full route must visit and leave both flowers");
+ check((Integer)get(a,"batches")==3&&(Integer)get(a,"totalReleases")==12,"full route must continue through all three shooting batches");
 }
 System.out.println("PASS: "+checks+" red/blue staging, timed push, motor stop, collection, measured retreat, contact corridor and deadline checks. Scripted hardware; no physical pickup claim.");
 }}
