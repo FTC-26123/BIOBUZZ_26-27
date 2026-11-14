@@ -79,7 +79,7 @@ public class TeleOp_FlowerArmTest extends OpMode {
         double jog = -gamepad1.left_stick_y;
         if (Math.abs(jog) > 0.1) {
             cycling = false;
-            arm.manual(jog * 0.5);
+            arm.manual(jog);   // capped at the Up / Down power
         } else if (arm.getState() == FlowerArm.State.MANUAL) {
             arm.manual(0);
         } else {

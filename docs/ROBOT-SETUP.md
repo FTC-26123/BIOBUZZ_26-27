@@ -462,7 +462,7 @@ Resting up and sagging off `touchUp`, it drives itself back up.
 - [ ] **8.4** Robot Settings > Flower arm > `Enabled` = ON, then run `Flower Arm Test` again and press Play.
       Nudge the left stick up: the arm must move UP. If it moves down, press **Back** (flips `Direction`).
 - [ ] **8.5** Speed is limited on purpose: defaults `Up power` 0.35, `Down power` 0.25, every move starts with a 0.3 s
-      soft start, and the code never drives the servo above **0.5** whatever the settings say (`FlowerArm.MAX_SAFE_POWER`).
+      soft start, and the code never drives the servo above **1.0** (full speed) whatever the settings say (`FlowerArm.MAX_SAFE_POWER`).
       **Y** (up): it stops on `touchUp`. **A** (down): it stops on `touchDown`. Neither should slam; lower
       `Up power` (Dpad Up/Down) or `Down power` (Dpad Right/Left) if it hits hard or overshoots the switch, raise it
       if it stalls. Gravity helps one way, so down usually needs less.

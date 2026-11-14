@@ -40,10 +40,10 @@ public class FlowerArm {
     /** +1 or -1: which servo direction moves the arm UP. Flip it in the test OpMode if "up" goes down. */
     public static double DIRECTION = -1;   // reversed on the real robot
     /**
-     * HARD SPEED LIMIT: the servo is never driven faster than this (0..1), whatever the settings say, so the ramp can
-     * never slam into its stops or the robot. Change it only in code.
+     * HARD SPEED LIMIT: the servo is never driven faster than this (0..1), whatever the settings say. 1.0 = Robot
+     * Settings may run it at full speed; the touch sensors still stop it at each end.
      */
-    public static final double MAX_SAFE_POWER = 0.5;
+    public static final double MAX_SAFE_POWER = 1.0;
     /** Servo speed (0..MAX_SAFE_POWER) going up and going down. Slow on purpose; down is helped by gravity. */
     public static double UP_POWER = 0.35;
     public static double DOWN_POWER = 0.25;

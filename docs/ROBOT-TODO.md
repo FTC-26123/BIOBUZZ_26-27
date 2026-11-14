@@ -37,7 +37,7 @@ Resting up and sagging off `touchUp`, it drives itself back up.
 - [ ] Nudge the left stick up → the arm moves **up**. If it moves down, press **Back** (flips direction).
 - [ ] **Y** = up: stops on `touchUp`. **A** = down: stops on `touchDown`. **B** = stop.
 - [ ] Hits the switches too hard → lower `Up power` (Dpad Up/Down) or `Down power` (Dpad Right/Left). Stalls → raise it.
-      Final: up ____ down ____ (max 0.5).
+      Final: up ____ down ____ (max 1.0).
 - [ ] **X** = cycle test, at least 10 moves with no FAULT. Slowest up ____ s, slowest down ____ s.
 - [ ] **Start** = SAVE. This saves the powers, the direction, `Max travel s` and the auton waits `Arm up s` / `Arm down s`.
 - [ ] Fault test: hold the arm while it moves → it stops with `did not reach ... in N s`.
