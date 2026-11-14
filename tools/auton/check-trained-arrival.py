@@ -50,7 +50,9 @@ write('org.firstinspires.ftc.teamcode.subsystems', 'RobotSettings', 'public clas
 write('org.firstinspires.ftc.teamcode.pedro', 'Constants', 'public class Constants {public static com.pedropathing.follower.Follower create(Object h){return null;}}')
 write('org.firstinspires.ftc.teamcode.subsystems', 'Intake', 'public class Intake {public void init(Object h){}public void stop(){}public void start(){}public void stopWindmill(){}}')
 write('org.firstinspires.ftc.teamcode.subsystems', 'Shooter', '''public class Shooter {
-public void init(Object h,Intake i){}public void stop(){}public void start(){}public void spinUp(){}public void update(){}public void holdFire(){}
+private double target=1900,trim=25;public double spinTarget;
+public void setAutoTarget(double t){target=t;}public void resetTrim(){trim=0;}public double getTargetLaunchPower(){return target+trim;}
+public void init(Object h,Intake i){}public void stop(){}public void start(){}public void spinUp(){spinTarget=getTargetLaunchPower();}public void update(){}public void holdFire(){}
 public void resetShotCount(){}public int getShotCount(){return 0;}public double getCurrentSpeed(){return 0;}public void setFeedPermit(boolean b){}
 public String getFeedStage(){return "WAIT";}public void addTelemetry(Object t){} }''')
 pkg='org.firstinspires.ftc.teamcode.Auton'
@@ -93,8 +95,11 @@ for(boolean blue:new boolean[]{false,true}){
  up.pressed=true;down.pressed=false;arm.init(startup.hardwareMap,true);
  check(servo.power==0,"initialization must not lower the ramp before START");
  check(!FlowerArm.ENABLED&&arm.isAvailable(),"required instance must work without changing saved/global enable");
+ FlowerArm.DIRECTION=-1; // Model a previously saved value loaded during INIT.
  startup.start();check(get(startup,"state").toString().equals("LOWER_RAMP")&&arm.isDown(),"START must command ramp down first");
- check(servo.power>0&&sf.follows==0,"ramp must move down before any route starts");
+ check(FlowerArm.DIRECTION==1,"auton must use requested direction even after old settings load");
+ check(servo.power<0&&sf.follows==0,"direction 1 must drive down with negative servo power before travel");
+ check(((org.firstinspires.ftc.teamcode.subsystems.Shooter)get(startup,"shooter")).spinTarget==1500,"spin-up must use exactly 1500 with old trim removed");
  up.pressed=false;ElapsedTime.now=1.5;startup.loop();check(sf.follows==0,"robot must wait for touchDown");
  down.pressed=true;ElapsedTime.now=1.6;startup.loop();
  check(servo.power==0&&arm.isAtDown(),"touchDown must stop the actual arm servo");
