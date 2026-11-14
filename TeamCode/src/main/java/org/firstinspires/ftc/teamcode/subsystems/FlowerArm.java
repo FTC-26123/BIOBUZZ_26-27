@@ -28,8 +28,9 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
  *   <li>A move that has not reached its switch after {@link #MAX_TRAVEL_SEC} stops: FAULT (jammed, switch missed).</li>
  *   <li>Resting UP and the arm sags off touchUp (gravity, a knock): it is driven back up onto the switch.</li>
  * </ul>
- * A FAULT stops the servo and stays until the next up()/down() command. Until {@link #ENABLED} is on, or if the servo
- * or either sensor is missing, the arm never moves and never stops an OpMode from starting.
+ * A FAULT stops the servo and stays until the next up()/down() command. Without {@link #ENABLED} or an explicit
+ * required-arm instance, the arm stays off. Missing hardware always prevents arm movement; the OpMode decides
+ * whether its route can run without the ramp.
  * Test and tune it with the "Flower Arm Test" OpMode (setup step 8).
  */
 public class FlowerArm {
@@ -73,6 +74,14 @@ public class FlowerArm {
 
     /** Finds the servo and switches. Does NOT move the arm. */
     public void init(HardwareMap hardwareMap) {
+        init(hardwareMap, false);
+    }
+
+    /**
+     * Allows an OpMode whose route requires the ramp to enable its own arm instance.
+     * Keeps saved settings unchanged and still requires the servo and both switches.
+     */
+    public void init(HardwareMap hardwareMap, boolean requiredForThisOpMode) {
         RobotSettings.ensureLoaded();
         servo = null;
         touchUp = touchDown = null;
@@ -81,7 +90,7 @@ public class FlowerArm {
         wantDown = false;
         try { touchUp = hardwareMap.tryGet(TouchSensor.class, TOUCH_UP); } catch (RuntimeException e) { touchUp = null; }
         try { touchDown = hardwareMap.tryGet(TouchSensor.class, TOUCH_DOWN); } catch (RuntimeException e) { touchDown = null; }
-        if (!ENABLED) { problem = "OFF (Robot Settings > Flower arm > Enabled)"; return; }
+        if (!ENABLED && !requiredForThisOpMode) { problem = "OFF (Robot Settings > Flower arm > Enabled)"; return; }
         try { servo = hardwareMap.tryGet(CRServo.class, SERVO_NAME); } catch (RuntimeException e) { servo = null; }
         if (servo == null) problem = "continuous servo \"" + SERVO_NAME + "\" not in the configuration";
         else if (touchUp == null) problem = "touch sensor \"" + TOUCH_UP + "\" not in the configuration";

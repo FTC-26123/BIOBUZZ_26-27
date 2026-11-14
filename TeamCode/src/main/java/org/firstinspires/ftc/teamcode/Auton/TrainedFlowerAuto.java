@@ -12,6 +12,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.teamcode.Auton.cycles.FrameClearance;
 import org.firstinspires.ftc.teamcode.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.subsystems.Shooter;
+import org.firstinspires.ftc.teamcode.subsystems.FlowerArm;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -25,12 +26,13 @@ public abstract class TrainedFlowerAuto extends OpMode {
     public static double SHOT_BATCH_TIMEOUT_SECONDS=8.0;
     public static double MAX_READY_FEED_SECONDS=2.0;
     public static final double NORMAL_TRAVEL_TOLERANCE_INCHES=3.0;
-    public static final String EXPORT_VERSION="RAMP15_V3_TIMED_PUSH_3IN";
-    private enum State { DRIVE, SHOOT, PUSH, COLLECT, FALLBACK, DONE }
+    public static final String EXPORT_VERSION="RAMP15_V3_TIMED_PUSH_3IN_ARM";
+    private enum State { LOWER_RAMP, DRIVE, SHOOT, PUSH, COLLECT, FALLBACK, DONE }
     private State state=State.DONE;
     private final ElapsedTime clock=new ElapsedTime();
     private final Intake intake=new Intake();
     private final Shooter shooter=new Shooter();
+    private final FlowerArm flowerArm=new FlowerArm();
     private Follower follower;
     private GoBildaPinpointDriver pinpoint;
     private int batchStartShots,batchReleases;
@@ -85,17 +87,24 @@ public abstract class TrainedFlowerAuto extends OpMode {
         limitedDrive=new LimitedDrive(tuned.drivetrain);
         follower=new Follower(tuned.localizer,limitedDrive,tuned.algorithm());
         pinpoint=hardwareMap.get(GoBildaPinpointDriver.class,"pinpoint");
-        intake.init(hardwareMap);shooter.init(hardwareMap,intake);ready=true;
+        intake.init(hardwareMap);shooter.init(hardwareMap,intake);
+        flowerArm.init(hardwareMap,true);ready=true;
         Pose start=transform(-13.606197,-61.569252,Math.PI/2);
         follower.setPose(start);follower.update();shooter.stop();intake.stop();
         telemetry.addLine("Load FOUR pollen. Both own-side flower pots must contain four pollen.");
         telemetry.addData("Start visualizer inches","%.4f, %.4f",start.x()+70.75,start.y()+70.75);
         telemetry.addData("Heading degrees",Math.toDegrees(start.heading()));
+        telemetry.addData("Flower arm",flowerArm.getStatus());
+        telemetry.addLine("START lowers the ramp to touchDown before driving.");
         telemetry.addLine(EXPORT_VERSION+": ramp tip 15 inches from center; quarter-inch wall gap.");telemetry.update();
     }
     @Override public void start(){
         clock.reset();leg=totalReleases=batches=0;emergencyPot=-1;parkingReason="None";
-        shooter.resetShotCount();shooter.spinUp();driveLeg();
+        follower.stop();follower.drivetrain.stop();
+        if(!flowerArm.isAvailable()){finish("Flower arm unavailable: "+flowerArm.getStatus());return;}
+        shooter.resetShotCount();shooter.spinUp();
+        state=State.LOWER_RAMP;result="Lowering ramp to touchDown";
+        flowerArm.down();flowerArm.update();report();
     }
     private int contactPot(){
         if(emergencyPot>=0)return emergencyPot;
@@ -154,6 +163,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
         double startTolerance=leg==3||leg==9?1.1:NORMAL_TRAVEL_TOLERANCE_INCHES+.1;
         if(!retreat&&Math.hypot(from.x()-expected.x(),from.y()-expected.y())>startTolerance){park("Missed curve start");return;}
         if(leg==3||leg==9){
+            if(!flowerArm.isAtDown()){finish("Flower push blocked: ramp is not down");return;}
             if(!Double.isFinite(FLOWER_PUSH_POWER)||FLOWER_PUSH_POWER<=0||FLOWER_PUSH_POWER>.45
                 ||!Double.isFinite(FLOWER_PUSH_SECONDS)||FLOWER_PUSH_SECONDS<=0||FLOWER_PUSH_SECONDS>2){
                 finish("Invalid flower push power/time");return;
@@ -223,7 +233,13 @@ public abstract class TrainedFlowerAuto extends OpMode {
     }
     @Override public void loop(){
         if(state==State.DONE)return;
+        flowerArm.update();
+        if(flowerArm.isFaulted()){finish("Flower arm fault: "+flowerArm.getStatus());return;}
         double now=clock.seconds();if(now>=29.7){finish("Autonomous deadline");return;}
+        if(state==State.LOWER_RAMP){
+            if(flowerArm.isAtDown()){result="Ramp down; starting route";driveLeg();}
+            report();return;
+        }
         limitedDrive.cap=state==State.PUSH?FLOWER_PUSH_POWER:1;
         follower.update();
         if(pinpoint.getDeviceStatus()!=GoBildaPinpointDriver.DeviceStatus.READY||!clear(follower.pose())){finish("Pose / clearance interlock");return;}
@@ -285,6 +301,8 @@ public abstract class TrainedFlowerAuto extends OpMode {
         telemetry.addData("Last batch completion",lastBatchMode);telemetry.addData("Ready feed seconds",readyFeedSeconds);telemetry.addData("Auto stage",state);telemetry.addData("Curve",leg+1);
         telemetry.addData("Auto result",result);telemetry.addData("Parking reason",parkingReason);
         telemetry.addData("Target errors",targetErrors());
+        telemetry.addData("Flower arm",flowerArm.getStatus());
+        telemetry.addData("Ramp switches",flowerArm.switchText());
         telemetry.addData("Flower push power / seconds","%.2f / %.2f",FLOWER_PUSH_POWER,FLOWER_PUSH_SECONDS);
         telemetry.addData("Elapsed (s)",clock.seconds());telemetry.addData("Completed shot batches",batches);
         telemetry.addData("Estimated releases",totalReleases+(state==State.SHOOT?batchReleases:0));
@@ -293,6 +311,7 @@ public abstract class TrainedFlowerAuto extends OpMode {
     }
     private void finish(String why){if(!"Parked".equals(why)&&follower!=null)abortDetails="curve="+(leg+1)+", pose="+follower.pose()+", feed="+readyFeedSeconds+", velocity="+shooter.getCurrentSpeed();result=why;state=State.DONE;stop();report();}
     @Override public void stop(){
+        flowerArm.stop();
         if(follower!=null){follower.stop();follower.drivetrain.stop();}
         if(ready){shooter.stop();intake.stop();}
     }
